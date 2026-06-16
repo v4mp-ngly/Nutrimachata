@@ -1287,22 +1287,10 @@ function mapPaciente(p, evals, dietas, hc) {
     dietas: dietas.map(d => {
       let weekPlan = {};
       try {
-        // week_plan is jsonb → Supabase returns it already parsed as object
-        // Fallback: if somehow stored as string, parse it
         weekPlan = typeof d.week_plan === 'string'
           ? JSON.parse(d.week_plan)
           : (d.week_plan && typeof d.week_plan === 'object' ? d.week_plan : {});
       } catch(e) { weekPlan = {}; }
-      return {
-        id: d.id,
-        nombre: d.nombre,
-        fecha: d.fecha,
-        calorias: d.calorias || 0,
-        tipo: d.tipo || 'Semanal',
-        weekPlan,
-        indicaciones: d.indicaciones || '',
-      };
-    }),
       return {
         id: d.id,
         nombre: d.nombre,
@@ -3374,34 +3362,47 @@ function printHistoriaClinica(patientId) {
     NutriMachata · Dra. María Alejandra Chalas · ${new Date().toLocaleDateString('es-VE')}
   </div>
 
-  <div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-    <button id="dl-btn" onclick="downloadAsPDF(window._pdfFilename)" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.2)">⬇ Descargar PDF</button>
-  </div>
-  <scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></scr'+'ipt>
-<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></scr'+'ipt>
+<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
+  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
+</div>
 <scr'+'ipt>
-async function downloadAsPDF(filename) {
-  const btn = document.getElementById("dl-btn");
-  if (btn) { btn.textContent = "Generando..."; btn.disabled = true; }
-  try {
-    const { jsPDF } = window.jspdf;
-    const el = document.querySelector(".page") || document.body;
-    if (btn) btn.style.visibility = "hidden";
-    await document.fonts.ready;
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
-    if (btn) btn.style.visibility = "visible";
-    const W = canvas.width / 2, H = canvas.height / 2;
-    const pdf = new jsPDF({ orientation: W > H ? "l" : "p", unit: "px", format: [W, H] });
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
-    pdf.save(filename);
-  } catch(e) {
-    console.error(e);
-    alert("Error al generar PDF");
-  } finally {
-    if (btn) { btn.textContent = "\u2B07 Descargar PDF"; btn.disabled = false; btn.style.visibility = "visible"; }
+(function() {
+  var fn = window._pdfFilename || window._fn || 'documento.pdf';
+  function loadScript(src, cb) {
+    var s = document.createElement('script'); s.src = src;
+    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
   }
-}
-window.addEventListener("load", () => setTimeout(() => downloadAsPDF(window._pdfFilename || "documento.pdf"), 700));
+  function go() {
+    var btn = document.getElementById('dl-btn');
+    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+    var el = document.querySelector('.page') || document.body;
+    if (btn) btn.style.visibility = 'hidden';
+    document.fonts.ready.then(function() {
+      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
+        .then(function(c) {
+          if (btn) btn.style.visibility = 'visible';
+          var W = c.width / 2, H = c.height / 2;
+          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
+          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
+          pdf.save(fn);
+        })
+        .catch(function(e) { console.error(e); })
+        .finally(function() {
+          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
+        });
+    });
+  }
+  window._pdfGo = go;
+  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
+      setTimeout(go, 400);
+    });
+  });
+  document.getElementById('dl-btn').addEventListener('click', function() {
+    if (window.html2canvas && window.jspdf) { go(); }
+    else { setTimeout(go, 800); }
+  });
+})();
 </scr'+'ipt>
 </body></html>`);
   win._pdfFilename = `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -4445,29 +4446,46 @@ ${dietas.length ? `<h2>Planes nutricionales</h2>${dietas.map(d=>`<div class="die
 <div class="footer"><span><strong>${clinicName}</strong> · ${doctorName}</span><span>Generado el ${today}</span></div>
 </div>
 <div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" onclick="go(window._fn||'Expediente.pdf')" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">⬇ Descargar PDF</button>
+  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
 </div>
-<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></scr'+'ipt>
-<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></scr'+'ipt>
 <scr'+'ipt>
-async function go(fn){
-  const btn=document.getElementById('dl-btn');
-  if(btn){btn.textContent='Generando...';btn.disabled=true;btn.style.opacity='0.7';}
-  try{
-    await document.fonts.ready;
-    const {jsPDF}=window.jspdf;
-    const el=document.querySelector('.page')||document.body;
-    if(btn)btn.style.visibility='hidden';
-    const c=await html2canvas(el,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',logging:false});
-    if(btn)btn.style.visibility='visible';
-    const W=c.width/2,H=c.height/2;
-    const pdf=new jsPDF({orientation:W>H?'l':'p',unit:'px',format:[W,H],hotfixes:['px_scaling']});
-    pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,H);
-    pdf.save(fn);
-  }catch(e){console.error(e);}
-  finally{if(btn){btn.textContent='⬇ Descargar PDF';btn.disabled=false;btn.style.opacity='1';btn.style.visibility='visible';}}
-}
-window.addEventListener('load',()=>setTimeout(()=>go(window._fn||'Expediente.pdf'),500));
+(function() {
+  var fn = window._pdfFilename || window._fn || 'documento.pdf';
+  function loadScript(src, cb) {
+    var s = document.createElement('script'); s.src = src;
+    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
+  }
+  function go() {
+    var btn = document.getElementById('dl-btn');
+    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+    var el = document.querySelector('.page') || document.body;
+    if (btn) btn.style.visibility = 'hidden';
+    document.fonts.ready.then(function() {
+      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
+        .then(function(c) {
+          if (btn) btn.style.visibility = 'visible';
+          var W = c.width / 2, H = c.height / 2;
+          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
+          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
+          pdf.save(fn);
+        })
+        .catch(function(e) { console.error(e); })
+        .finally(function() {
+          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
+        });
+    });
+  }
+  window._pdfGo = go;
+  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
+      setTimeout(go, 400);
+    });
+  });
+  document.getElementById('dl-btn').addEventListener('click', function() {
+    if (window.html2canvas && window.jspdf) { go(); }
+    else { setTimeout(go, 800); }
+  });
+})();
 </scr'+'ipt>
 </body></html>`);
   win._fn = `Expediente_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -4833,34 +4851,48 @@ ${d.indicaciones?`<div class="indicaciones"><div class="ind-title">📋 Indicaci
 </div>
 
 </div>
-  <div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-    <button id="dl-btn" onclick="downloadAsPDF(window._pdfFilename||'documento.pdf')" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">⬇ Descargar PDF</button>
-  </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></scr'+'ipt>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></scr'+'ipt>
-  <scr'+'ipt>
-  async function downloadAsPDF(filename) {
-    const btn = document.getElementById("dl-btn");
-    if (btn) { btn.textContent = "Generando..."; btn.disabled = true; btn.style.opacity = "0.7"; }
-    try {
-      await document.fonts.ready;
-      const { jsPDF } = window.jspdf;
-      const el = document.querySelector(".page") || document.body;
-      if (btn) btn.style.visibility = "hidden";
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
-      if (btn) btn.style.visibility = "visible";
-      const W = canvas.width / 2, H = canvas.height / 2;
-      const orient = W > H ? "l" : "p";
-      const pdf = new jsPDF({ orientation: orient, unit: "px", format: [W, H], hotfixes: ["px_scaling"] });
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
-      pdf.save(filename);
-    } catch(e) {
-      console.error(e);
-      if (btn) { btn.textContent = "⬇ Descargar PDF"; btn.disabled = false; btn.style.opacity = "1"; }
-    }
+<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
+  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
+</div>
+<scr'+'ipt>
+(function() {
+  var fn = window._pdfFilename || window._fn || 'documento.pdf';
+  function loadScript(src, cb) {
+    var s = document.createElement('script'); s.src = src;
+    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
   }
-  window.addEventListener("load", () => setTimeout(() => downloadAsPDF(window._pdfFilename || "documento.pdf"), 700));
-  </scr'+'ipt>
+  function go() {
+    var btn = document.getElementById('dl-btn');
+    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+    var el = document.querySelector('.page') || document.body;
+    if (btn) btn.style.visibility = 'hidden';
+    document.fonts.ready.then(function() {
+      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
+        .then(function(c) {
+          if (btn) btn.style.visibility = 'visible';
+          var W = c.width / 2, H = c.height / 2;
+          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
+          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
+          pdf.save(fn);
+        })
+        .catch(function(e) { console.error(e); })
+        .finally(function() {
+          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
+        });
+    });
+  }
+  window._pdfGo = go;
+  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
+      setTimeout(go, 400);
+    });
+  });
+  document.getElementById('dl-btn').addEventListener('click', function() {
+    if (window.html2canvas && window.jspdf) { go(); }
+    else { setTimeout(go, 800); }
+  });
+})();
+</scr'+'ipt>
 </body></html>`);
   win._pdfFilename = `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
   win.document.close();
@@ -5631,29 +5663,46 @@ body{font-family:'DM Sans',sans-serif;background:white;color:#1a1a1a;font-size:1
 ${bodyHTML}
 </div>
 <div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" onclick="go(window._fn||'Reporte.pdf')" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">⬇ Descargar PDF</button>
+  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
 </div>
-<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></scr'+'ipt>
-<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></scr'+'ipt>
 <scr'+'ipt>
-async function go(fn){
-  const btn=document.getElementById('dl-btn');
-  if(btn){btn.textContent='Generando...';btn.disabled=true;btn.style.opacity='0.7';}
-  try{
-    await document.fonts.ready;
-    const {jsPDF}=window.jspdf;
-    const el=document.querySelector('.page')||document.body;
-    if(btn)btn.style.visibility='hidden';
-    const c=await html2canvas(el,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',logging:false});
-    if(btn)btn.style.visibility='visible';
-    const W=c.width/2,H=c.height/2;
-    const pdf=new jsPDF({orientation:W>H?'l':'p',unit:'px',format:[W,H],hotfixes:['px_scaling']});
-    pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,H);
-    pdf.save(fn);
-  }catch(e){console.error(e);}
-  finally{if(btn){btn.textContent='⬇ Descargar PDF';btn.disabled=false;btn.style.opacity='1';btn.style.visibility='visible';}}
-}
-window.addEventListener('load',()=>setTimeout(()=>go(window._fn||'Reporte.pdf'),500));
+(function() {
+  var fn = window._pdfFilename || window._fn || 'documento.pdf';
+  function loadScript(src, cb) {
+    var s = document.createElement('script'); s.src = src;
+    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
+  }
+  function go() {
+    var btn = document.getElementById('dl-btn');
+    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+    var el = document.querySelector('.page') || document.body;
+    if (btn) btn.style.visibility = 'hidden';
+    document.fonts.ready.then(function() {
+      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
+        .then(function(c) {
+          if (btn) btn.style.visibility = 'visible';
+          var W = c.width / 2, H = c.height / 2;
+          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
+          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
+          pdf.save(fn);
+        })
+        .catch(function(e) { console.error(e); })
+        .finally(function() {
+          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
+        });
+    });
+  }
+  window._pdfGo = go;
+  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
+      setTimeout(go, 400);
+    });
+  });
+  document.getElementById('dl-btn').addEventListener('click', function() {
+    if (window.html2canvas && window.jspdf) { go(); }
+    else { setTimeout(go, 800); }
+  });
+})();
 </scr'+'ipt>
 </body></html>`);
   win._fn = 'ReporteClinico.pdf';
