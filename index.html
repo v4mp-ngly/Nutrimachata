@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="mobile-web-app-capable" content="yes">
@@ -44,7 +44,7 @@
     --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
   * { -webkit-box-sizing: border-box; box-sizing: border-box; }
   input, select, textarea, button { font-family: inherit; -webkit-appearance: none; appearance: none; }
@@ -296,7 +296,7 @@
   .form-control:focus, .form-select:focus, .form-textarea:focus { border-color: var(--olive); }
   .form-textarea { resize: vertical; min-height: 80px; }
   .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
-  .checkbox-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1.5px solid var(--gray-200); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all 0.15s; user-select: none; }
+  .checkbox-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1.5px solid var(--gray-200); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all 0.15s; -webkit-user-select: none; user-select: none; }
   .checkbox-pill input { display: none; }
   .checkbox-pill:has(input:checked) { background: var(--beige); border-color: var(--olive); color: var(--olive-dark); font-weight: 500; }
   .checkbox-pill.checked { background: var(--beige); border-color: var(--olive); color: var(--olive-dark); font-weight: 500; }
@@ -2788,7 +2788,7 @@ function getWizHTML(step) {
           <div style="display:flex;flex-direction:column;gap:10px">
             ${['Alcohol','Tabaco','Café','Ninguno'].map(h=>`
             <label onclick="this.classList.toggle('habit-active',this.querySelector('input').checked===false);this.querySelector('input').checked=!this.querySelector('input').checked;this.classList.toggle('habit-active',this.querySelector('input').checked)"
-              style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:var(--radius);cursor:pointer;font-size:14px;transition:all 0.15s;user-select:none" 
+              style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:var(--radius);cursor:pointer;font-size:14px;transition:all 0.15s;-webkit-user-select:none;user-select:none" 
               class="${chk('habitos',h)?'habit-active':''}">
               <span style="width:20px;height:20px;border:2px solid var(--gray-300);border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s" class="hab-chk">${chk('habitos',h)?'✓':''}</span>
               <input type="checkbox" name="wf-habitos" value="${h}" ${chk('habitos',h)} style="display:none"> ${h}
@@ -3229,185 +3229,613 @@ async function finishWizard() {
     `;
 }
 
-function printHistoriaClinica(patientId) {
-  const p = DB.patients.find(x=>x.id==patientId);
-  if (!p) return;
-  const hc = p.historiaClinica || {};
-  const logoEl = document.getElementById('sidebar-logo-img');
-  const logoSrc = logoEl ? (logoEl.src || '') : '';
-  const yesno = (v) => v==='si'?'<span style="font-weight:600">☑ Sí</span> / ☐ No':'☐ Sí / <span style="font-weight:600">☑ No</span>';
-  const checkList = (arr, items) => items.map(i=>`<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 8px 3px 0;font-size:12px">${(arr||[]).includes(i)?'☑':'☐'} ${i}</span>`).join('');
+// === PDF FUNCTIONS REPLACEMENT ===
 
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Historia Clínica - ${p.nombre}</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'DM Sans',sans-serif;font-size:11px;color:#1a1a1a;padding:20px 24px;background:white}
-  .logo-header{text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #5E8C2A}
-  .logo-header img{height:60px;object-fit:contain}
-  .page-title{font-size:14px;font-weight:700;letter-spacing:3px;color:#3F5A00;text-transform:uppercase;margin-top:6px}
-  .section-header{background:#5E8C2A;color:white;font-weight:700;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 12px;margin:14px 0 8px;border-radius:3px}
-  .field-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;flex-wrap:wrap}
-  .field-label{font-size:11px;color:#333;white-space:nowrap}
-  .field-line{flex:1;border-bottom:1px solid #aaa;min-width:80px;padding-bottom:1px;font-size:11px;color:#1a1a1a;min-height:16px}
-  .field-line.long{min-width:200px}
-  .checkbox-grid{display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0}
-  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .q-row{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;font-size:11px;border-bottom:1px solid #f0f0f0}
-  .q-row:nth-child(even){background:#fafaf8}
-  .rec-label{font-size:11px;font-weight:600;color:#5E8C2A;margin-bottom:4px}
-  .rec-box{border:1px solid #ddd;border-radius:3px;padding:6px;min-height:36px;font-size:11px;color:#333;margin-bottom:8px}
-  @media print{body{padding:8px 12px}@page{size:A4 portrait;margin:10mm}}
-</style></head><body>
-  <div class="logo-header">
-    ${logoSrc?`<img src="${logoSrc}" alt="Logo">`:'<div style="font-size:20px;font-weight:700;color:#3F5A00">NutriMachata</div>'}
-    <div class="page-title">Historia Clínica</div>
-  </div>
-
-  <div class="section-header">Datos Generales</div>
-  <div class="field-row"><span class="field-label">Nombre:</span><span class="field-line long">${p.nombre}</span></div>
-  <div class="field-row">
-    <span class="field-label">Cédula:</span><span class="field-line">${p.cedula||''}</span>
-    <span class="field-label">Fecha de nacimiento:</span><span class="field-line">${p.dob||''}</span>
-  </div>
-  <div class="field-row">
-    <span class="field-label">Teléfono:</span><span class="field-line">${p.telefono}</span>
-    <span class="field-label">Edad:</span><span class="field-line" style="max-width:50px">${p.edad}</span>
-  </div>
-  <div class="field-row"><span class="field-label">Dirección:</span><span class="field-line long">${p.direccion||''}</span></div>
-  <div class="field-row"><span class="field-label">Género:</span>
-    <span>${p.sexo==='M'?'<b>☑ Masculino</b> / ☐ Femenino':'☐ Masculino / <b>☑ Femenino</b>'}</span>
-  </div>
-
-  <div style="margin-top:8px"><span class="field-label"><b>Motivo de consulta:</b></span>
-    <div class="field-line" style="width:100%;margin-top:2px">${hc.motivo||''}</div>
-  </div>
-  <div style="margin-top:6px"><span class="field-label"><b>¿Qué espera lograr?</b></span>
-    <div class="field-line" style="width:100%;margin-top:2px">${hc.objetivo||p.objetivo||''}</div>
-  </div>
-  <div style="margin-top:6px" class="field-row">
-    <span class="field-label"><b>¿En cuánto tiempo?</b></span><span class="field-line">${hc.plazo||''}</span>
-  </div>
-
-  <div class="section-header">Antecedentes Personales</div>
-  <div class="checkbox-grid">${checkList(hc.antecedentes,['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad'])}</div>
-  <div class="field-row"><span class="field-label">Otros:</span><span class="field-line">${hc.antecOtros||''}</span></div>
-
-  <div class="section-header">Medicamentos y Suplementos Actuales</div>
-  <div class="rec-box">${hc.medicamentos||''}</div>
-  <div class="field-row"><span class="field-label">¿Es intolerante o alérgico?</span>
-    <span>${hc.tieneAlergias==='si'?'<b>☑ Sí</b> / ☐ No':'☐ Sí / <b>☑ No</b>'}</span>
-  </div>
-  <div class="field-row"><span class="field-label">En caso afirmativo:</span><span class="field-line long">${hc.alergias||''}</span></div>
-
-  <div class="section-header">Antecedentes Familiares</div>
-  <div class="checkbox-grid">${checkList(hc.antecFam,['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular'])}</div>
-  <div class="field-row"><span class="field-label">Otros:</span><span class="field-line">${hc.antecFamOtros||''}</span></div>
-
-  <div class="section-header">¿Ha Tenido Alguno de Estos Síntomas Recientemente?</div>
-  <div class="checkbox-grid">${checkList(hc.sintomas,['Náuseas','Vómitos','Distensión','Estreñimiento','Diarrea'])}</div>
-  <div class="field-row"><span class="field-label">Alteraciones metabólicas:</span><span class="field-line">${hc.metabolicas||''}</span></div>
-
-  <div class="two-col" style="margin-top:12px">
-    <div>
-      <div class="section-header" style="margin-top:0">Estilo de Vida y Actividad Física</div>
-      <div style="margin-bottom:6px"><span class="field-label">Nivel de actividad:</span>
-        <span style="font-size:11px"> ${['Sedentario','Ligero','Moderado','Intenso'].map(n=>`${hc.actividad===n?'<b>'+n+'</b>':n}`).join(' / ')}</span>
-      </div>
-      <div class="field-row"><span class="field-label">Tipo de ejercicio:</span><span class="field-line">${hc.ejercicio||''}</span></div>
-      <div class="field-row"><span class="field-label">Frecuencia/semana:</span><span class="field-line">${hc.frecuencia||''}</span></div>
-      <div class="field-row"><span class="field-label">Horas de sueño:</span><span class="field-line" style="max-width:50px">${hc.sueno||''}</span></div>
-      <div style="margin-top:6px"><span class="field-label">Estrés:</span>
-        <span style="font-size:11px"> ${['Bajo','Medio','Alto'].map(n=>`${hc.estres===n?'<b>'+n+'</b>':n}`).join(' / ')}</span>
-      </div>
-    </div>
-    <div>
-      <div class="section-header" style="margin-top:0">Hábitos Tóxicos</div>
-      <div class="checkbox-grid" style="flex-direction:column;gap:6px">
-        ${['Alcohol','Tabaco','Café','Ninguno'].map(h=>`<span style="font-size:12px">${(hc.habitos||[]).includes(h)?'☑':'☐'} ${h}</span>`).join('')}
-        ${hc.habitosOtros?`<span style="font-size:11px">Otros: ${hc.habitosOtros}</span>`:''}
-      </div>
-    </div>
-  </div>
-
-  <div class="section-header">Cuestionario Rápido de Conducta Alimentaria</div>
-  ${[['comeEstres','¿Come más cuando está estresado o ansioso?'],['comeAburrido','¿Come por aburrimiento o emociones?'],['comeEmociones','¿Come por emociones?'],['hambreEmocional','¿Dificultad para identificar hambre real/emocional?'],['comeRapido','¿Tiende a comer rápido?'],['comeLleno','¿Come hasta sentirse demasiado lleno?'],['culpaComer','¿Siente culpa/ansiedad después de comer?'],['culpaExceso','¿Siente culpa después de comer en exceso?'],['dietasRepetidas','¿Ha realizado dietas repetidamente?'],['horariosRegulares','¿Tiene horarios de comida regulares?']].map(([k,q])=>`
-  <div class="q-row"><span>${q}</span><span>${hc[k]==='si'?'<b>☑ Sí</b> / ☐ No':hc[k]==='no'?'☐ Sí / <b>☑ No</b>':'☐ Sí / ☐ No'}</span></div>`).join('')}
-  <div style="margin-top:8px" class="field-row"><span class="field-label">Comidas fuera de casa:</span>
-    <span>${['Nunca','1-2 veces/semana','Más de 3 veces/semana'].map(n=>`${hc.comidasFuera===n?'<b>'+n+'</b>':n}`).join(' / ')}</span>
-  </div>
-
-  <div class="section-header">Escriba los Alimentos que No Consume</div>
-  <div class="rec-box" style="min-height:50px">${hc.noConsume||''}</div>
-
-  <div class="section-header">Recordatorio de 24 Horas</div>
-  ${[['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>','Desayuno','rec24Desayuno'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1H8V6a4 4 0 0 1 4-4z"/><path d="M8 7c-3.5 1-5 4-5 7a9 9 0 0 0 9 9 9 9 0 0 0 9-9c0-3-1.5-6-5-7"/></svg>','Media Mañana','rec24Mañana'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>','Almuerzo','rec24Almuerzo'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/></svg>','Merienda','rec24Merienda'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>','Cena','rec24Cena'],['🍿','Snacks / Extras','rec24Snacks']].map(([icon,label,key])=>`
-  <div class="rec-label">${icon} ${label}:</div>
-  <div class="rec-box">${hc[key]||''}</div>`).join('')}
-
-  <div class="section-header">Evaluación Antropométrica</div>
-  <div class="field-row">
-    <span class="field-label">Peso:</span><span class="field-line" style="max-width:80px">${p.peso} kg</span>
-    <span class="field-label">Talla:</span><span class="field-line" style="max-width:80px">${p.talla} m</span>
-    <span class="field-label">IMC:</span><span class="field-line" style="max-width:80px;font-weight:700;color:#3F5A00">${(p.imc||0).toFixed(2)}</span>
-    <span class="field-label">P.A.:</span><span class="field-line" style="max-width:80px">${p.presion}</span>
-  </div>
-  <div style="margin-top:6px"><span class="field-label"><b>Observaciones:</b></span>
-    <div class="field-line" style="width:100%;margin-top:2px">${hc.obsConsulta||''}</div>
-  </div>
-
-  <div style="margin-top:24px;text-align:center;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px">
-    NutriMachata · Dra. María Alejandra Chalas · ${new Date().toLocaleDateString('es-VE')}
-  </div>
-
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._pdfFilename = `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  win.document.close();
+function _getPrintCSS() {
+  return '<meta charset="UTF-8">'
+    + '<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">'
+    + '<style>'
+    + ':root{'
+    + '--olive:#5E8C2A;--olive-dark:#3F5A00;--olive-pale:#D4E8B0;--beige:#F5F2EB;'
+    + '--black:#1A1A1A;--gray-400:#A8A59D;--gray-500:#7A786F;--gray-700:#3D3C38;'
+    + '--radius:10px;--radius-lg:16px;'
+    + '}'
+    + '*{margin:0;padding:0;box-sizing:border-box}'
+    + 'html,body{font-family:\'DM Sans\',sans-serif;font-size:11px;color:#1a1a1a;background:white;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + '.page{max-width:190mm;margin:0 auto;padding:10mm 12mm}'
+    + 'h2{font-family:\'Playfair Display\',serif;font-size:13px;font-weight:500;color:#3F5A00;border-bottom:1.5px solid #C8DFA0;padding-bottom:4px;margin:12px 0 7px}'
+    + '.hdr{background:#3F5A00;color:white;border-radius:7px;padding:11px 15px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}'
+    + '.hdr-left{display:flex;align-items:center;gap:10px}'
+    + '.hdr img{height:44px;width:auto;object-fit:contain}'
+    + '.clinic{font-family:\'Playfair Display\',serif;font-size:17px;font-weight:500}'
+    + '.hdr-right{font-size:9px;text-align:right;opacity:0.8;line-height:1.8}'
+    + '.pat-hero{background:#EAF3D8;border-radius:6px;padding:9px 13px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:center;border-left:4px solid #5E8C2A}'
+    + '.pat-name{font-family:\'Playfair Display\',serif;font-size:15px;color:#3F5A00;margin-bottom:2px}'
+    + '.pat-sub{font-size:9px;color:#666}'
+    + '.kpis{display:flex;gap:8px}'
+    + '.kpi{background:white;border-radius:4px;padding:6px 10px;text-align:center;border:1px solid #C8DFA0}'
+    + '.kv{font-family:\'DM Mono\',monospace;font-size:14px;font-weight:600;color:#3F5A00}'
+    + '.kl{font-size:8px;color:#888;text-transform:uppercase;letter-spacing:0.4px}'
+    + '.ig,.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}'
+    + '.ig label,.info-item label{font-size:8px;font-weight:700;color:#8AB550;text-transform:uppercase;letter-spacing:0.7px;display:block;margin-bottom:2px}'
+    + '.ig span,.info-item span,.info-item .font-mono{font-size:11px;color:#1a1a1a;display:block}'
+    + '.mb-4{margin-bottom:16px}'
+    + '.font-mono{font-family:\'DM Mono\',monospace;font-weight:500}'
+    + '.text-muted{color:#888}'
+    + '.text-sm{font-size:11px}'
+    + '.patient-avatar{display:flex;align-items:center;justify-content:center;color:white;font-weight:600;border-radius:50%}'
+    + '.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600}'
+    + '.badge-warning{background:rgba(196,122,26,0.15);color:#C47A1A}'
+    + '.badge-success{background:rgba(45,122,74,0.15);color:#2D7A4A}'
+    + '.badge-info{background:rgba(42,106,140,0.15);color:#2A6A8C}'
+    + '.badge-danger{background:rgba(196,74,42,0.15);color:#C44A2A}'
+    + '.badge-neutral{background:rgba(90,88,82,0.12);color:#5A5852}'
+    + '.badge-olive{background:rgba(94,140,42,0.15);color:#5E8C2A}'
+    + '.btn{border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif}'
+    + '.btn-olive{background:#3F5A00;color:white}'
+    + '.sec{background:#5E8C2A;color:white;border-radius:3px;font-weight:700;font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;padding:5px 9px;margin:12px 0 7px}'
+    + '.chk-grid{display:flex;flex-wrap:wrap;gap:3px 10px;margin:5px 0}'
+    + '.chk{font-size:10px}'
+    + '.fl{display:flex;align-items:flex-end;gap:5px;margin-bottom:5px;flex-wrap:wrap}'
+    + '.fl-lbl{font-size:9.5px;color:#444;white-space:nowrap;font-weight:500}'
+    + '.fl-val{flex:1;border-bottom:1px solid #bbb;min-width:50px;font-size:10px;min-height:13px;padding-bottom:1px}'
+    + '.tb{border:1px solid #ddd;border-radius:3px;padding:5px 7px;min-height:26px;font-size:10px;color:#333;margin-bottom:7px;white-space:pre-wrap;background:#fafaf8}'
+    + '.qrow{display:flex;justify-content:space-between;padding:4px 7px;font-size:10px;border-bottom:1px solid #f0f0f0}'
+    + '.qrow:nth-child(even){background:#fafaf8}'
+    + '.ft{border-top:1px solid #C8DFA0;padding:5px 10px;display:flex;justify-content:space-between;font-size:8px;color:#999;margin-top:12px}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:9px;font-size:10px}'
+    + 'thead th{background:#3F5A00;color:white;padding:5px 6px;font-size:8px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase}'
+    + 'tbody td{padding:4px 6px;border-bottom:1px solid #EAF3D8}'
+    + 'tbody tr:nth-child(even) td{background:#F5FAF0}'
+    + '.mtd-l{font-weight:700;color:#3F5A00;font-size:9px;background:#EAF3D8;width:80px;border-right:2px solid #5E8C2A;vertical-align:middle;padding:7px 5px}'
+    + '.mtd{padding:6px 7px;font-size:10px;vertical-align:top;line-height:1.55;border-right:1px solid #EAF3D8;color:#222}'
+    + '.sig{margin-top:14px;text-align:right}'
+    + '.sig-line{border-bottom:1px solid #aaa;width:155px;margin:0 0 3px auto}'
+    + '.sig-lbl{font-size:8px;color:#888;width:155px;margin-left:auto;text-align:center}'
+    + '.ind-box{background:#EAF3D8;border-left:3px solid #5E8C2A;border-radius:0 4px 4px 0;padding:6px 10px;margin-bottom:9px}'
+    + '.pdf-bar{position:fixed;top:0;left:0;right:0;background:#1a1a1a;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:99999;font-family:sans-serif;font-size:13px;gap:12px}'
+    + '.pdf-bar-tip{opacity:0.75;font-size:11px}'
+    + '.pdf-save-btn{background:#3F5A00;color:white;border:none;border-radius:6px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pdf-save-btn:hover{background:#5E8C2A}'
+    + '@media print{'
+    + 'html,body{width:210mm}'
+    + '@page{size:A4 portrait;margin:0}'
+    + '.pdf-bar{display:none!important}'
+    + '.page{padding:6mm 8mm;margin-top:0!important}'
+    + '}'
+    + '</style>';
 }
+
+
+// ── Carga dinámica de scripts externos ──────────────────────
+function _loadScript(src, cb) {
+  if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = src;
+  s.onload = cb;
+  s.onerror = function() { console.error('No se pudo cargar: ' + src); cb(); };
+  document.head.appendChild(s);
+}
+
+// ── Descarga el HTML como PDF usando html2canvas + jsPDF ────
+// Construye el HTML, lo renderiza en un iframe oculto,
+// captura con html2canvas y genera el PDF sin diálogos.
+function _downloadAsPDF(bodyHTML, filename, docTitle) {
+  var btn = document.querySelector('[data-pdf-loading]');
+  if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; }
+
+  var logoEl  = document.getElementById('sidebar-logo-img');
+  var logoSrc = logoEl ? (logoEl.src || '') : '';
+  var logoHTML = logoSrc
+    ? '<img src="' + logoSrc + '" style="height:42px;width:auto;object-fit:contain" alt="Logo">'
+    : '<div style="width:38px;height:38px;background:rgba(255,255,255,0.2);border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;font-weight:800">N</div>';
+  var s      = DB.settings || {};
+  var doctor = s.doctorName || 'Dra. Mar\u00eda Alejandra Chalas';
+  var clinic = s.clinicName || 'NutriMachata';
+  var today  = new Date().toLocaleDateString('es-DO', {year:'numeric',month:'long',day:'numeric'});
+
+  // Full HTML for the document
+  var fullHTML = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+    + '<title>' + (docTitle||clinic) + '</title>'
+    + _getPrintCSS()
+    + '<style>body{margin:0;background:white}.page{padding:10mm 12mm;max-width:190mm}</style>'
+    + '</head><body><div class="page">'
+    + '<div class="hdr"><div class="hdr-left">' + logoHTML
+    + '<div><div class="clinic">' + clinic + '</div>'
+    + '<div style="font-size:9px;opacity:0.6;margin-top:1px;letter-spacing:1px;text-transform:uppercase">Nutrici\u00f3n Cl\u00ednica</div>'
+    + '</div></div>'
+    + '<div class="hdr-right"><strong>' + doctor + '</strong><br>' + today + '</div></div>'
+    + bodyHTML
+    + '</div></body></html>';
+
+  // Create hidden iframe
+  var iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:794px;height:1123px;border:none;visibility:hidden';
+  document.body.appendChild(iframe);
+
+  iframe.onload = function() {
+    var iDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+    // Load CDNs then capture
+    _loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
+      _loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
+        var targetEl = iDoc.querySelector('.page') || iDoc.body;
+        html2canvas(targetEl, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: 794,
+          windowWidth: 794
+        }).then(function(canvas) {
+          var imgData = canvas.toDataURL('image/jpeg', 0.92);
+          var jsPDF   = window.jspdf.jsPDF;
+          var pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+          var pW      = pdf.internal.pageSize.getWidth();
+          var pH      = pdf.internal.pageSize.getHeight();
+          var ratio   = canvas.width / canvas.height;
+          var imgH    = pW / ratio;
+          var y = 0;
+          // Multi-page support
+          while (y < imgH) {
+            if (y > 0) { pdf.addPage(); }
+            pdf.addImage(imgData, 'JPEG', 0, -y, pW, imgH);
+            y += pH;
+          }
+          pdf.save(filename || 'documento.pdf');
+          document.body.removeChild(iframe);
+          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; delete btn.dataset.pdfLoading; }
+          notify('PDF descargado correctamente', 'success');
+        }).catch(function(err) {
+          console.error('html2canvas error:', err);
+          document.body.removeChild(iframe);
+          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; delete btn.dataset.pdfLoading; }
+          notify('Error al generar el PDF', 'danger');
+        });
+      });
+    });
+  };
+
+  // Write into iframe
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(fullHTML);
+  iframe.contentDocument.close();
+}
+
+// ── Botón de descarga reutilizable ───────────────────────────
+function _setPdfButton(el, bodyHTML, filename, docTitle) {
+  el.dataset.pdfLoading = '1';
+  el.textContent = 'Generando PDF...';
+  el.disabled = true;
+  _downloadAsPDF(bodyHTML, filename, docTitle);
+}
+
+// ── Historia Clínica ──────────────────────────────────────────
+function printHistoriaClinica(patientId) {
+  var p = DB.patients.find(function(x){ return x.id == patientId; });
+  if (!p) return;
+  var hc = p.historiaClinica || {};
+  var s  = DB.settings || {};
+  var doctor = s.doctorName || 'Dra. Mar\u00eda Alejandra Chalas';
+  var clinic  = s.clinicName || 'NutriMachata';
+  var chk = function(arr,val){ return (arr||[]).includes(val) ? '\u2611' : '\u2610'; };
+  var yn  = function(v){
+    return (v==='si'||v===true||v==='true')
+      ? '<strong>\u2611 S\u00ed</strong> / \u2610 No'
+      : (v==='no'||v===false||v==='false')
+        ? '\u2610 S\u00ed / <strong>\u2611 No</strong>'
+        : '\u2610 S\u00ed / \u2610 No';
+  };
+  var fld = function(lbl,val){
+    return '<div class="fl"><span class="fl-lbl">' + lbl + ':</span><span class="fl-val">' + (val||'') + '</span></div>';
+  };
+  var ANTEC_P = ['Hipertensi\u00f3n','Dislipidemia','Enfermedad card\u00edaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresi\u00f3n','Ansiedad'];
+  var ANTEC_F = ['C\u00e1ncer','Diabetes','Hipertensi\u00f3n','Ansiedad','Enfermedad cardiovascular'];
+  var SINT    = ['N\u00e1useas','V\u00f3mitos','Distensi\u00f3n','Estre\u00f1imiento','Diarrea'];
+  var COND    = [
+    ['comeEstres','\u00bfCome m\u00e1s cuando est\u00e1 estresado/ansioso?'],
+    ['comeAburrido','\u00bfCome por aburrimiento, sin hambre real?'],
+    ['hambreEmocional','\u00bfLe cuesta identificar hambre real vs. emocional?'],
+    ['comeRapido','\u00bfTiende a comer r\u00e1pido, sin masticar bien?'],
+    ['comeLleno','\u00bfSuele comer hasta sentirse demasiado lleno?'],
+    ['culpaComer','\u00bfSiente culpa despu\u00e9s de comer en exceso?'],
+    ['dietasRepetidas','\u00bfHa realizado dietas repetidas en el pasado?'],
+    ['horariosRegulares','\u00bfTiene horarios de comida regulares?'],
+  ];
+  var REC = [
+    ['Desayuno','rec24Desayuno'],['Media Ma\u00f1ana','rec24Ma\u00f1ana'],
+    ['Almuerzo','rec24Almuerzo'],['Merienda','rec24Merienda'],
+    ['Cena','rec24Cena'],['Snacks / Extras','rec24Snacks'],
+  ];
+  var body = '<div class="pat-hero"><div>'
+    + '<div class="pat-name">' + p.nombre + '</div>'
+    + '<div class="pat-sub">' + p.edad + ' a\u00f1os \u00b7 ' + (p.sexo==='F'?'Femenino':'Masculino') + (p.cedula?' \u00b7 C.I. '+p.cedula:'') + '</div>'
+    + '</div><div class="kpis">'
+    + '<div class="kpi"><div class="kv">' + p.peso + '</div><div class="kl">kg</div></div>'
+    + '<div class="kpi"><div class="kv">' + (p.imc||0).toFixed(1) + '</div><div class="kl">IMC</div></div>'
+    + '<div class="kpi"><div class="kv">' + p.talla + '</div><div class="kl">m</div></div>'
+    + '</div></div>'
+    + '<div class="sec">Datos Generales</div><div class="ig">'
+    + '<div><label>Nombre</label><span>' + p.nombre + '</span></div>'
+    + '<div><label>C\u00e9dula</label><span>' + (p.cedula||'\u2014') + '</span></div>'
+    + '<div><label>Fecha Nacimiento</label><span>' + (p.dob||hc.dob||'\u2014') + '</span></div>'
+    + '<div><label>Edad</label><span>' + p.edad + ' a\u00f1os</span></div>'
+    + '<div><label>Tel\u00e9fono</label><span>' + (p.telefono||'\u2014') + '</span></div>'
+    + '<div><label>Sexo</label><span>' + (p.sexo==='F'?'Femenino':'Masculino') + '</span></div>'
+    + '</div>' + fld('Direcci\u00f3n', p.direccion||hc.direccion)
+    + '<div class="sec">Motivo de Consulta</div><div class="tb">' + (hc.motivo||'') + '</div>'
+    + fld('\u00bfQu\u00e9 espera lograr?', hc.objetivo||p.objetivo)
+    + fld('\u00bfEn cu\u00e1nto tiempo?', hc.plazo)
+    + '<div class="sec">Antecedentes Personales</div>'
+    + '<div class="chk-grid">' + ANTEC_P.map(function(e){return '<span class="chk">'+chk(hc.antecedentes,e)+' '+e+'</span>';}).join('') + '</div>'
+    + fld('Otros', hc.antecOtros)
+    + '<div class="sec">Antecedentes Familiares</div>'
+    + '<div class="chk-grid">' + ANTEC_F.map(function(e){return '<span class="chk">'+chk(hc.antecFam,e)+' '+e+'</span>';}).join('') + '</div>'
+    + '<div class="sec">Medicamentos y Suplementos</div>'
+    + '<div class="tb">' + (hc.medicamentos||'') + '</div>'
+    + '<div class="fl"><span class="fl-lbl">\u00bfAlergias?</span>&nbsp;' + yn(hc.tieneAlergias) + '</div>'
+    + fld('Detalle alergias', hc.alergias)
+    + '<div class="sec">Alimentos que NO Consume</div><div class="tb">' + (hc.noConsume||'') + '</div>'
+    + '<div class="sec">Estilo de Vida</div><div class="ig">'
+    + '<div><label>Actividad</label><span>' + (hc.actividad||'\u2014') + '</span></div>'
+    + '<div><label>Ejercicio</label><span>' + (hc.ejercicio||'\u2014') + '</span></div>'
+    + '<div><label>Frecuencia/sem</label><span>' + (hc.frecuencia||'\u2014') + '</span></div>'
+    + '<div><label>Horas sue\u00f1o</label><span>' + (hc.sueno||'\u2014') + ' h</span></div>'
+    + '<div><label>Estr\u00e9s</label><span>' + (hc.estres||'\u2014') + '</span></div>'
+    + '<div><label>H\u00e1bitos t\u00f3xicos</label><span>' + ((hc.habitos||[]).join(', ')||'Ninguno') + '</span></div>'
+    + '</div>'
+    + '<div class="sec">S\u00edntomas</div>'
+    + '<div class="chk-grid">' + SINT.map(function(sv){return '<span class="chk">'+chk(hc.sintomas,sv)+' '+sv+'</span>';}).join('') + '</div>'
+    + '<div class="sec">Conducta Alimentaria</div>'
+    + COND.map(function(pair){return '<div class="qrow"><span>'+pair[1]+'</span><span>'+yn(hc[pair[0]])+'</span></div>';}).join('')
+    + fld('Comidas fuera de casa', hc.comidasFuera)
+    + '<div class="sec">Recordatorio 24h</div>'
+    + REC.map(function(t){return '<div style="margin-bottom:5px"><div style="font-size:8px;font-weight:700;color:#5E8C2A;text-transform:uppercase;margin-bottom:2px">'+t[0]+'</div><div class="tb">'+(hc[t[1]]||'')+'</div></div>';}).join('')
+    + '<div class="sec">Antropometr\u00eda</div><div class="ig">'
+    + '<div><label>Peso</label><span style="font-weight:600">' + p.peso + ' kg</span></div>'
+    + '<div><label>Talla</label><span>' + p.talla + ' m</span></div>'
+    + '<div><label>IMC</label><span style="font-weight:700;color:#3F5A00">' + (p.imc||0).toFixed(2) + '</span></div>'
+    + '<div><label>Presi\u00f3n</label><span>' + (p.presion||'\u2014') + '</span></div>'
+    + '</div>'
+    + '<div class="sig"><div class="sig-line"></div><div class="sig-lbl">Firma y Sello \u00b7 ' + doctor + '</div></div>'
+    + '<div class="ft"><span>' + clinic + '</span><span>' + new Date().toLocaleDateString('es-DO') + '</span></div>';
+
+  _downloadAsPDF(body, 'HC_' + p.nombre.replace(/\s+/g,'_') + '.pdf', 'Historia Cl\u00ednica');
+}
+
+// ── Plan Nutricional ─────────────────────────────────────────
+function printDiet(patientId, dietId) {
+  var p = DB.patients.find(function(x){ return x.id == patientId; });
+  if (!p) return;
+  var d = (p.dietas||[]).find(function(x){ return x.id == dietId; });
+  if (!d) return;
+  var s       = DB.settings || {};
+  var doctor  = s.doctorName || 'Dra. Mar\u00eda Alejandra Chalas';
+  var clinic  = s.clinicName || 'NutriMachata';
+  var weekPlan  = d.weekPlan || {};
+  var DIAS_P    = ['Lunes','Martes','Mi\u00e9rcoles','Jueves','Viernes','S\u00e1bado','Domingo'];
+  var COMIDAS_P = ['Desayuno','Media ma\u00f1ana','Almuerzo','Merienda','Cena'];
+  var ICONS_P   = {'Desayuno':'\u2600\ufe0f','Media ma\u00f1ana':'\uD83C\uDF4E','Almuerzo':'\uD83C\uDF3F','Merienda':'\uD83E\uDED0','Cena':'\uD83C\uDF19'};
+  var activeDays = DIAS_P.filter(function(dia){
+    return COMIDAS_P.some(function(c){ var cell=(weekPlan[c]||{})[dia]; return cell && cell.trim(); });
+  });
+  var useDays = activeDays.length > 0 ? activeDays : DIAS_P;
+  var rows = COMIDAS_P.map(function(comida){
+    return '<tr><td class="mtd-l">' + (ICONS_P[comida]||'') + '<br>' + comida + '</td>'
+      + useDays.map(function(dia){
+          var c = (weekPlan[comida]||{})[dia] || '';
+          return '<td class="mtd">' + (c.replace(/\n/g,'<br>')||'\u2014') + '</td>';
+        }).join('') + '</tr>';
+  }).join('');
+  var body = '<div style="background:#EAF3D8;border-left:4px solid #5E8C2A;border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+    + '<div><div style="font-size:14px;font-weight:500;color:#3F5A00">\uD83E\uDD57 ' + d.nombre + '</div>'
+    + '<div style="font-size:9px;color:#666;margin-top:2px">' + d.fecha + (d.calorias?' \u00b7 <strong>'+d.calorias+' kcal/d\u00eda</strong>':'') + '</div></div>'
+    + '<div style="font-size:9px;color:#555;text-align:right"><strong>' + p.nombre + '</strong><br>' + p.edad + ' a\u00f1os \u00b7 ' + p.peso + ' kg \u00b7 IMC ' + (p.imc||0).toFixed(1) + '</div>'
+    + '</div>'
+    + '<table><thead><tr><th style="width:72px;text-align:left;padding-left:7px">Tiempo</th>'
+    + useDays.map(function(dia){return '<th>'+dia.substring(0,3)+'</th>';}).join('')
+    + '</tr></thead><tbody>' + rows + '</tbody></table>'
+    + (d.indicaciones ? '<div class="ind-box"><div style="font-size:8px;font-weight:700;color:#5E8C2A;text-transform:uppercase;margin-bottom:3px">Indicaciones especiales</div><div style="font-size:10px;color:#333;line-height:1.7">'+d.indicaciones.replace(/\n/g,'<br>')+'</div></div>' : '')
+    + '<div class="sig"><div class="sig-line"></div><div class="sig-lbl">Firma y Sello \u00b7 ' + doctor + '</div></div>'
+    + '<div class="ft"><span>' + clinic + ' \u00b7 Plan Nutricional</span><span>' + d.nombre + '</span></div>';
+  _downloadAsPDF(body, 'Dieta_' + p.nombre.replace(/\s+/g,'_') + '.pdf', 'Plan Nutricional');
+}
+
+// ── Expediente del Paciente ───────────────────────────────────
+async function downloadPatientReport(patientId) {
+  var p = DB.patients.find(function(x){ return x.id == patientId; });
+  if (!p) return;
+  var evals  = p.evaluaciones || [];
+  var dietas = p.dietas || [];
+  var s      = DB.settings || {};
+  var doctor = s.doctorName || 'Dra. Mar\u00eda Alejandra Chalas';
+  var clinic = s.clinicName || 'NutriMachata';
+  var hasGrasa   = evals.some(function(e){return e.grasa;});
+  var hasCintura = evals.some(function(e){return e.cintura;});
+  var hasCadera  = evals.some(function(e){return e.cadera;});
+  var evalsHTML = evals.length ? (
+    '<h2>Historial de Evaluaciones</h2><table><thead><tr>'
+    + '<th>Fecha</th><th>Peso</th><th>IMC</th><th>Presi\u00f3n</th>'
+    + (hasGrasa?'<th>% Grasa</th>':'') + (hasCintura?'<th>Cintura</th>':'') + (hasCadera?'<th>Cadera</th>':'')
+    + '<th>Obs.</th></tr></thead><tbody>'
+    + [].concat(evals).reverse().map(function(e){
+        return '<tr><td>' + e.fecha + '</td><td style="font-weight:600">' + e.peso + ' kg</td>'
+          + '<td style="font-weight:600;color:#3F5A00">' + (e.imc||0).toFixed(1) + '</td>'
+          + '<td>' + (e.presion||'\u2014') + '</td>'
+          + (hasGrasa?'<td>'+(e.grasa!=null?e.grasa+'%':'\u2014')+'</td>':'')
+          + (hasCintura?'<td>'+(e.cintura!=null?e.cintura+' cm':'\u2014')+'</td>':'')
+          + (hasCadera?'<td>'+(e.cadera!=null?e.cadera+' cm':'\u2014')+'</td>':'')
+          + '<td style="font-size:9px;color:#666">' + (e.obs||'\u2014') + '</td></tr>';
+      }).join('')
+    + '</tbody></table>'
+  ) : '';
+  var dietasHTML = dietas.length ? (
+    '<h2>Planes Nutricionales</h2>'
+    + dietas.map(function(d){
+        return '<div style="background:#F5FAF0;border:1px solid #C8DFA0;border-radius:5px;padding:7px 10px;margin-bottom:7px">'
+          + '<div style="font-weight:600;color:#3F5A00">\uD83E\uDD57 ' + d.nombre + '</div>'
+          + '<div style="font-size:9px;color:#666">' + d.fecha + (d.calorias?' \u00b7 '+d.calorias+' kcal/d\u00eda':'') + '</div>'
+          + (d.indicaciones?'<div style="font-size:10px;color:#555;margin-top:3px">'+d.indicaciones+'</div>':'')
+          + '</div>';
+      }).join('')
+  ) : '';
+  var body = '<div class="pat-hero"><div>'
+    + '<div class="pat-name">' + p.nombre + '</div>'
+    + '<div class="pat-sub">' + p.edad + ' a\u00f1os \u00b7 ' + (p.sexo==='F'?'Femenino':'Masculino') + (p.cedula?' \u00b7 C.I. '+p.cedula:'') + ' \u00b7 ' + p.estado + '</div>'
+    + '</div><div class="kpis">'
+    + '<div class="kpi"><div class="kv">' + p.peso + '</div><div class="kl">kg</div></div>'
+    + '<div class="kpi"><div class="kv">' + (p.imc||0).toFixed(1) + '</div><div class="kl">IMC</div></div>'
+    + '<div class="kpi"><div class="kv">' + evals.length + '</div><div class="kl">Eval.</div></div>'
+    + '</div></div>'
+    + '<div class="ig">'
+    + '<div><label>Tel\u00e9fono</label><span>' + (p.telefono||'\u2014') + '</span></div>'
+    + '<div><label>Email</label><span>' + (p.email||'\u2014') + '</span></div>'
+    + '</div>'
+    + evalsHTML + dietasHTML
+    + '<div class="sig"><div class="sig-line"></div><div class="sig-lbl">Firma y Sello \u00b7 ' + doctor + '</div></div>'
+    + '<div class="ft"><span>' + clinic + ' \u00b7 Expediente</span><span>' + new Date().toLocaleDateString('es-DO') + '</span></div>';
+  _downloadAsPDF(body, 'Expediente_' + p.nombre.replace(/\s+/g,'_') + '.pdf', 'Expediente');
+}
+
+// ── Reporte Clínico (desde modal) ────────────────────────────
+function downloadReportPDF() {
+  var el = document.getElementById('report-modal-body');
+  if (!el || !el.innerHTML.trim() || el.querySelector('.empty-state')) {
+    notify('Genera el reporte primero', 'warning');
+    return;
+  }
+  var clone = el.cloneNode(true);
+  clone.querySelectorAll('button,.print-btn,.pdf-bar').forEach(function(b){ b.remove(); });
+  _downloadAsPDF(clone.innerHTML, 'ReporteClinico.pdf', 'Reporte Cl\u00ednico');
+}
+
+
+
+function openReportModal(patientId, type) {
+  var p = patientId ? DB.patients.find(function(x){ return x.id == patientId; }) : null;
+  document.getElementById('report-modal-body').innerHTML = p
+    ? generateReportHTML(p)
+    : '<div class="empty-state"><div class="empty-icon">\uD83D\uDCCA</div><div class="empty-title">Seleccione un paciente</div></div>';
+  openModal('modal-report');
+}
+
+
+// ── SVG Bar Chart ─────────────────────────────────────────────
+// Returns a data: URL with an SVG bar chart.
+// bars = [{label, value, color}]
+function _svgBarChart(bars, opts) {
+  var W = opts.W || 320, H = opts.H || 180;
+  var PL = 44, PR = 14, PT = 18, PB = 36;
+  var cW = W - PL - PR, cH = H - PT - PB;
+  var vals = bars.map(function(b){ return b.value; });
+  var vMax = Math.max.apply(null, vals) || 1;
+  var yMax = vMax * 1.18;
+  var barW = Math.min(38, (cW / bars.length) * 0.62);
+  var step = cW / bars.length;
+  var inner = '';
+  // Grid lines
+  for (var g = 0; g <= 4; g++) {
+    var gv = (yMax / 4) * g;
+    var gy = (PT + cH - (gv / yMax) * cH).toFixed(1);
+    inner += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (PL+cW) + '" y2="' + gy + '" stroke="#e8e6e0" stroke-width="1"/>';
+    inner += '<text x="' + (PL-4) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle" font-size="8" fill="#aaa" font-family="monospace">' + gv.toFixed(gv < 10 ? 1 : 0) + '</text>';
+  }
+  // Axes
+  inner += '<line x1="' + PL + '" y1="' + PT + '" x2="' + PL + '" y2="' + (PT+cH) + '" stroke="#ccc" stroke-width="1.5"/>';
+  inner += '<line x1="' + PL + '" y1="' + (PT+cH) + '" x2="' + (PL+cW) + '" y2="' + (PT+cH) + '" stroke="#ccc" stroke-width="1.5"/>';
+  // Bars
+  bars.forEach(function(b, i) {
+    var bx = PL + step * i + step / 2 - barW / 2;
+    var bh = (b.value / yMax) * cH;
+    var by = PT + cH - bh;
+    // Bar shadow
+    inner += '<rect x="' + (bx+2).toFixed(1) + '" y="' + (by+2).toFixed(1) + '" width="' + barW + '" height="' + bh.toFixed(1) + '" rx="4" fill="rgba(0,0,0,0.08)"/>';
+    // Bar
+    inner += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW + '" height="' + bh.toFixed(1) + '" rx="4" fill="' + b.color + '"/>';
+    // Value on top
+    inner += '<text x="' + (bx + barW/2).toFixed(1) + '" y="' + (by - 5).toFixed(1) + '" text-anchor="middle" font-size="9" fill="' + b.color + '" font-family="monospace" font-weight="700">' + b.value + (opts.unit||'') + '</text>';
+    // Label below axis
+    var lbl = b.label.length > 7 ? b.label.substring(0,6)+'\u2026' : b.label;
+    inner += '<text x="' + (bx + barW/2).toFixed(1) + '" y="' + (PT+cH+14) + '" text-anchor="middle" font-size="8.5" fill="#555" font-family="sans-serif">' + lbl + '</text>';
+  });
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">'
+    + '<rect width="' + W + '" height="' + H + '" fill="white" rx="6"/>'
+    + inner + '</svg>';
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+// ── Color by nutritional status ───────────────────────────────
+function _barColor(imc) {
+  if (!imc) return '#A8A59D';
+  if (imc < 18.5) return '#2A6A8C';           // bajo peso - blue
+  if (imc < 25)   return '#2D7A4A';           // normal    - green
+  if (imc < 30)   return '#C47A1A';           // sobrepeso - yellow/amber
+  return '#C44A2A';                            // obesidad  - red
+}
+
+// ── generateReportHTML ────────────────────────────────────────
+function generateReportHTML(p) {
+  var evals  = p.evaluaciones || [];
+  var dietas = p.dietas || [];
+
+  // Build bars for each evaluation: Peso, IMC, % Grasa
+  // Use up to last 6 evaluations
+  var recent = evals.slice(-6);
+
+  var pesoBars = recent.map(function(e) {
+    return { label: (e.fecha||'').slice(5), value: e.peso, color: _barColor(e.imc) };
+  });
+  var imcBars = recent.map(function(e) {
+    return { label: (e.fecha||'').slice(5), value: parseFloat((e.imc||0).toFixed(1)), color: _barColor(e.imc) };
+  });
+  var hasGrasa = recent.some(function(e){ return e.grasa != null; });
+  var grasaBars = hasGrasa ? recent.filter(function(e){ return e.grasa != null; }).map(function(e) {
+    return { label: (e.fecha||'').slice(5), value: e.grasa, color: _barColor(e.imc) };
+  }) : [];
+
+  // Chart block
+  var chartBlock = '';
+  if (recent.length >= 1) {
+    var wImg  = _svgBarChart(pesoBars.length ? pesoBars : [{label:'Sin datos',value:0,color:'#ccc'}], {W:300,H:170,unit:' kg'});
+    var iImg  = _svgBarChart(imcBars.length  ? imcBars  : [{label:'Sin datos',value:0,color:'#ccc'}], {W:300,H:170,unit:''});
+
+    chartBlock = '<div style="margin:14px 0">'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">'
+
+      // Peso
+      + '<div style="background:#fafaf8;border-radius:8px;padding:10px 12px;border:1px solid #e8e6e0">'
+      + '<div style="font-size:10px;font-weight:700;color:#3F5A00;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px">Evoluci\u00f3n de Peso</div>'
+      + '<img src="' + wImg + '" style="width:100%;height:auto;display:block">'
+      + '</div>'
+
+      // IMC
+      + '<div style="background:#fafaf8;border-radius:8px;padding:10px 12px;border:1px solid #e8e6e0">'
+      + '<div style="font-size:10px;font-weight:700;color:#3F5A00;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px">Evoluci\u00f3n de IMC</div>'
+      + '<img src="' + iImg + '" style="width:100%;height:auto;display:block">'
+      + '</div>'
+
+      + '</div>';
+
+    // % Grasa (full width if available)
+    if (grasaBars.length >= 1) {
+      var gImg = _svgBarChart(grasaBars, {W:620,H:160,unit:'%'});
+      chartBlock += '<div style="background:#fafaf8;border-radius:8px;padding:10px 12px;border:1px solid #e8e6e0;margin-bottom:10px">'
+        + '<div style="font-size:10px;font-weight:700;color:#3F5A00;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px">Evoluci\u00f3n de % Grasa Corporal</div>'
+        + '<img src="' + gImg + '" style="width:100%;height:auto;display:block">'
+        + '</div>';
+    }
+
+    // Legend
+    chartBlock += '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:9px;margin-bottom:4px">'
+      + '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#2D7A4A;border-radius:2px;display:inline-block"></span>Normal (18.5\u201324.9)</span>'
+      + '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#C47A1A;border-radius:2px;display:inline-block"></span>Sobrepeso (25\u201329.9)</span>'
+      + '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#C44A2A;border-radius:2px;display:inline-block"></span>Obesidad (\u226530)</span>'
+      + '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#2A6A8C;border-radius:2px;display:inline-block"></span>Bajo peso</span>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // Last evaluation summary
+  var lastEval = evals.length ? evals[evals.length-1] : null;
+  var lastBlock = '';
+  if (lastEval) {
+    var kpis = [['Peso',lastEval.peso+' kg'],['IMC',(lastEval.imc||0).toFixed(1)]];
+    if (lastEval.presion) kpis.push(['\u00daLT. PRESI\u00d3N',lastEval.presion]);
+    if (lastEval.grasa  != null) kpis.push(['% GRASA',lastEval.grasa+'%']);
+    if (lastEval.cintura!= null) kpis.push(['CINTURA',lastEval.cintura+' cm']);
+    if (lastEval.cadera != null) kpis.push(['CADERA',lastEval.cadera+' cm']);
+    lastBlock = '<div style="border-top:1.5px solid #C8DFA0;margin:10px 0 8px"></div>'
+      + '<div style="font-size:11px;font-weight:700;color:#3F5A00;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:7px">\u00daltima evaluaci\u00f3n &mdash; ' + lastEval.fecha + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+      + kpis.map(function(pr){
+          return '<div style="background:#EAF3D8;border-radius:8px;padding:7px 14px;text-align:center;border:1px solid #C8DFA0">'
+            + '<div style="font-size:8px;color:#8AB550;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;font-weight:700">' + pr[0] + '</div>'
+            + '<div style="font-size:15px;font-weight:700;font-family:\'DM Mono\',monospace;color:#3F5A00">' + pr[1] + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>'
+      + (lastEval.obs ? '<div style="background:#EAF3D8;border-left:3px solid #5E8C2A;padding:7px 12px;border-radius:0 6px 6px 0;font-size:11px;color:#333;margin-bottom:8px"><strong>Observaciones:</strong> ' + lastEval.obs + '</div>' : '');
+  }
+
+  // Dietas summary
+  var dietasBlock = '';
+  if (dietas.length) {
+    dietasBlock = '<div style="border-top:1.5px solid #C8DFA0;margin:10px 0 8px"></div>'
+      + '<div style="font-size:11px;font-weight:700;color:#3F5A00;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:7px">Planes Nutricionales</div>'
+      + dietas.slice(0,3).map(function(d){
+          return '<div style="background:#F5FAF0;border:1px solid #C8DFA0;border-radius:6px;padding:7px 12px;margin-bottom:6px">'
+            + '<div style="font-weight:600;color:#3F5A00;font-size:12px">\uD83E\uDD57 ' + d.nombre + '</div>'
+            + '<div style="font-size:10px;color:#666;margin-top:2px">' + d.fecha + (d.calorias?' &middot; '+d.calorias+' kcal/d\u00eda':'') + '</div>'
+            + '</div>';
+        }).join('');
+  }
+
+  return ''
+    // Patient header
+    + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding:12px 16px;background:#EAF3D8;border-radius:12px;border-left:4px solid #5E8C2A">'
+    + '<div style="width:50px;height:50px;border-radius:50%;font-size:18px;font-weight:700;background:' + p.color + ';display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0">' + p.initials + '</div>'
+    + '<div><div style="font-size:17px;font-weight:600;font-family:\'Playfair Display\',serif;color:#1a1a1a">' + p.nombre + '</div>'
+    + '<div style="font-size:11px;color:#666;margin-top:2px">' + p.edad + ' a\u00f1os &middot; ' + (p.sexo==='F'?'Femenino':'Masculino') + (p.cedula?' &middot; C.I. '+p.cedula:'') + '</div>'
+    + '<div style="margin-top:5px"><span class="badge ' + getImcBadge(p.imc) + '">' + p.estado + '</span></div>'
+    + '</div>'
+    + '<div style="margin-left:auto;text-align:right">'
+    + '<div style="font-size:22px;font-weight:800;font-family:\'DM Mono\',monospace;color:' + _barColor(p.imc) + '">' + (p.imc||0).toFixed(1) + '</div>'
+    + '<div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.5px">IMC actual</div>'
+    + '<div style="font-size:13px;font-weight:600;color:#3F5A00;margin-top:2px">' + p.peso + ' kg</div>'
+    + '</div>'
+    + '</div>'
+
+    // Charts
+    + chartBlock
+
+    // Last eval
+    + lastBlock
+
+    // Dietas
+    + dietasBlock
+
+    // Footer note
+    + '<div style="border-top:1.5px solid #C8DFA0;margin:12px 0 6px"></div>'
+    + '<div style="font-size:10px;color:#aaa;text-align:center;line-height:1.8">Documento generado por NutriMachata &middot; Sistema de Gesti\u00f3n Nutricional</div>'
+
+    // Download button (only shown inside modal, hidden on print)
+    + '<div style="margin-top:12px;text-align:center"><button class="btn btn-olive" onclick="downloadReportPDF()" style="font-size:14px;padding:12px 28px">\uD83D\uDCBE Guardar como PDF</button></div>';
+}
+
+function _svgLineChart(labels, values, color, unit) {
+  if (!values || values.length < 2) return '';
+  var W=340,H=130,PL=38,PR=10,PT=12,PB=24,cW=W-PL-PR,cH=H-PT-PB;
+  var vMin=Math.min.apply(null,values),vMax=Math.max.apply(null,values);
+  var range=vMax-vMin||1,yMin=vMin-range*0.18,yMax=vMax+range*0.18;
+  var tx=function(i){return PL+(i/(values.length-1))*cW;};
+  var ty=function(v){return PT+cH-((v-yMin)/(yMax-yMin))*cH;};
+  var inner='';
+  for(var i=0;i<=4;i++){var v=yMin+(yMax-yMin)*(i/4),y=ty(v).toFixed(1);inner+='<line x1="'+PL+'" y1="'+y+'" x2="'+(PL+cW)+'" y2="'+y+'" stroke="#e8e6e0" stroke-width="1"/><text x="'+(PL-3)+'" y="'+y+'" text-anchor="end" dominant-baseline="middle" font-size="8" fill="#aaa" font-family="monospace">'+v.toFixed(1)+'</text>';}
+  var pts=values.map(function(v,i){return tx(i).toFixed(1)+','+ty(v).toFixed(1);}).join(' ');
+  var area='M'+tx(0).toFixed(1)+','+(PT+cH)+' '+values.map(function(v,i){return 'L'+tx(i).toFixed(1)+','+ty(v).toFixed(1);}).join(' ')+' L'+tx(values.length-1).toFixed(1)+','+(PT+cH)+' Z';
+  inner+='<path d="'+area+'" fill="'+color+'" opacity="0.1"/><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
+  values.forEach(function(v,i){inner+='<circle cx="'+tx(i).toFixed(1)+'" cy="'+ty(v).toFixed(1)+'" r="3.5" fill="'+color+'" stroke="white" stroke-width="1.5"/>';});
+  inner+='<text x="'+tx(0).toFixed(1)+'" y="'+(ty(values[0])-7).toFixed(1)+'" text-anchor="start" font-size="9" fill="'+color+'" font-family="monospace" font-weight="700">'+values[0]+unit+'</text>';
+  inner+='<text x="'+tx(values.length-1).toFixed(1)+'" y="'+(ty(values[values.length-1])-7).toFixed(1)+'" text-anchor="end" font-size="9" fill="'+color+'" font-family="monospace" font-weight="700">'+values[values.length-1]+unit+'</text>';
+  var idxs=values.length<=5?values.map(function(_,i){return i;}):[0,Math.floor(values.length/2),values.length-1];
+  idxs.forEach(function(i){var lbl=(labels[i]||'').replace(/^20/,'').replace(/-/g,'/');inner+='<text x="'+tx(i).toFixed(1)+'" y="'+(PT+cH+13).toFixed(1)+'" text-anchor="middle" font-size="8" fill="#999" font-family="sans-serif">'+lbl+'</text>';});
+  inner+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+cH)+'" stroke="#ccc" stroke-width="1"/><line x1="'+PL+'" y1="'+(PT+cH)+'" x2="'+(PL+cW)+'" y2="'+(PT+cH)+'" stroke="#ccc" stroke-width="1"/>';
+  return 'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'"><rect width="'+W+'" height="'+H+'" fill="white" rx="5"/>'+inner+'</svg>')));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ═══════════════════════════════════════════════
 //  EVALUACIONES
@@ -4292,205 +4720,7 @@ function switchHCTab(tab, btn) {
 }
 
 // ── SVG Chart Generator (synchronous, no DOM/animation needed) ─────────────
-function _svgChart(labels, values, opts) {
-  const { color='#5E8C2A', width=540, height=150, unit='', refMin=null, refMax=null } = opts || {};
-  if (!values || !values.length) return '';
-  const PAD = { top:14, right:14, bottom:26, left:42 };
-  const W = width - PAD.left - PAD.right;
-  const H = height - PAD.top - PAD.bottom;
-  const vMin = Math.min(...values); const vMax = Math.max(...values);
-  const range = vMax - vMin || 1;
-  const yMin = vMin - range * 0.18; const yMax = vMax + range * 0.18;
-  const toX = (i) => PAD.left + (values.length < 2 ? W/2 : i / (values.length-1) * W);
-  const toY = (v) => PAD.top + H - ((v - yMin) / (yMax - yMin)) * H;
-  const useBar = values.length <= 3;
-  let inner = '';
-  // Reference band
-  if (refMin !== null && refMax !== null) {
-    const ry1 = toY(Math.min(refMax, yMax)); const ry2 = toY(Math.max(refMin, yMin));
-    if (ry2 > ry1) inner += `<rect x="${PAD.left}" y="${ry1.toFixed(1)}" width="${W}" height="${(ry2-ry1).toFixed(1)}" fill="#5E8C2A" opacity="0.1"/>`;
-  }
-  // Grid
-  for (let s = 0; s <= 4; s++) {
-    const v = yMin + (yMax-yMin)*(s/4); const y = toY(v).toFixed(1);
-    inner += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left+W}" y2="${y}" stroke="#e8e6e0" stroke-width="1"/>`;
-    inner += `<text x="${PAD.left-4}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="9" fill="#aaa" font-family="monospace">${v.toFixed(1)}</text>`;
-  }
-  // Axes
-  inner += `<line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1"/>`;
-  inner += `<line x1="${PAD.left}" y1="${PAD.top+H}" x2="${PAD.left+W}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1"/>`;
-  if (useBar) {
-    const step = W / values.length; const bw = Math.min(50, step*0.6);
-    values.forEach((v,i) => {
-      const x = PAD.left + step*i + step/2 - bw/2; const y = toY(v); const bh = PAD.top+H-y;
-      inner += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" fill="${color}" opacity="${i===values.length-1?1:0.55}" rx="3"/>`;
-      inner += `<text x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${color}" font-family="monospace" font-weight="700">${v}${unit}</text>`;
-    });
-  } else {
-    const pts = values.map((v,i)=>`${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-    const area = `M${toX(0).toFixed(1)},${(PAD.top+H).toFixed(1)} ${values.map((v,i)=>`L${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')} L${toX(values.length-1).toFixed(1)},${(PAD.top+H).toFixed(1)} Z`;
-    inner += `<path d="${area}" fill="${color}" opacity="0.12"/>`;
-    inner += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-    values.forEach((v,i) => {
-      inner += `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>`;
-    });
-    // First and last value labels
-    inner += `<text x="${toX(0).toFixed(1)}" y="${(toY(values[0])-7).toFixed(1)}" text-anchor="start" font-size="10" fill="${color}" font-family="monospace" font-weight="700">${values[0]}${unit}</text>`;
-    inner += `<text x="${toX(values.length-1).toFixed(1)}" y="${(toY(values[values.length-1])-7).toFixed(1)}" text-anchor="end" font-size="10" fill="${color}" font-family="monospace" font-weight="700">${values[values.length-1]}${unit}</text>`;
-  }
-  // X labels
-  const idxs = values.length<=5 ? values.map((_,i)=>i) : [0, Math.floor(values.length/2), values.length-1];
-  idxs.forEach(i => {
-    const lbl = (labels[i]||'').replace(/^20/,'').replace(/-/g,'/');
-    inner += `<text x="${toX(i).toFixed(1)}" y="${(PAD.top+H+14).toFixed(1)}" text-anchor="middle" font-size="9" fill="#999" font-family="sans-serif">${lbl}</text>`;
-  });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="white" rx="6"/>${inner}</svg>`;
-}
-function _svgToDataURL(svg) {
-  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-}
 
-async function downloadPatientReport(patientId) {
-  const p = DB.patients.find(x => x.id == patientId);
-  if (!p) return;
-  const evals  = p.evaluaciones || [];
-  const dietas = p.dietas || [];
-  const today  = new Date().toLocaleDateString('es-DO', {year:'numeric',month:'long',day:'numeric'});
-  const settings   = DB.settings || {};
-  const doctorName = settings.doctorName || 'Dra. María Alejandra Chalas';
-  const clinicName = settings.clinicName || 'NutriMachata';
-
-  // Logo
-  const logoEl  = document.getElementById('sidebar-logo-img');
-  const logoSrc = logoEl ? (logoEl.src || '') : '';
-  const logoHTML = logoSrc
-    ? `<img src="${logoSrc}" style="height:44px;width:auto;object-fit:contain" alt="Logo">`
-    : `<div style="height:44px;width:44px;background:#3F5A00;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;font-weight:800">N</div>`;
-
-  // Build SVG charts synchronously
-  let weightChartHTML = '';
-  let imcChartHTML = '';
-  if (evals.length >= 2) {
-    const labels  = evals.map(e => e.fecha);
-    const weights = evals.map(e => e.peso);
-    const imcVals = evals.map(e => parseFloat((e.imc||0).toFixed(1)));
-    const wSVG = _svgChart(labels, weights, { color:'#5E8C2A', unit:' kg', width:540, height:150 });
-    const iSVG = _svgChart(labels, imcVals,  { color:'#C47A1A', unit:'',   width:540, height:150, refMin:18.5, refMax:24.9 });
-    weightChartHTML = `<h2 style="margin:14px 0 6px">Evolución de Peso</h2><div style="background:#fafaf8;border-radius:8px;padding:6px;border:1px solid #e8e6e0;margin-bottom:12px"><img src="${_svgToDataURL(wSVG)}" style="width:100%;height:auto;display:block"></div>`;
-    imcChartHTML    = `<h2 style="margin:14px 0 6px">Evolución de IMC</h2><div style="background:#fafaf8;border-radius:8px;padding:6px;border:1px solid #e8e6e0;margin-bottom:12px"><img src="${_svgToDataURL(iSVG)}" style="width:100%;height:auto;display:block"><div style="font-size:9px;color:#aaa;text-align:right;margin-top:2px">Banda verde = rango normal 18.5–24.9</div></div>`;
-  }
-
-  const win = window.open('', '_blank');
-  if (!win) { notify('Permite ventanas emergentes para descargar el PDF', 'warning'); return; }
-
-  win.document.write(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<title>Expediente — ${p.nombre}</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'DM Sans',sans-serif;color:#1a1a1a;font-size:11px;line-height:1.6;background:white}
-.page{max-width:190mm;margin:0 auto;padding:12mm 14mm}
-.header{background:#3F5A00;color:white;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px}
-.header-left{display:flex;align-items:center;gap:12px}
-.clinic{font-family:'Playfair Display',serif;font-size:18px;font-weight:500}
-.header-right{font-size:9.5px;text-align:right;opacity:0.85;line-height:1.8}
-.patient-hero{background:#EAF3D8;border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;border-left:4px solid #5E8C2A}
-.patient-name{font-family:'Playfair Display',serif;font-size:18px;color:#3F5A00;margin-bottom:3px}
-.patient-sub{font-size:10px;color:#666}
-.kpis{display:flex;gap:10px}
-.kpi{background:white;border-radius:6px;padding:8px 14px;text-align:center;border:1px solid #C8DFA0}
-.kpi-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:600;color:#3F5A00}
-.kpi-lbl{font-size:8.5px;color:#888;text-transform:uppercase;letter-spacing:0.5px}
-h2{font-family:'Playfair Display',serif;font-size:13px;color:#3F5A00;border-bottom:1.5px solid #C8DFA0;padding-bottom:4px;margin:14px 0 8px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.info-item label{font-size:8.5px;font-weight:700;color:#8AB550;text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:1px}
-.info-item span{font-size:11px;color:#1a1a1a}
-table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:10px}
-thead th{background:#3F5A00;color:white;padding:6px 8px;text-align:left;font-weight:600;font-size:9px;letter-spacing:0.5px;text-transform:uppercase}
-tbody td{padding:5px 8px;border-bottom:1px solid #EAF3D8}
-tbody tr:nth-child(even) td{background:#F5FAF0}
-.diet-card{background:#F5FAF0;border:1px solid #C8DFA0;border-radius:6px;padding:8px 12px;margin-bottom:8px}
-.diet-name{font-weight:600;color:#3F5A00;margin-bottom:2px}
-.diet-meta{font-size:9.5px;color:#888}
-.footer{margin-top:16px;border-top:1px solid #C8DFA0;padding-top:8px;display:flex;justify-content:space-between;font-size:8.5px;color:#999}
-@media print{.page{padding:8mm 10mm}@page{size:A4 portrait;margin:0}}
-</style></head>
-<body><div class="page">
-<div class="header">
-  <div class="header-left">${logoHTML}<div><div class="clinic">${clinicName}</div><div style="font-size:9.5px;opacity:0.65;margin-top:2px">Nutrición Clínica &amp; Bienestar</div></div></div>
-  <div class="header-right"><strong>${doctorName}</strong><br>Generado: ${today}</div>
-</div>
-<div class="patient-hero">
-  <div>
-    <div class="patient-name">${p.nombre}</div>
-    <div class="patient-sub">${p.edad} años · ${p.sexo==='F'?'Femenino':'Masculino'}${p.cedula?' · C.I. '+p.cedula:''} · ${p.estado}</div>
-  </div>
-  <div class="kpis">
-    <div class="kpi"><div class="kpi-val">${p.peso}</div><div class="kpi-lbl">kg</div></div>
-    <div class="kpi"><div class="kpi-val">${(p.imc||0).toFixed(1)}</div><div class="kpi-lbl">IMC</div></div>
-    <div class="kpi"><div class="kpi-val">${evals.length}</div><div class="kpi-lbl">Eval.</div></div>
-  </div>
-</div>
-<div class="info-grid">
-  <div class="info-item"><label>Teléfono</label><span>${p.telefono||'—'}</span></div>
-  <div class="info-item"><label>Email</label><span>${p.email||'—'}</span></div>
-  <div class="info-item"><label>Objetivo</label><span>${p.objetivo||'—'}</span></div>
-  <div class="info-item"><label>Alergias</label><span>${p.alergias||'—'}</span></div>
-  <div class="info-item"><label>Enfermedades</label><span>${p.enfermedades||'—'}</span></div>
-  <div class="info-item"><label>Presión arterial</label><span>${p.presion||'—'}</span></div>
-</div>
-${weightChartHTML}${imcChartHTML}
-${evals.length ? `<h2>Historial de evaluaciones</h2><table><thead><tr><th>Fecha</th><th>Peso</th><th>IMC</th><th>Presión</th>${evals.some(e=>e.grasa)?'<th>% Grasa</th>':''}${evals.some(e=>e.cintura)?'<th>Cintura</th>':''}${evals.some(e=>e.cadera)?'<th>Cadera</th>':''}<th>Observaciones</th></tr></thead><tbody>${[...evals].reverse().map(e=>`<tr><td style="font-family:'DM Mono',monospace">${e.fecha}</td><td style="font-weight:600">${e.peso} kg</td><td style="font-weight:600">${(e.imc||0).toFixed(1)}</td><td>${e.presion||'—'}</td>${evals.some(ev=>ev.grasa)?`<td>${e.grasa!=null?e.grasa+'%':'—'}</td>`:''}${evals.some(ev=>ev.cintura)?`<td>${e.cintura!=null?e.cintura+' cm':'—'}</td>`:''}${evals.some(ev=>ev.cadera)?`<td>${e.cadera!=null?e.cadera+' cm':'—'}</td>`:''}<td style="color:#666">${e.obs||'—'}</td></tr>`).join('')}</tbody></table>` : ''}
-${dietas.length ? `<h2>Planes nutricionales</h2>${dietas.map(d=>`<div class="diet-card"><div class="diet-name">🥗 ${d.nombre}</div><div class="diet-meta">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div>${d.indicaciones?`<div style="font-size:10px;color:#555;margin-top:4px">${d.indicaciones}</div>`:''}</div>`).join('')}` : ''}
-<div class="footer"><span><strong>${clinicName}</strong> · ${doctorName}</span><span>Generado el ${today}</span></div>
-</div>
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._fn = `Expediente_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  win.document.close();
-}
 
 
 
@@ -4706,197 +4936,6 @@ function openDietView(patientId, dietId) {
   openModal('modal-diet');
 }
 
-function printDiet(patientId, dietId) {
-  const p = DB.patients.find(x=>x.id==patientId);
-  if(!p) return;
-  const d = (p.dietas||[]).find(x=>x.id==dietId);
-  if(!d) return;
-
-  const weekPlan = d.weekPlan || getEmptyWeekPlan();
-  const settings = DB.settings || {};
-  const clinicName  = settings.clinicName  || 'NutriMachata';
-  const doctorName  = settings.doctorName  || 'Dra. María Alejandra Chalas';
-  const clinicPhone = settings.phone       || '';
-  const clinicEmail = settings.email       || '';
-  const today = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'long', day:'numeric' });
-
-  const logoEl  = document.getElementById('sidebar-logo-img');
-  const logoB64 = logoEl ? (logoEl.getAttribute('data-logo-b64') || logoEl.src || '') : '';
-  const logoHTML = logoB64
-    ? `<img src="${logoB64}" style="height:52px;width:auto;object-fit:contain" alt="Logo">`
-    : `<div style="height:52px;width:52px;background:#3F5A00;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;font-weight:800">N</div>`;
-
-  const MEAL_ICONS = {'Desayuno':'☀️','Media mañana':'🍎','Almuerzo':'🌿','Merienda':'🫐','Cena':'🌙'};
-  const C2='#3F5A00', C3='#5E8C2A', C4='#8AB550', C5='#C8DFA0', C6='#EAF3D8', C7='#F5FAF0';
-
-  const days = DIAS.filter(dia => COMIDAS.some(c => (weekPlan[c]||{})[dia]?.trim()));
-  const useDays = days.length > 0 ? days : DIAS;
-
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<title>Plan Nutricional — ${p.nombre}</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'DM Sans',sans-serif;background:white;color:#1A1A1A;font-size:11px}
-.page{width:277mm;min-height:188mm;margin:0 auto;padding:9mm 11mm 7mm;display:flex;flex-direction:column;gap:0}
-.header-band{background:${C2};border-radius:10px;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:16px}
-.header-left{display:flex;align-items:center;gap:12px}
-.clinic-name{font-family:'Playfair Display',serif;font-size:19px;font-weight:500;color:white;letter-spacing:0.3px;line-height:1.1}
-.clinic-sub{font-size:9.5px;color:rgba(255,255,255,0.6);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
-.header-right{text-align:right;color:rgba(255,255,255,0.7);font-size:9.5px;line-height:1.85}
-.header-right strong{color:white;font-weight:500}
-.plan-strip{background:${C6};border-left:4px solid ${C3};border-radius:0 6px 6px 0;padding:6px 14px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
-.plan-name{font-family:'Playfair Display',serif;font-size:13px;font-weight:500;color:${C2}}
-.plan-meta{font-size:9.5px;color:#555;display:flex;gap:12px;align-items:center}
-.meta-pill{background:${C3};color:white;border-radius:20px;padding:2px 9px;font-size:9.5px;font-weight:600}
-.patient-row{display:grid;grid-template-columns:2fr 1fr 2fr;gap:7px;margin-bottom:9px}
-.info-chip{background:${C7};border:1px solid ${C5};border-radius:6px;padding:5px 9px}
-.chip-label{font-size:8px;font-weight:700;color:${C4};text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
-.chip-value{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:${C2}}
-.chip-value.name-val{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600}
-table{width:100%;border-collapse:collapse;margin-bottom:9px;table-layout:fixed}
-table thead tr{background:${C2}}
-table thead th{color:white;font-family:'DM Sans',sans-serif;font-size:8.5px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:6px 5px;text-align:center;border:none}
-table thead th:first-child{text-align:left;padding-left:10px;border-radius:6px 0 0 0}
-table thead th:last-child{border-radius:0 6px 0 0}
-table tbody tr:nth-child(odd) td{background:${C7}}
-table tbody tr:nth-child(even) td{background:white}
-table tbody td{padding:6px 6px;font-size:9.5px;color:#222;line-height:1.55;vertical-align:top;border-bottom:1px solid ${C5};border-right:1px solid ${C5}}
-table tbody td:first-child{font-weight:700;color:${C2};font-size:9.5px;border-right:2px solid ${C3};vertical-align:middle;padding-left:10px;white-space:nowrap}
-.meal-icon{font-size:12px;display:block;margin-bottom:1px}
-table tbody tr:last-child td{border-bottom:2px solid ${C3}}
-.indicaciones{background:${C6};border-radius:6px;border-left:3px solid ${C3};padding:7px 12px;margin-bottom:9px}
-.ind-title{font-size:8.5px;font-weight:700;color:${C3};text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
-.ind-body{font-size:10px;color:#333;line-height:1.7}
-.sig-row{display:flex;justify-content:flex-end;margin-bottom:8px}
-.sig-line{border-bottom:1px solid #aaa;width:160px;margin-bottom:3px}
-.sig-label{font-size:8.5px;color:#888;text-align:center}
-.footer-band{background:${C7};border-top:1.5px solid ${C5};padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-radius:0 0 8px 8px;margin-top:auto}
-.footer-left{font-size:8.5px;color:#555;line-height:1.75}
-.footer-left strong{color:${C2}}
-.footer-right{font-size:8.5px;color:#999;text-align:right;line-height:1.75}
-@media print{html,body{width:297mm}@page{size:A4 landscape;margin:0}.page{padding:6mm 9mm 5mm}}
-</style></head>
-<body><div class="page">
-
-<div class="header-band">
-  <div class="header-left">
-    ${logoHTML}
-    <div>
-      <div class="clinic-name">${clinicName}</div>
-      <div class="clinic-sub">Nutrición Clínica &amp; Bienestar</div>
-    </div>
-  </div>
-  <div class="header-right">
-    <strong>${doctorName}</strong><br>
-    ${clinicPhone ? clinicPhone+'<br>' : ''}${clinicEmail ? clinicEmail+'<br>' : ''}Fecha: <strong>${today}</strong>
-  </div>
-</div>
-
-<div class="plan-strip">
-  <div class="plan-name">🥗 ${d.nombre}</div>
-  <div class="plan-meta">
-    ${d.calorias ? `<span>🔥 <strong>${d.calorias}</strong> kcal/día</span>` : ''}
-    <span>📅 ${d.fecha}</span>
-    <span class="meta-pill">${d.tipo||'Semanal'}</span>
-  </div>
-</div>
-
-<div class="patient-row">
-  <div class="info-chip">
-    <div class="chip-label">Paciente</div>
-    <div class="chip-value name-val">${p.nombre}</div>
-  </div>
-  <div class="info-chip">
-    <div class="chip-label">Edad / Sexo</div>
-    <div class="chip-value">${p.edad} años · ${p.sexo==='F'?'F':'M'}</div>
-  </div>
-  <div class="info-chip">
-    <div class="chip-label">Peso · Talla · IMC</div>
-    <div class="chip-value">${p.peso} kg · ${p.talla} m · ${(p.imc||0).toFixed(1)}</div>
-  </div>
-</div>
-
-<table>
-  <thead><tr>
-    <th style="text-align:left;padding-left:10px">Tiempo de comida</th>
-    ${useDays.map(dia=>`<th>${dia}</th>`).join('')}
-  </tr></thead>
-  <tbody>
-    ${COMIDAS.map(comida=>{
-      const icon=MEAL_ICONS[comida]||'🍽️';
-      return `<tr><td><span class="meal-icon">${icon}</span>${comida}</td>${useDays.map(dia=>{const c=(weekPlan[comida]||{})[dia]||'';return `<td>${c.replace(/\n/g,'<br>')||'<span style="color:#ddd">—</span>'}</td>`;}).join('')}</tr>`;
-    }).join('')}
-  </tbody>
-</table>
-
-${d.indicaciones?`<div class="indicaciones"><div class="ind-title">📋 Indicaciones especiales</div><div class="ind-body">${d.indicaciones.replace(/\n/g,'<br>')}</div></div>`:''}
-
-<div class="sig-row">
-  <div>
-    <div class="sig-line"></div>
-    <div class="sig-label">Firma y Sello · ${doctorName}</div>
-  </div>
-</div>
-
-<div class="footer-band">
-  <div class="footer-left">
-    <strong>${clinicName}</strong> · ${doctorName}<br>
-    Este plan ha sido elaborado de forma personalizada. Consulta a tu médico antes de realizar cualquier cambio.
-  </div>
-  <div class="footer-right">${d.nombre}<br>Generado: ${today}</div>
-</div>
-
-</div>
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._pdfFilename = `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  win.document.close();
-}
 
 function deleteDiet(patientId, dietId) {
   showConfirm('¿Eliminar este plan nutricional?', async ()=>{
@@ -5594,203 +5633,8 @@ function renderReports() {
   `;
 }
 
-function downloadReportPDF() {
-  const el = document.getElementById('report-modal-body');
-  if (!el || !el.innerHTML.trim() || el.querySelector('.empty-state')) {
-    notify('Genera el reporte primero', 'warning');
-    return;
-  }
-  // Logo
-  const logoEl  = document.getElementById('sidebar-logo-img');
-  const logoSrc = logoEl ? (logoEl.src || '') : '';
-  const logoHTML = logoSrc
-    ? `<img src="${logoSrc}" style="height:48px;width:auto;object-fit:contain" alt="Logo">`
-    : `<div style="height:48px;width:48px;background:#3F5A00;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;font-weight:800">N</div>`;
-
-  const today = new Date().toLocaleDateString('es-DO',{year:'numeric',month:'long',day:'numeric'});
-  const settings = DB.settings || {};
-  const doctorName = settings.doctorName || 'Dra. María Alejandra Chalas';
-  const clinicName = settings.clinicName || 'NutriMachata';
-
-  // Clone modal content so we can clean it up (remove the download button inside)
-  const clone = el.cloneNode(true);
-  // Remove any nested download buttons from the clone
-  clone.querySelectorAll('button').forEach(b => b.remove());
-  const bodyHTML = clone.innerHTML;
-
-  const win = window.open('', '_blank', 'width=900,height=700');
-  if (!win) { notify('Permite ventanas emergentes para descargar', 'warning'); return; }
-
-  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Reporte Clínico</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'DM Sans',sans-serif;background:white;color:#1a1a1a;font-size:13px;line-height:1.6}
-.page{max-width:780px;margin:0 auto;padding:14mm 16mm}
-.report-header{background:#3F5A00;color:white;border-radius:10px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.report-header-left{display:flex;align-items:center;gap:12px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.info-item label{font-size:9px;font-weight:700;color:#8AB550;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:2px}
-.info-item span,.font-mono{font-family:'DM Mono',monospace;font-size:13px;color:#1a1a1a;font-weight:500}
-.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
-.badge-warning{background:rgba(196,122,26,0.15);color:#C47A1A}
-.badge-success{background:rgba(45,122,74,0.15);color:#2D7A4A}
-.badge-info{background:rgba(42,106,140,0.15);color:#2A6A8C}
-.badge-danger{background:rgba(196,74,42,0.15);color:#C44A2A}
-.badge-neutral{background:rgba(90,88,82,0.12);color:#5A5852}
-.badge-olive{background:rgba(94,140,42,0.15);color:#5E8C2A}
-.patient-avatar{display:flex;align-items:center;justify-content:center;color:white;font-weight:600}
-.divider{border-top:1.5px solid #C8DFA0;margin:14px 0}
-.text-muted{color:#888}
-.text-sm{font-size:12px}
-.mb-4{margin-bottom:16px}
-:root{--beige:#F5F2EB;--gray-400:#A8A59D;--gray-500:#7A786F;--gray-700:#3D3C38;--olive-dark:#3F5A00;--olive:#5E8C2A;--olive-pale:#D4E8B0;--radius:10px;--radius-lg:16px;--black:#1A1A1A}
-@media print{@page{size:A4 portrait;margin:0}.page{padding:8mm 10mm}}
-</style>
-</head>
-<body><div class="page">
-<div class="report-header">
-  <div class="report-header-left">
-    ${logoHTML}
-    <div>
-      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:600">${clinicName}</div>
-      <div style="font-size:11px;opacity:0.7;margin-top:2px">Reporte Clínico · ${today}</div>
-    </div>
-  </div>
-  <div style="text-align:right;font-size:11px;opacity:0.8;line-height:1.8"><strong>${doctorName}</strong><br>Nutrición Clínica &amp; Bienestar</div>
-</div>
-${bodyHTML}
-</div>
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._fn = 'ReporteClinico.pdf';
-  win.document.close();
-}
 
 
-function openReportModal(patientId, type) {
-  const p = patientId ? DB.patients.find(x => x.id == patientId) : null;
-  document.getElementById('report-modal-body').innerHTML = p ? generateReportHTML(p) : `
-    <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Reporte en preparación</div><div class="empty-text">Seleccione un paciente para generar el reporte completo</div></div>
-  `;
-  openModal('modal-report');
-}
-
-function generatePatientReport() {
-  const pid = parseInt(document.getElementById('report-patient-select').value);
-  if (!pid) { notify('Seleccione un paciente', 'danger'); return; }
-  openReportModal(pid);
-}
-
-function generateReportHTML(p) {
-  const evals   = p.evaluaciones || [];
-  const dietas  = p.dietas || [];
-  const lastEval = evals.length ? evals[evals.length-1] : null;
-  const hasCharts = evals.length >= 2;
-
-  // Build SVG charts synchronously
-  let chartBlock = '';
-  if (hasCharts) {
-    const labels  = evals.map(e => e.fecha);
-    const weights = evals.map(e => e.peso);
-    const imcVals = evals.map(e => parseFloat((e.imc||0).toFixed(1)));
-    const wSVG = _svgChart(labels, weights, { color:'#5E8C2A', unit:' kg', width:340, height:130 });
-    const iSVG = _svgChart(labels, imcVals,  { color:'#C47A1A', unit:'',   width:340, height:130, refMin:18.5, refMax:24.9 });
-    chartBlock = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
-      <div style="background:#fafaf8;border-radius:8px;padding:8px;border:1px solid #e8e6e0">
-        <div style="font-size:11px;font-weight:600;color:var(--olive-dark);margin-bottom:6px">📈 Evolución de Peso</div>
-        <img src="${_svgToDataURL(wSVG)}" style="width:100%;height:auto;display:block">
-      </div>
-      <div style="background:#fafaf8;border-radius:8px;padding:8px;border:1px solid #e8e6e0">
-        <div style="font-size:11px;font-weight:600;color:var(--olive-dark);margin-bottom:6px">📊 Evolución de IMC</div>
-        <img src="${_svgToDataURL(iSVG)}" style="width:100%;height:auto;display:block">
-      </div>
-    </div>`;
-  } else if (evals.length > 0) {
-    chartBlock = `<div style="background:var(--beige);border-radius:var(--radius-lg);padding:12px;margin:12px 0;text-align:center;font-size:12px;color:var(--gray-500)">📈 Se necesitan al menos 2 evaluaciones para ver gráficos de evolución</div>`;
-  }
-
-  return `
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px;background:var(--beige);border-radius:var(--radius-lg)">
-      <div class="patient-avatar" style="width:52px;height:52px;border-radius:50%;font-size:18px;background:${p.color};flex-shrink:0">${p.initials}</div>
-      <div>
-        <div style="font-size:18px;font-weight:600;font-family:'Playfair Display',serif">${p.nombre}</div>
-        <div class="text-muted text-sm">${p.edad} años · ${p.sexo==='F'?'Femenino':'Masculino'} · ${p.email||'—'}</div>
-        <div style="margin-top:5px"><span class="badge ${getImcBadge(p.imc)}">${p.estado}</span></div>
-      </div>
-    </div>
-    <div class="info-grid mb-4">
-      <div class="info-item"><label>Peso actual</label><span class="font-mono">${p.peso} kg</span></div>
-      <div class="info-item"><label>Talla</label><span class="font-mono">${p.talla} m</span></div>
-      <div class="info-item"><label>IMC</label><span class="font-mono" style="color:${getImcColor(p.imc)};font-weight:600">${(p.imc||0).toFixed(2)}</span></div>
-      <div class="info-item"><label>Presión Arterial</label><span class="font-mono">${p.presion||'—'}</span></div>
-      <div class="info-item"><label>Estado Nutricional</label><span>${p.estado}</span></div>
-      <div class="info-item"><label>Objetivo</label><span>${p.objetivo||'—'}</span></div>
-      <div class="info-item"><label>Alergias</label><span>${p.alergias||'Ninguna'}</span></div>
-      <div class="info-item"><label>Enfermedades</label><span>${p.enfermedades||'Ninguna'}</span></div>
-    </div>
-    ${chartBlock}
-    ${lastEval ? `
-    <div class="divider"></div>
-    <div style="font-size:12px;font-weight:600;color:var(--black);margin:10px 0 6px">Última evaluación — ${lastEval.fecha}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      ${[['Peso',lastEval.peso+' kg'],['IMC',(lastEval.imc||0).toFixed(1)],lastEval.presion?['Presión',lastEval.presion]:null,lastEval.grasa!=null?['% Grasa',lastEval.grasa+'%']:null,lastEval.cintura!=null?['Cintura',lastEval.cintura+' cm']:null].filter(Boolean).map(([l,v])=>`<div style="background:var(--beige);border-radius:var(--radius);padding:6px 12px;text-align:center"><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;margin-bottom:2px">${l}</div><div style="font-size:14px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark)">${v}</div></div>`).join('')}
-    </div>
-    ${lastEval.obs?`<div style="background:var(--beige);border-left:3px solid var(--olive);padding:8px 12px;border-radius:0 var(--radius) var(--radius) 0;font-size:12px;color:var(--gray-700);margin-bottom:10px"><strong>Obs:</strong> ${lastEval.obs}</div>`:''}
-    `:''}
-    ${dietas.length?`<div class="divider"></div><div style="font-size:12px;font-weight:600;color:var(--black);margin:10px 0 6px">Planes Nutricionales</div>${dietas.slice(0,3).map(d=>`<div style="background:var(--beige);border:1px solid var(--olive-pale);border-radius:var(--radius);padding:8px 12px;margin-bottom:6px"><div style="font-weight:600;color:var(--olive-dark)">🥗 ${d.nombre}</div><div style="font-size:11px;color:var(--gray-500)">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div></div>`).join('')}`:''}
-    <div class="divider"></div>
-    <div style="font-size:11px;color:var(--gray-500);text-align:center;margin-top:10px;line-height:1.8">
-      Documento generado por NutriMachata · Sistema de Gestión Nutricional<br>Conforme a la Ley de Ejercicio de la Nutrición
-    </div>
-    <div style="margin-top:14px;text-align:center">
-      <button class="btn btn-olive" onclick="downloadReportPDF()" style="font-size:14px;padding:12px 28px">⬇ Descargar Reporte PDF</button>
-    </div>
-  `;
-}
 
 
 // ═══════════════════════════════════════════════
