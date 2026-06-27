@@ -3262,8 +3262,7 @@ function printHistoriaClinica(patientId) {
   const yesno = (v) => v==='si'?'<span style="font-weight:600">☑ Sí</span> / ☐ No':'☐ Sí / <span style="font-weight:600">☑ No</span>';
   const checkList = (arr, items) => items.map(i=>`<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 8px 3px 0;font-size:12px">${(arr||[]).includes(i)?'☑':'☐'} ${i}</span>`).join('');
 
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <title>Historia Clínica - ${p.nombre}</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -3289,7 +3288,6 @@ function printHistoriaClinica(patientId) {
     ${logoSrc?`<img src="${logoSrc}" alt="Logo">`:'<div style="font-size:20px;font-weight:700;color:#3F5A00">NutriMachata</div>'}
     <div class="page-title">Historia Clínica</div>
   </div>
-
   <div class="section-header">Datos Generales</div>
   <div class="field-row"><span class="field-label">Nombre:</span><span class="field-line long">${p.nombre}</span></div>
   <div class="field-row">
@@ -3304,7 +3302,6 @@ function printHistoriaClinica(patientId) {
   <div class="field-row"><span class="field-label">Género:</span>
     <span>${p.sexo==='M'?'<b>☑ Masculino</b> / ☐ Femenino':'☐ Masculino / <b>☑ Femenino</b>'}</span>
   </div>
-
   <div style="margin-top:8px"><span class="field-label"><b>Motivo de consulta:</b></span>
     <div class="field-line" style="width:100%;margin-top:2px">${hc.motivo||''}</div>
   </div>
@@ -3314,26 +3311,20 @@ function printHistoriaClinica(patientId) {
   <div style="margin-top:6px" class="field-row">
     <span class="field-label"><b>¿En cuánto tiempo?</b></span><span class="field-line">${hc.plazo||''}</span>
   </div>
-
   <div class="section-header">Antecedentes Personales</div>
   <div class="checkbox-grid">${checkList(hc.antecedentes,['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad'])}</div>
   <div class="field-row"><span class="field-label">Otros:</span><span class="field-line">${hc.antecOtros||''}</span></div>
-
   <div class="section-header">Medicamentos y Suplementos Actuales</div>
   <div class="rec-box">${hc.medicamentos||''}</div>
   <div class="field-row"><span class="field-label">¿Es intolerante o alérgico?</span>
     <span>${hc.tieneAlergias==='si'?'<b>☑ Sí</b> / ☐ No':'☐ Sí / <b>☑ No</b>'}</span>
   </div>
   <div class="field-row"><span class="field-label">En caso afirmativo:</span><span class="field-line long">${hc.alergias||''}</span></div>
-
   <div class="section-header">Antecedentes Familiares</div>
   <div class="checkbox-grid">${checkList(hc.antecFam,['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular'])}</div>
-  <div class="field-row"><span class="field-label">Otros:</span><span class="field-line">${hc.antecFamOtros||''}</span></div>
-
   <div class="section-header">¿Ha Tenido Alguno de Estos Síntomas Recientemente?</div>
   <div class="checkbox-grid">${checkList(hc.sintomas,['Náuseas','Vómitos','Distensión','Estreñimiento','Diarrea'])}</div>
   <div class="field-row"><span class="field-label">Alteraciones metabólicas:</span><span class="field-line">${hc.metabolicas||''}</span></div>
-
   <div class="two-col" style="margin-top:12px">
     <div>
       <div class="section-header" style="margin-top:0">Estilo de Vida y Actividad Física</div>
@@ -3343,34 +3334,17 @@ function printHistoriaClinica(patientId) {
       <div class="field-row"><span class="field-label">Tipo de ejercicio:</span><span class="field-line">${hc.ejercicio||''}</span></div>
       <div class="field-row"><span class="field-label">Frecuencia/semana:</span><span class="field-line">${hc.frecuencia||''}</span></div>
       <div class="field-row"><span class="field-label">Horas de sueño:</span><span class="field-line" style="max-width:50px">${hc.sueno||''}</span></div>
-      <div style="margin-top:6px"><span class="field-label">Estrés:</span>
-        <span style="font-size:11px"> ${['Bajo','Medio','Alto'].map(n=>`${hc.estres===n?'<b>'+n+'</b>':n}`).join(' / ')}</span>
-      </div>
     </div>
     <div>
       <div class="section-header" style="margin-top:0">Hábitos Tóxicos</div>
       <div class="checkbox-grid" style="flex-direction:column;gap:6px">
         ${['Alcohol','Tabaco','Café','Ninguno'].map(h=>`<span style="font-size:12px">${(hc.habitos||[]).includes(h)?'☑':'☐'} ${h}</span>`).join('')}
-        ${hc.habitosOtros?`<span style="font-size:11px">Otros: ${hc.habitosOtros}</span>`:''}
       </div>
     </div>
   </div>
-
   <div class="section-header">Cuestionario Rápido de Conducta Alimentaria</div>
-  ${[['comeEstres','¿Come más cuando está estresado o ansioso?'],['comeAburrido','¿Come por aburrimiento o emociones?'],['comeEmociones','¿Come por emociones?'],['hambreEmocional','¿Dificultad para identificar hambre real/emocional?'],['comeRapido','¿Tiende a comer rápido?'],['comeLleno','¿Come hasta sentirse demasiado lleno?'],['culpaComer','¿Siente culpa/ansiedad después de comer?'],['culpaExceso','¿Siente culpa después de comer en exceso?'],['dietasRepetidas','¿Ha realizado dietas repetidamente?'],['horariosRegulares','¿Tiene horarios de comida regulares?']].map(([k,q])=>`
+  ${[['comeEstres','¿Come más cuando está estresado o ansioso?'],['comeAburrido','¿Come por aburrimiento o emociones?'],['hambreEmocional','¿Dificultad para identificar hambre real/emocional?'],['comeRapido','¿Tiende a comer rápido?'],['comeLleno','¿Come hasta sentirse demasiado lleno?'],['culpaComer','¿Siente culpa/ansiedad después de comer?'],['dietasRepetidas','¿Ha realizado dietas repetidamente?'],['horariosRegulares','¿Tiene horarios de comida regulares?']].map(([k,q])=>`
   <div class="q-row"><span>${q}</span><span>${hc[k]==='si'?'<b>☑ Sí</b> / ☐ No':hc[k]==='no'?'☐ Sí / <b>☑ No</b>':'☐ Sí / ☐ No'}</span></div>`).join('')}
-  <div style="margin-top:8px" class="field-row"><span class="field-label">Comidas fuera de casa:</span>
-    <span>${['Nunca','1-2 veces/semana','Más de 3 veces/semana'].map(n=>`${hc.comidasFuera===n?'<b>'+n+'</b>':n}`).join(' / ')}</span>
-  </div>
-
-  <div class="section-header">Escriba los Alimentos que No Consume</div>
-  <div class="rec-box" style="min-height:50px">${hc.noConsume||''}</div>
-
-  <div class="section-header">Recordatorio de 24 Horas</div>
-  ${[['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>','Desayuno','rec24Desayuno'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1H8V6a4 4 0 0 1 4-4z"/><path d="M8 7c-3.5 1-5 4-5 7a9 9 0 0 0 9 9 9 9 0 0 0 9-9c0-3-1.5-6-5-7"/></svg>','Media Mañana','rec24Mañana'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>','Almuerzo','rec24Almuerzo'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/></svg>','Merienda','rec24Merienda'],['<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>','Cena','rec24Cena'],['🍿','Snacks / Extras','rec24Snacks']].map(([icon,label,key])=>`
-  <div class="rec-label">${icon} ${label}:</div>
-  <div class="rec-box">${hc[key]||''}</div>`).join('')}
-
   <div class="section-header">Evaluación Antropométrica</div>
   <div class="field-row">
     <span class="field-label">Peso:</span><span class="field-line" style="max-width:80px">${p.peso} kg</span>
@@ -3378,59 +3352,12 @@ function printHistoriaClinica(patientId) {
     <span class="field-label">IMC:</span><span class="field-line" style="max-width:80px;font-weight:700;color:#3F5A00">${(p.imc||0).toFixed(2)}</span>
     <span class="field-label">P.A.:</span><span class="field-line" style="max-width:80px">${p.presion}</span>
   </div>
-  <div style="margin-top:6px"><span class="field-label"><b>Observaciones:</b></span>
-    <div class="field-line" style="width:100%;margin-top:2px">${hc.obsConsulta||''}</div>
-  </div>
-
   <div style="margin-top:24px;text-align:center;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px">
-    NutriMachata · Dra. María Alejandra Chalas · ${new Date().toLocaleDateString('es-VE')}
+    NutriMachata · Dra. María Alejandra Chalas · ${new Date().toLocaleDateString('es-DO')}
   </div>
+</body></html>`;
 
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._pdfFilename = `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  win.document.close();
+  _printHTML(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // ═══════════════════════════════════════════════
@@ -4404,10 +4331,7 @@ async function downloadPatientReport(patientId) {
     imcChartHTML    = `<h2 style="margin:14px 0 6px">Evolución de IMC</h2><div style="background:#fafaf8;border-radius:8px;padding:6px;border:1px solid #e8e6e0;margin-bottom:12px"><img src="${_svgToDataURL(iSVG)}" style="width:100%;height:auto;display:block"><div style="font-size:9px;color:#aaa;text-align:right;margin-top:2px">Banda verde = rango normal 18.5–24.9</div></div>`;
   }
 
-  const win = window.open('', '_blank');
-  if (!win) { notify('Permite ventanas emergentes para descargar el PDF', 'warning'); return; }
-
-  win.document.write(`<!DOCTYPE html>
+  const expHTML_start = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Expediente — ${p.nombre}</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -4469,51 +4393,8 @@ ${evals.length ? `<h2>Historial de evaluaciones</h2><table><thead><tr><th>Fecha<
 ${dietas.length ? `<h2>Planes nutricionales</h2>${dietas.map(d=>`<div class="diet-card"><div class="diet-name">🥗 ${d.nombre}</div><div class="diet-meta">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div>${d.indicaciones?`<div style="font-size:10px;color:#555;margin-top:4px">${d.indicaciones}</div>`:''}</div>`).join('')}` : ''}
 <div class="footer"><span><strong>${clinicName}</strong> · ${doctorName}</span><span>Generado el ${today}</span></div>
 </div>
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._fn = `Expediente_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  win.document.close();
+</body></html>`;
+  _printHTML(expHTML_start, `Expediente_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 
@@ -4756,8 +4637,8 @@ function printDiet(patientId, dietId) {
   const days = DIAS.filter(dia => COMIDAS.some(c => (weekPlan[c]||{})[dia]?.trim()));
   const useDays = days.length > 0 ? days : DIAS;
 
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html>
+  const win = null; // replaced by _printHTML
+  const dietHTML = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Plan Nutricional — ${p.nombre}</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -4875,51 +4756,8 @@ ${d.indicaciones?`<div class="indicaciones"><div class="ind-title">📋 Indicaci
 </div>
 
 </div>
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._pdfFilename = `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  win.document.close();
+</body></html>`;
+  _printHTML(dietHTML, `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 function deleteDiet(patientId, dietId) {
@@ -5752,10 +5590,7 @@ function downloadReportPDF() {
   clone.querySelectorAll('button').forEach(b => b.remove());
   const bodyHTML = clone.innerHTML;
 
-  const win = window.open('', '_blank', 'width=900,height=700');
-  if (!win) { notify('Permite ventanas emergentes para descargar', 'warning'); return; }
-
-  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  const reportHTML = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <title>Reporte Clínico</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -5796,51 +5631,8 @@ body{font-family:'DM Sans',sans-serif;background:white;color:#1a1a1a;font-size:1
 </div>
 ${bodyHTML}
 </div>
-<div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-  <button id="dl-btn" style="background:#3F5A00;color:white;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.25)">&#x2B07; Descargar PDF</button>
-</div>
-<scr'+'ipt>
-(function() {
-  var fn = window._pdfFilename || window._fn || 'documento.pdf';
-  function loadScript(src, cb) {
-    var s = document.createElement('script'); s.src = src;
-    s.onload = cb; s.onerror = cb; document.head.appendChild(s);
-  }
-  function go() {
-    var btn = document.getElementById('dl-btn');
-    if (btn) { btn.textContent = 'Generando...'; btn.disabled = true; btn.style.opacity = '0.7'; }
-    var el = document.querySelector('.page') || document.body;
-    if (btn) btn.style.visibility = 'hidden';
-    document.fonts.ready.then(function() {
-      html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff', logging: false })
-        .then(function(c) {
-          if (btn) btn.style.visibility = 'visible';
-          var W = c.width / 2, H = c.height / 2;
-          var pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
-          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
-          pdf.save(fn);
-        })
-        .catch(function(e) { console.error(e); })
-        .finally(function() {
-          if (btn) { btn.textContent = '\u2B07 Descargar PDF'; btn.disabled = false; btn.style.opacity = '1'; btn.style.visibility = 'visible'; }
-        });
-    });
-  }
-  window._pdfGo = go;
-  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
-      setTimeout(go, 400);
-    });
-  });
-  document.getElementById('dl-btn').addEventListener('click', function() {
-    if (window.html2canvas && window.jspdf) { go(); }
-    else { setTimeout(go, 800); }
-  });
-})();
-</scr'+'ipt>
-</body></html>`);
-  win._fn = 'ReporteClinico.pdf';
-  win.document.close();
+</body></html>`;
+  _printHTML(reportHTML, 'ReporteClinico_' + new Date().toISOString().split('T')[0] + '.pdf');
 }
 
 
@@ -6179,7 +5971,11 @@ function renderPortal() {
             <div style="font-size:14px;font-weight:700;color:var(--black)">🥗 Plan Nutricional Activo</div>
             <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${activeDiet ? activeDiet.nombre : 'Sin plan asignado'}</div>
           </div>
-          ${activeDiet ? `<button class="btn btn-olive btn-sm" onclick="navigate('my-diet')">Ver plan →</button>` : ''}
+          ${activeDiet ? `
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-olive btn-sm" onclick="navigate('my-diet')">Ver plan →</button>
+            <button class="btn btn-outline btn-sm" onclick="printPatientDiet('${p ? p.id : DB.currentUser.patientId}','${activeDiet.id}')" style="display:flex;align-items:center;gap:5px">⬇ PDF</button>
+          </div>` : ''}
         </div>
         ${activeDiet ? `
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
@@ -6329,44 +6125,165 @@ function renderPortal() {
 function renderMyDiet() {
   const patientId = DB.currentUser.patientId;
   const p = DB.patients.find(x => x.id == patientId || x.email === DB.currentUser.email);
-  const diet = p && (p.dietas || []).slice(-1)[0];
-  if (!p || !diet) {
-    document.getElementById('page-content').innerHTML = `<div class="empty-state"><div class="empty-icon">🥗</div><div class="empty-title">Sin plan activo</div><div class="empty-text">La Dra. Chalas aún no ha asignado un plan nutricional</div></div>`;
+  const dietas = p ? [...(p.dietas || [])].reverse() : []; // newest first
+  const activeDiet = dietas[0] || null;
+
+  if (!p || !activeDiet) {
+    document.getElementById('page-content').innerHTML = `
+      <div style="max-width:600px;margin:0 auto">
+        <div class="empty-state">
+          <div class="empty-icon">🥗</div>
+          <div class="empty-title">Sin plan nutricional activo</div>
+          <div class="empty-text">La Dra. Chalas aún no ha asignado un plan nutricional. Aparecerá aquí después de tu consulta.</div>
+        </div>
+      </div>`;
     return;
   }
-  // Build diet view HTML directly without using the modal
-  const d = diet;
-  const weekPlan = d.weekPlan || {};
-  document.getElementById('page-content').innerHTML = `
-    <div style="max-width:780px;margin:0 auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-        <div>
-          <div style="font-size:18px;font-weight:600">${d.nombre}</div>
-          <div class="text-muted text-sm">${d.calorias?d.calorias+' kcal/día · ':''}${d.fecha}</div>
+
+  // Build selector tabs if multiple diets
+  const tabsHTML = dietas.length > 1 ? `
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      ${dietas.map((d, i) => `
+        <button onclick="showPatientDietTab(${i})"
+          id="diet-tab-${i}"
+          style="padding:7px 14px;border-radius:20px;border:1.5px solid ${i===0?'var(--olive)':'var(--gray-200)'};
+                 background:${i===0?'var(--olive)':'var(--white)'};
+                 color:${i===0?'white':'var(--gray-600)'};
+                 font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s">
+          ${i===0?'✦ ':''} ${d.nombre.length > 22 ? d.nombre.slice(0,22)+'…' : d.nombre}
+          <span style="font-size:10px;opacity:0.7;margin-left:4px">${d.fecha}</span>
+        </button>`).join('')}
+    </div>` : '';
+
+  function dietCardHTML(d, idx) {
+    const weekPlan = d.weekPlan || {};
+    const hasAnyContent = COMIDAS.some(c => DIAS.some(dia => (weekPlan[c]||{})[dia]?.trim()));
+    return `
+    <div id="diet-card-${idx}" style="${idx > 0 ? 'display:none' : ''}">
+      <!-- Header de la dieta -->
+      <div style="background:linear-gradient(135deg,var(--olive-dark),var(--olive));border-radius:var(--radius-xl);padding:22px 28px;margin-bottom:20px;color:white;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.07);pointer-events:none"></div>
+        <div style="position:relative;z-index:1">
+          <div style="font-size:11px;opacity:0.65;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Plan Nutricional</div>
+          <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:500;margin-bottom:14px">${d.nombre}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+              ${d.calorias ? `<div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:8px 14px;text-align:center">
+                <div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace">${d.calorias}</div>
+                <div style="font-size:9px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px">kcal/día</div>
+              </div>` : ''}
+              <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:8px 14px;text-align:center">
+                <div style="font-size:15px;font-weight:600;font-family:'DM Mono',monospace">${d.fecha}</div>
+                <div style="font-size:9px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px">Fecha del plan</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:8px 14px;text-align:center">
+                <div style="font-size:15px;font-weight:600">${d.tipo || 'Semanal'}</div>
+                <div style="font-size:9px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px">Tipo</div>
+              </div>
+            </div>
+            <!-- Botón PDF -->
+            <button onclick="printPatientDiet('${p.id}','${d.id}')"
+              style="display:flex;align-items:center;gap:8px;padding:10px 18px;background:rgba(255,255,255,0.18);border:1.5px solid rgba(255,255,255,0.35);border-radius:var(--radius);color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap"
+              onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
+              ⬇ Descargar PDF
+            </button>
+          </div>
         </div>
       </div>
+
+      ${d.indicaciones ? `
+      <div style="background:var(--beige);border-left:3px solid var(--olive);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:14px 18px;margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📋 Indicaciones especiales</div>
+        <div style="font-size:13px;line-height:1.75;color:var(--gray-700)">${d.indicaciones.replace(/\n/g,'<br>')}</div>
+      </div>` : ''}
+
+      <!-- Tabla semanal -->
       <div class="card" style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:16px">
+        ${hasAnyContent ? `
         <table style="width:100%;border-collapse:collapse;min-width:680px">
-          <thead><tr>
-            <th style="width:95px;padding:10px;text-align:left;font-size:10px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid var(--olive);background:var(--beige)"></th>
-            ${DIAS.map(dia=>`<th style="padding:10px 6px;text-align:center;font-size:10px;font-weight:700;color:var(--olive-dark);letter-spacing:1.5px;text-transform:uppercase;border-bottom:2px solid var(--olive);border-left:1px solid var(--gray-200);background:var(--beige)">${dia}</th>`).join('')}
-          </tr></thead>
-          <tbody>
-            ${COMIDAS.map((comida,ci)=>`
+          <thead>
             <tr>
-              <td style="padding:10px;font-size:12px;font-weight:700;color:var(--olive-dark);background:var(--beige);border-bottom:1px solid var(--gray-200);border-right:1px solid var(--gray-200);vertical-align:middle">
-                <div style="font-size:16px;margin-bottom:3px">${COMIDAS_ICONS[ci]}</div>${comida}
-              </td>
-              ${DIAS.map(dia=>{const cell=weekPlan[comida]?(weekPlan[comida][dia]||''):'';
-                return `<td style="padding:10px 9px;font-size:12px;color:var(--gray-700);border-bottom:1px solid var(--gray-200);border-left:1px solid var(--gray-200);vertical-align:top;line-height:1.6;min-width:90px">${cell.replace(/\n/g,'<br>')||'<span style="color:var(--gray-300)">—</span>'}</td>`;
+              <th style="width:100px;padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid var(--olive);background:var(--beige)"></th>
+              ${DIAS.map(dia => {
+                const today = new Date().toLocaleDateString('es-DO',{weekday:'long'});
+                const isToday = today.toLowerCase().startsWith(dia.toLowerCase().substring(0,3));
+                return `<th style="padding:10px 6px;text-align:center;font-size:10px;font-weight:700;
+                  color:${isToday?'var(--white)':'var(--olive-dark)'};
+                  background:${isToday?'var(--olive)':'var(--beige)'};
+                  letter-spacing:1.5px;text-transform:uppercase;border-bottom:2px solid var(--olive);border-left:1px solid var(--gray-200)">${dia}</th>`;
               }).join('')}
-            </tr>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${COMIDAS.map((comida, ci) => {
+              const hasRow = DIAS.some(dia => (weekPlan[comida]||{})[dia]?.trim());
+              if (!hasRow) return '';
+              return `<tr>
+                <td style="padding:10px 12px;background:var(--beige);border-bottom:1px solid var(--gray-200);border-right:1px solid var(--gray-200);vertical-align:middle">
+                  <div style="font-size:18px;margin-bottom:3px">${COMIDAS_ICONS[ci]}</div>
+                  <div style="font-size:11px;font-weight:700;color:var(--olive-dark)">${comida}</div>
+                </td>
+                ${DIAS.map(dia => {
+                  const cell = (weekPlan[comida]||{})[dia] || '';
+                  return `<td style="padding:10px 9px;font-size:12px;color:var(--gray-700);border-bottom:1px solid var(--gray-200);border-left:1px solid var(--gray-200);vertical-align:top;line-height:1.65;min-width:90px">
+                    ${cell.replace(/\n/g,'<br>') || '<span style="color:var(--gray-200)">—</span>'}
+                  </td>`;
+                }).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
-        </table>
+        </table>` : `
+        <div class="card-body"><div class="empty-state" style="padding:32px 20px">
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">Plan sin contenido</div>
+          <div class="empty-text">Este plan aún no tiene alimentos registrados</div>
+        </div></div>`}
       </div>
-      ${d.indicaciones?`<div style="background:var(--beige);border-left:3px solid var(--olive);border-radius:0 var(--radius) var(--radius) 0;padding:12px 16px"><div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Indicaciones Especiales</div><div style="font-size:13px;line-height:1.7;color:var(--gray-700)">${d.indicaciones}</div></div>`:''}
-    </div>
-  `;
+
+      <!-- Botón PDF abajo también -->
+      <div style="display:flex;justify-content:center;padding-bottom:8px">
+        <button onclick="printPatientDiet('${p.id}','${d.id}')"
+          style="display:flex;align-items:center;gap:10px;padding:13px 28px;background:var(--olive);border:none;border-radius:var(--radius-lg);color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(94,140,42,0.3);transition:all 0.2s"
+          onmouseover="this.style.background='var(--olive-dark)';this.style.transform='translateY(-1px)'"
+          onmouseout="this.style.background='var(--olive)';this.style.transform=''">
+          ⬇ Descargar mi plan en PDF
+        </button>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="max-width:860px;margin:0 auto">
+      ${dietas.length > 1 ? `
+      <div style="margin-bottom:8px">
+        <div style="font-size:13px;font-weight:600;color:var(--gray-500);margin-bottom:8px">
+          Tienes ${dietas.length} planes nutricionales — el más reciente está activo:
+        </div>
+        ${tabsHTML}
+      </div>` : ''}
+      ${dietas.map((d, i) => dietCardHTML(d, i)).join('')}
+    </div>`;
+}
+
+function showPatientDietTab(idx) {
+  // Hide all cards, show selected
+  document.querySelectorAll('[id^="diet-card-"]').forEach((el, i) => {
+    el.style.display = i === idx ? '' : 'none';
+  });
+  // Update tab buttons
+  document.querySelectorAll('[id^="diet-tab-"]').forEach((btn, i) => {
+    const active = i === idx;
+    btn.style.background  = active ? 'var(--olive)' : 'var(--white)';
+    btn.style.color       = active ? 'white'        : 'var(--gray-600)';
+    btn.style.borderColor = active ? 'var(--olive)'  : 'var(--gray-200)';
+  });
+}
+
+function printPatientDiet(patientId, dietId) {
+  const p = DB.patients.find(x => x.id == patientId || x.id == parseInt(patientId));
+  if (!p) { notify('No se encontró el paciente', 'danger'); return; }
+  // Use the same printDiet function that doctors use
+  printDiet(p.id, dietId);
 }
 
 function renderMyHistory() {
@@ -6450,7 +6367,10 @@ function renderMyHistory() {
 
   if (evals.length >= 2) {
     setTimeout(() => {
-      const labels = evals.map(e => e.fecha.substring(5));
+      const labels = evals.map(e => {
+        const parts = e.fecha.split('-');
+        return parts.length === 3 ? `${parts[2]}/${parts[1]}` : e.fecha.substring(5);
+      });
 
       // Peso chart
       const ctx1 = document.getElementById('my-weight-chart');
@@ -6775,20 +6695,20 @@ function renderMyMeasures() {
     if (vals.length < 2) return '';
     const min = Math.min(...vals), max = Math.max(...vals);
     const range = max - min || 1;
-    const W = 80, H = 28, pts = vals.map((v,i) => {
-      const x = vals.length === 1 ? W/2 : (i / (vals.length-1)) * W;
-      const y = H - ((v - min) / range) * H;
+    const W = 80, H = 28;
+    const pts = vals.map((v,i) => {
+      const x = (i / (vals.length-1)) * W;
+      const y = H - ((v - min) / range) * (H - 4) - 2;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
-    const trend = vals[vals.length-1] <= vals[0];
-    const c = field.lower ? (trend ? '#2D7A4A' : '#C44A2A') : (trend ? '#C44A2A' : '#2D7A4A');
-    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;margin-top:6px">
-      <polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      ${vals.map((v,i)=>{
-        const x = vals.length===1?W/2:(i/(vals.length-1))*W;
-        const y = H - ((v-min)/range)*H;
-        return i===vals.length-1?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${c}"/>`:'';
-      }).join('')}
+    const diff = vals[vals.length-1] - vals[0];
+    const improving = field.lower ? diff < 0 : diff > 0;
+    const neutral = Math.abs(diff) < 0.01;
+    const c = neutral ? '#2A6A8C' : improving ? '#2D7A4A' : '#C47A1A';
+    const lastX = W, lastY = H - ((vals[vals.length-1] - min) / range) * (H - 4) - 2;
+    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;margin-top:4px">
+      <polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${c}"/>
     </svg>`;
   }
 
@@ -6855,7 +6775,10 @@ function renderMyMeasures() {
             const vLast  = lastEval[f.key];
             if (vFirst == null && vLast == null) return '';
             const d = (vFirst != null && vLast != null) ? parseFloat((vLast - vFirst).toFixed(1)) : null;
-            const good = d !== null ? (f.lower ? d <= 0 : d >= 0) : null;
+            const good = d !== null ? (f.lower ? d < 0 : d > 0) : null;
+            const neutral = d === 0;
+            const badgeColor = neutral ? '#2A6A8C' : good ? '#2D7A4A' : '#C44A2A';
+            const badgeBg    = neutral ? 'rgba(42,106,140,0.1)' : good ? 'rgba(45,122,74,0.1)' : 'rgba(196,74,42,0.1)';
             const rowBg = fi % 2 === 0 ? 'var(--white)' : 'var(--gray-50)';
             const formatVal = (v, f) => v != null ? (f.key === 'imc' ? parseFloat(v).toFixed(1) : v) + (f.unit ? ' '+f.unit : '') : '—';
             return `<div style="display:grid;grid-template-columns:1fr 120px 120px 90px 80px;align-items:center;gap:0;padding:12px 16px;background:${rowBg};border-bottom:1px solid var(--gray-100)">
@@ -6866,9 +6789,7 @@ function renderMyMeasures() {
               <div style="text-align:center;font-family:'DM Mono',monospace;font-size:14px;color:var(--gray-500)">${formatVal(vFirst, f)}</div>
               <div style="text-align:center;font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--olive-dark)">${formatVal(vLast, f)}</div>
               <div style="text-align:center">
-                ${d !== null ? `<span style="font-size:12px;font-weight:700;padding:3px 9px;border-radius:12px;
-                  background:${good?'rgba(45,122,74,0.1)':'rgba(196,74,42,0.1)'};
-                  color:${good?'var(--success)':'var(--danger)'}">${d>0?'+':''}${d}${f.unit?' '+f.unit:''}</span>` : '<span style="color:var(--gray-300);font-size:12px">—</span>'}
+                ${d !== null ? `<span style="font-size:12px;font-weight:700;padding:3px 9px;border-radius:12px;background:${badgeBg};color:${badgeColor}">${d>0?'+':''}${d}${f.unit?' '+f.unit:''}</span>` : '<span style="color:var(--gray-300);font-size:12px">—</span>'}
               </div>
               <div style="display:flex;justify-content:center">${sparkline(f)}</div>
             </div>`;
@@ -6927,29 +6848,26 @@ function renderMyMeasures() {
         </div>
       </div>` : ''}
 
-      ${evals.length >= 2 ? `
-      <!-- GRÁFICAS DE EVOLUCIÓN -->
+      ${evals.length >= 2 && activeFields.length > 0 ? `
+      <!-- GRÁFICAS DE EVOLUCIÓN — una por cada medida con datos -->
       <div class="card mb-4">
         <div class="card-header">
-          <div><div class="card-title">📈 Evolución en el tiempo</div><div class="card-subtitle">${evals.length} evaluaciones registradas</div></div>
+          <div>
+            <div class="card-title">📈 Evolución en el tiempo</div>
+            <div class="card-subtitle">${evals.length} evaluaciones registradas</div>
+          </div>
         </div>
-        <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Evolución de Peso</div>
-            <div style="height:160px"><canvas id="mym-peso-chart"></canvas></div>
+        <div style="padding:20px 24px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px 32px" id="mym-charts-grid">
+            ${activeFields.map(f => {
+              const hasData = evals.some(e => e[f.key] != null && e[f.key] !== 0);
+              if (!hasData) return '';
+              return `<div>
+                <div style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">${f.icon} Evolución de ${f.label}</div>
+                <div style="height:160px;position:relative"><canvas id="mym-chart-${f.key}"></canvas></div>
+              </div>`;
+            }).join('')}
           </div>
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Evolución de IMC</div>
-            <div style="height:160px"><canvas id="mym-imc-chart"></canvas></div>
-          </div>
-          ${activeFields.some(f => f.key === 'cintura') ? `<div>
-            <div style="font-size:12px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Evolución de Cintura</div>
-            <div style="height:160px"><canvas id="mym-cintura-chart"></canvas></div>
-          </div>` : ''}
-          ${activeFields.some(f => f.key === 'grasa') ? `<div>
-            <div style="font-size:12px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Evolución % Grasa Corporal</div>
-            <div style="height:160px"><canvas id="mym-grasa-chart"></canvas></div>
-          </div>` : ''}
         </div>
       </div>` : ''}
 
@@ -6994,34 +6912,120 @@ function renderMyMeasures() {
   // Render charts after DOM is set
   if (evals.length >= 2) {
     setTimeout(() => {
-      const labels = evals.map(e => e.fecha.substring(5)); // mm-dd
+      const labels = evals.map(e => {
+        // Format label as "dd/mm" for readability
+        const parts = e.fecha.split('-');
+        return parts.length === 3 ? `${parts[2]}/${parts[1]}` : e.fecha.substring(5);
+      });
 
-      function makeChart(id, label, data, color, refMin, refMax) {
-        const ctx = document.getElementById(id);
-        if (!ctx || data.every(v=>v==null)) return;
-        const datasets = [{ label, data, borderColor: color, backgroundColor: color+'18', borderWidth: 2, pointRadius: 4, pointBackgroundColor: color, tension: 0.35, fill: true }];
-        if (refMin !== undefined) {
-          datasets.push({ label: 'Normal', data: Array(data.length).fill(refMin), borderColor: 'rgba(94,140,42,0.25)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false });
-          datasets.push({ label: 'Límite', data: Array(data.length).fill(refMax), borderColor: 'rgba(196,122,26,0.25)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false });
+      // Color palette per field
+      const FIELD_COLORS = {
+        peso:    '#5E8C2A',
+        imc:     '#C47A1A',
+        cintura: '#2A6A8C',
+        abdomen: '#2A8C6A',
+        cadera:  '#7A3A8C',
+        muslo:   '#8C5A2A',
+        pecho:   '#C44A2A',
+        cuello:  '#2A6A8C',
+        muneca:  '#6A2A8C',
+        grasa:   '#7A3A8C',
+        fc:      '#C44A2A',
+      };
+
+      activeFields.forEach(f => {
+        const canvasId = `mym-chart-${f.key}`;
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        const rawData = evals.map(e => {
+          const v = e[f.key];
+          return (v != null && v !== 0) ? parseFloat(parseFloat(v).toFixed(f.key === 'imc' ? 1 : 1)) : null;
+        });
+
+        // Skip if all null
+        if (rawData.every(v => v === null)) return;
+
+        const color = getFieldChartColor(f, evals) || FIELD_COLORS[f.key] || '#5E8C2A';
+        const colorAlpha = color + '18';
+
+        const datasets = [{
+          label: f.label,
+          data: rawData,
+          borderColor: color,
+          backgroundColor: colorAlpha,
+          borderWidth: 2.5,
+          pointRadius: rawData.map(v => v !== null ? 4 : 0),
+          pointBackgroundColor: color,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          tension: 0.35,
+          fill: true,
+          spanGaps: true,
+        }];
+
+        // Add reference lines for IMC
+        if (f.key === 'imc') {
+          datasets.push({
+            label: 'Normal min',
+            data: rawData.map(() => 18.5),
+            borderColor: 'rgba(94,140,42,0.3)',
+            borderDash: [5, 4],
+            borderWidth: 1.2,
+            pointRadius: 0,
+            fill: false,
+            spanGaps: true,
+          });
+          datasets.push({
+            label: 'Normal max',
+            data: rawData.map(() => 24.9),
+            borderColor: 'rgba(94,140,42,0.3)',
+            borderDash: [5, 4],
+            borderWidth: 1.2,
+            pointRadius: 0,
+            fill: '-1',
+            backgroundColor: 'rgba(94,140,42,0.07)',
+            spanGaps: true,
+          });
         }
+
         new Chart(ctx.getContext('2d'), {
           type: 'line',
           data: { labels, datasets },
           options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} ${label.includes('kg')?'kg':label.includes('IMC')?'':''}` } } },
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 800, easing: 'easeOutQuart' },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                filter: item => item.datasetIndex === 0,
+                callbacks: {
+                  label: c => {
+                    const v = c.parsed.y;
+                    return v != null ? ` ${v}${f.unit ? ' '+f.unit : ''}` : '';
+                  }
+                }
+              }
+            },
             scales: {
-              y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 5 }, beginAtZero: false },
-              x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 9 }, color: '#aaa' } }
+              y: {
+                grid: { color: 'rgba(0,0,0,0.04)' },
+                ticks: {
+                  font: { family: 'DM Mono', size: 9 },
+                  maxTicksLimit: 5,
+                  callback: v => `${v}${f.unit ? ' '+f.unit : ''}`
+                },
+                beginAtZero: false,
+              },
+              x: {
+                grid: { display: false },
+                ticks: { font: { family: 'DM Sans', size: 9 }, color: '#aaa', maxRotation: 0 }
+              }
             }
           }
         });
-      }
-
-      makeChart('mym-peso-chart',    'Peso (kg)',        evals.map(e=>e.peso),   '#5E8C2A');
-      makeChart('mym-imc-chart',     'IMC',              evals.map(e=>parseFloat((e.imc||0).toFixed(1))), '#C47A1A', 18.5, 24.9);
-      makeChart('mym-cintura-chart', 'Cintura (cm)',     evals.map(e=>e.cintura||null), '#2A6A8C');
-      makeChart('mym-grasa-chart',   '% Grasa',         evals.map(e=>e.grasa||null),   '#7A3A8C');
+      });
     }, 120);
   }
 }
@@ -7529,6 +7533,108 @@ function calcAgeFromDob(dobId, edadId) {
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
   edadEl.value = age >= 0 ? age : '';
 }
+
+// ═══════════════════════════════════════════════
+//  PDF ENGINE — iframe + print (sin popups)
+// ═══════════════════════════════════════════════
+function _printHTML(htmlContent, filename) {
+  // Remove any existing print frame
+  const old = document.getElementById('_pdf-frame');
+  if (old) old.remove();
+
+  const frame = document.createElement('iframe');
+  frame.id = '_pdf-frame';
+  frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:99999;border:none;background:white';
+  document.body.appendChild(frame);
+
+  // Overlay to show loading
+  const overlay = document.createElement('div');
+  overlay.id = '_pdf-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(63,90,0,0.85);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:white;font-family:DM Sans,sans-serif';
+  overlay.innerHTML = `
+    <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+    <div style="font-size:18px;font-weight:600">Preparando PDF...</div>
+    <div style="font-size:13px;opacity:0.7">Cuando aparezca el diálogo de impresión, elige "Guardar como PDF"</div>
+    <button onclick="document.getElementById('_pdf-overlay').remove();document.getElementById('_pdf-frame').remove()"
+      style="margin-top:8px;padding:10px 24px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.4);border-radius:8px;color:white;font-size:14px;cursor:pointer;font-family:inherit">
+      Cancelar
+    </button>`;
+  document.body.appendChild(overlay);
+
+  const doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  // Wait for fonts/images to load then print
+  frame.onload = function() {
+    setTimeout(function() {
+      try {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+      } catch(e) {
+        console.error('Print error:', e);
+      }
+      // Remove overlay after dialog appears
+      setTimeout(function() {
+        const ov = document.getElementById('_pdf-overlay');
+        const fr = document.getElementById('_pdf-frame');
+        if (ov) ov.remove();
+        if (fr) fr.remove();
+      }, 1500);
+    }, 800);
+  };
+}
+
+// ═══════════════════════════════════════════════
+//  SEMANTIC COLOR HELPERS FOR MEASUREMENTS
+// ═══════════════════════════════════════════════
+// Returns { color, bg, label } based on value and field thresholds
+function getMeasureStatus(key, value) {
+  if (value == null) return { color: '#A8A59D', bg: 'rgba(168,165,157,0.1)', label: '—', dot: '⚪' };
+  const v = parseFloat(value);
+
+  const rules = {
+    imc: [
+      { max: 18.4, color: '#2A6A8C', bg: 'rgba(42,106,140,0.1)', label: 'Bajo peso',   dot: '🔵' },
+      { max: 24.9, color: '#2D7A4A', bg: 'rgba(45,122,74,0.1)',  label: 'Normal',       dot: '🟢' },
+      { max: 29.9, color: '#C47A1A', bg: 'rgba(196,122,26,0.1)', label: 'Sobrepeso',    dot: '🟡' },
+      { max: 34.9, color: '#C44A2A', bg: 'rgba(196,74,42,0.1)',  label: 'Obesidad I',   dot: '🔴' },
+      { max: Infinity, color: '#8C1A1A', bg: 'rgba(140,26,26,0.1)', label: 'Obesidad II+', dot: '🔴' },
+    ],
+    grasa_f: [ // Female
+      { max: 20,  color: '#2A6A8C', bg: 'rgba(42,106,140,0.1)', label: 'Bajo',    dot: '🔵' },
+      { max: 32,  color: '#2D7A4A', bg: 'rgba(45,122,74,0.1)',  label: 'Normal',  dot: '🟢' },
+      { max: 38,  color: '#C47A1A', bg: 'rgba(196,122,26,0.1)', label: 'Alto',    dot: '🟡' },
+      { max: Infinity, color: '#C44A2A', bg: 'rgba(196,74,42,0.1)', label: 'Muy alto', dot: '🔴' },
+    ],
+    grasa_m: [ // Male
+      { max: 8,   color: '#2A6A8C', bg: 'rgba(42,106,140,0.1)', label: 'Bajo',    dot: '🔵' },
+      { max: 20,  color: '#2D7A4A', bg: 'rgba(45,122,74,0.1)',  label: 'Normal',  dot: '🟢' },
+      { max: 25,  color: '#C47A1A', bg: 'rgba(196,122,26,0.1)', label: 'Alto',    dot: '🟡' },
+      { max: Infinity, color: '#C44A2A', bg: 'rgba(196,74,42,0.1)', label: 'Muy alto', dot: '🔴' },
+    ],
+  };
+
+  const scale = rules[key];
+  if (scale) {
+    const match = scale.find(r => v <= r.max);
+    return match || scale[scale.length - 1];
+  }
+  return { color: '#5E8C2A', bg: 'rgba(94,140,42,0.1)', label: '', dot: '🟢' };
+}
+
+// Per-field color for charts based on whether lower is better and if improving
+function getFieldChartColor(field, evals) {
+  if (!evals || evals.length < 2) return '#5E8C2A';
+  const first = parseFloat(evals[0][field.key]);
+  const last  = parseFloat(evals[evals.length-1][field.key]);
+  if (isNaN(first) || isNaN(last)) return '#5E8C2A';
+  const improving = field.lower ? last < first : last > first;
+  if (Math.abs(last - first) < 0.01) return '#2A6A8C'; // neutral = blue
+  return improving ? '#2D7A4A' : '#C47A1A';             // green or orange
+}
+
 </script>
 </body>
 </html>
