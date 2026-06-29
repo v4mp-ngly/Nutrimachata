@@ -4135,25 +4135,111 @@ function openHistoriaClinica(patientId, activeTab) {
       </div>` : ''}
       <!-- Summary table -->
       <div class="card">
-        <div class="card-header"><div class="card-title">Tabla de progreso</div></div>
-        <div class="table-container">
-          <table>
-            <thead><tr><th>Fecha</th><th>Peso</th><th>IMC</th><th>Presión</th>${evals.some(e=>e.grasa)?'<th>% Grasa</th>':''}${evals.some(e=>e.cintura)?'<th>Cintura</th>':''}${evals.some(e=>e.cadera)?'<th>Cadera</th>':''}<th>Obs.</th></tr></thead>
+        <div class="card-header"><div class="card-title">Tabla de progreso</div><div class="card-subtitle">Todas las medidas por evaluación</div></div>
+        <div class="table-container" style="overflow-x:auto">
+          <table style="min-width:700px">
+            <thead><tr>
+              <th>Fecha</th>
+              <th>Peso</th>
+              <th>Δ Peso</th>
+              <th>IMC</th>
+              <th>Estado</th>
+              <th>Presión</th>
+              ${evals.some(e=>e.cintura)?'<th>Cintura</th>':''}
+              ${evals.some(e=>e.abdomen)?'<th>Abdomen</th>':''}
+              ${evals.some(e=>e.cadera)?'<th>Cadera</th>':''}
+              ${evals.some(e=>e.muslo)?'<th>Muslo</th>':''}
+              ${evals.some(e=>e.pecho)?'<th>Pecho</th>':''}
+              ${evals.some(e=>e.cuello)?'<th>Cuello</th>':''}
+              ${evals.some(e=>e.muneca)?'<th>Muñeca</th>':''}
+              ${evals.some(e=>e.grasa)?'<th>% Grasa</th>':''}
+              ${evals.some(e=>e.fc)?'<th>FC</th>':''}
+              <th>Obs.</th>
+            </tr></thead>
             <tbody>
-              ${[...evals].reverse().map(e=>`<tr>
-                <td class="font-mono text-sm">${e.fecha}</td>
-                <td class="font-mono" style="font-weight:600">${e.peso} kg</td>
-                <td class="font-mono" style="color:${getImcColor(e.imc)};font-weight:600">${(e.imc||0).toFixed(1)}</td>
-                <td class="text-sm">${e.presion||'—'}</td>
-                ${evals.some(ev=>ev.grasa)?`<td class="font-mono text-sm">${e.grasa!=null?e.grasa+'%':'—'}</td>`:''}
-                ${evals.some(ev=>ev.cintura)?`<td class="font-mono text-sm">${e.cintura!=null?e.cintura+' cm':'—'}</td>`:''}
-                ${evals.some(ev=>ev.cadera)?`<td class="font-mono text-sm">${e.cadera!=null?e.cadera+' cm':'—'}</td>`:''}
-                <td class="text-sm text-muted">${e.obs||'—'}</td>
-              </tr>`).join('')}
+              ${[...evals].reverse().map((e, ri) => {
+                const prevE = evals[evals.length - 2 - ri];
+                const dP = prevE && e.peso && prevE.peso ? parseFloat((e.peso - prevE.peso).toFixed(1)) : null;
+                const isToday = e.fecha === new Date().toISOString().split('T')[0];
+                return `<tr style="${isToday?'background:rgba(94,140,42,0.06);font-weight:500':''}">
+                  <td class="font-mono text-sm" style="white-space:nowrap${isToday?';color:var(--olive-dark)':''}">${e.fecha}${isToday?' <span style="font-size:9px;background:var(--olive);color:white;border-radius:4px;padding:1px 5px;margin-left:4px">HOY</span>':''}</td>
+                  <td class="font-mono" style="font-weight:700">${e.peso} kg</td>
+                  <td>${dP!==null?`<span style="font-size:11px;font-weight:700;color:${dP<0?'var(--success)':dP>0?'var(--danger)':'var(--gray-400)'}">${dP>0?'+':''}${dP} kg</span>`:'<span style="color:var(--gray-300)">—</span>'}</td>
+                  <td class="font-mono" style="font-weight:700;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</td>
+                  <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
+                  <td class="text-sm">${e.presion||'—'}</td>
+                  ${evals.some(ev=>ev.cintura)?`<td class="font-mono text-sm">${e.cintura!=null?e.cintura+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.abdomen)?`<td class="font-mono text-sm">${e.abdomen!=null?e.abdomen+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.cadera)?`<td class="font-mono text-sm">${e.cadera!=null?e.cadera+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.muslo)?`<td class="font-mono text-sm">${e.muslo!=null?e.muslo+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.pecho)?`<td class="font-mono text-sm">${e.pecho!=null?e.pecho+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.cuello)?`<td class="font-mono text-sm">${e.cuello!=null?e.cuello+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.muneca)?`<td class="font-mono text-sm">${e.muneca!=null?e.muneca+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.grasa)?`<td class="font-mono text-sm">${e.grasa!=null?e.grasa+'%':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.fc)?`<td class="font-mono text-sm">${e.fc!=null?e.fc+' lpm':'—'}</td>`:''}
+                  <td class="text-sm text-muted" style="max-width:160px">${e.obs||'—'}</td>
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </div>
-      </div>` : `<div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Insuficientes datos</div><div class="empty-text">Se necesitan al menos 2 evaluaciones para ver gráficos de evolución</div><button class="btn btn-olive mt-4" onclick="openEvalModal('${p.id}')">+ Primera Evaluación</button></div>`}
+      </div>` : `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn btn-olive btn-sm" onclick="openEvalModal('${p.id}')">+ Nueva Evaluación</button>
+      </div>
+      <div class="empty-state" style="padding:24px"><div class="empty-icon">📈</div><div class="empty-title">Se necesitan al menos 2 evaluaciones para ver gráficos</div></div>`}
+      ${evals.length ? `
+      <!-- Tabla siempre visible -->
+      <div class="card" style="margin-top:${hasCharts?'0':'0'}">
+        <div class="card-header"><div class="card-title">Tabla de progreso</div><div class="card-subtitle">${evals.length} evaluación${evals.length!==1?'es':''} · Todas las medidas</div></div>
+        <div class="table-container" style="overflow-x:auto">
+          <table style="min-width:700px">
+            <thead><tr>
+              <th>Fecha</th>
+              <th>Peso</th>
+              <th>Δ</th>
+              <th>IMC</th>
+              <th>Estado</th>
+              <th>Presión</th>
+              ${evals.some(e=>e.cintura)?'<th>Cintura</th>':''}
+              ${evals.some(e=>e.abdomen)?'<th>Abdomen</th>':''}
+              ${evals.some(e=>e.cadera)?'<th>Cadera</th>':''}
+              ${evals.some(e=>e.muslo)?'<th>Muslo</th>':''}
+              ${evals.some(e=>e.pecho)?'<th>Pecho</th>':''}
+              ${evals.some(e=>e.cuello)?'<th>Cuello</th>':''}
+              ${evals.some(e=>e.muneca)?'<th>Muñeca</th>':''}
+              ${evals.some(e=>e.grasa)?'<th>% Grasa</th>':''}
+              ${evals.some(e=>e.fc)?'<th>FC</th>':''}
+              <th>Obs.</th>
+            </tr></thead>
+            <tbody>
+              ${[...evals].reverse().map((e, ri) => {
+                const prevE = evals[evals.length - 2 - ri];
+                const dP = prevE && e.peso && prevE.peso ? parseFloat((e.peso - prevE.peso).toFixed(1)) : null;
+                const isToday = e.fecha === new Date().toISOString().split('T')[0];
+                return `<tr style="${isToday?'background:rgba(94,140,42,0.06)':''}">
+                  <td class="font-mono text-sm" style="white-space:nowrap">${e.fecha}${isToday?'<span style="font-size:9px;background:var(--olive);color:white;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle">HOY</span>':''}</td>
+                  <td class="font-mono" style="font-weight:700">${e.peso} kg</td>
+                  <td>${dP!==null?`<span style="font-size:11px;font-weight:700;color:${dP<0?'var(--success)':dP>0?'var(--danger)':'var(--gray-400)'}">${dP>0?'+':''}${dP}</span>`:'<span style="color:var(--gray-200)">—</span>'}</td>
+                  <td class="font-mono" style="font-weight:700;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</td>
+                  <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
+                  <td class="text-sm">${e.presion||'—'}</td>
+                  ${evals.some(ev=>ev.cintura)?`<td class="font-mono text-sm">${e.cintura!=null?e.cintura+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.abdomen)?`<td class="font-mono text-sm">${e.abdomen!=null?e.abdomen+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.cadera)?`<td class="font-mono text-sm">${e.cadera!=null?e.cadera+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.muslo)?`<td class="font-mono text-sm">${e.muslo!=null?e.muslo+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.pecho)?`<td class="font-mono text-sm">${e.pecho!=null?e.pecho+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.cuello)?`<td class="font-mono text-sm">${e.cuello!=null?e.cuello+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.muneca)?`<td class="font-mono text-sm">${e.muneca!=null?e.muneca+' cm':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.grasa)?`<td class="font-mono text-sm">${e.grasa!=null?e.grasa+'%':'—'}</td>`:''}
+                  ${evals.some(ev=>ev.fc)?`<td class="font-mono text-sm">${e.fc!=null?e.fc+' lpm':'—'}</td>`:''}
+                  <td class="text-sm text-muted" style="max-width:140px">${e.obs||'—'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : ''}
     </div>
   `;
 
@@ -7163,11 +7249,12 @@ function buildHCEditForm(p) {
   const yesNoField = (id, label, val) => `
     <div class="form-group mb-3"><label>${label}</label>
       <select class="form-select" id="${id}">
-        <option value="" ${!val?'selected':''}>Sin respuesta</option>
-        <option value="true" ${val===true||val==='true'?'selected':''}>Sí</option>
-        <option value="false" ${val===false||val==='false'?'selected':''}>No</option>
+        <option value="" ${!val&&val!==false?'selected':''}>Sin respuesta</option>
+        <option value="true" ${val===true||val==='true'||val==='si'?'selected':''}>Sí</option>
+        <option value="false" ${val===false||val==='false'||val==='no'?'selected':''}>No</option>
       </select>
     </div>`;
+  const HABITOS_LIST = ['Alcohol','Tabaco','Café','Ninguno'];
   return `
     <div class="form-row mb-3">
       <div class="form-group"><label>Motivo de consulta</label><textarea class="form-textarea" id="hc-motivo">${hc.motivo||''}</textarea></div>
@@ -7175,8 +7262,13 @@ function buildHCEditForm(p) {
     </div>
     <div class="form-row mb-3">
       <div class="form-group"><label>Plazo</label><input class="form-control" id="hc-plazo" value="${hc.plazo||''}"></div>
-      <div class="form-group"><label>Medicamentos</label><textarea class="form-textarea" id="hc-medicamentos">${hc.medicamentos||''}</textarea></div>
+      <div class="form-group"><label>Medicamentos y suplementos</label><textarea class="form-textarea" id="hc-medicamentos">${hc.medicamentos||''}</textarea></div>
     </div>
+    <div class="form-row mb-3">
+      ${yesNoField('hc-tieneAlergias','¿Tiene alergias / intolerancias?',hc.tieneAlergias)}
+      <div class="form-group"><label>Detalle de alergias</label><input class="form-control" id="hc-alergias" value="${hc.alergias||''}"></div>
+    </div>
+    <div class="form-group mb-3"><label>Alimentos que NO consume</label><textarea class="form-textarea" id="hc-noConsume">${hc.noConsume||p.noConsume||''}</textarea></div>
     <div class="form-row mb-3">
       <div class="form-group"><label>Actividad física</label>
         <select class="form-select" id="hc-actividad">
@@ -7190,16 +7282,37 @@ function buildHCEditForm(p) {
       <div class="form-group"><label>Horas de sueño</label><input class="form-control" id="hc-sueno" type="number" value="${hc.sueno||''}"></div>
     </div>
     <div class="form-row mb-3">
-      <div class="form-group"><label>Nivel de estrés (1-10)</label><input class="form-control" id="hc-estres" type="number" min="1" max="10" value="${hc.estres||''}"></div>
-      <div class="form-group"><label>Metabólicas</label><input class="form-control" id="hc-metabolicas" value="${hc.metabolicas||''}"></div>
+      <div class="form-group"><label>Nivel de estrés (1–10)</label><input class="form-control" id="hc-estres" type="number" min="1" max="10" value="${hc.estres||''}"></div>
+      <div class="form-group"><label>Alteraciones metabólicas</label><input class="form-control" id="hc-metabolicas" value="${hc.metabolicas||''}"></div>
+    </div>
+    <div class="form-group mb-3"><label>Hábitos tóxicos</label>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px;background:var(--beige);border-radius:var(--radius);border:1px solid var(--gray-200)">
+        ${HABITOS_LIST.map(h=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="hc-habito-${h.toLowerCase()}" ${(hc.habitos||[]).includes(h)?'checked':''} style="accent-color:var(--olive)"> ${h}
+        </label>`).join('')}
+      </div>
+      <input class="form-control mt-2" id="hc-habitosOtros" placeholder="Otros hábitos..." value="${hc.habitosOtros||''}">
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px">Conducta Alimentaria</div>
+    <div class="form-row mb-3">
+      ${yesNoField('hc-comeEstres','¿Come más bajo estrés/ansiedad?',hc.comeEstres)}
+      ${yesNoField('hc-comeAburrido','¿Come por aburrimiento?',hc.comeAburrido)}
     </div>
     <div class="form-row mb-3">
-      ${yesNoField('hc-comeEstres','¿Come bajo estrés?',hc.comeEstres)}
-      ${yesNoField('hc-tieneAlergias','¿Tiene alergias?',hc.tieneAlergias)}
+      ${yesNoField('hc-hambreEmocional','¿Dificultad para identificar hambre real?',hc.hambreEmocional)}
+      ${yesNoField('hc-comeRapido','¿Tiende a comer rápido?',hc.comeRapido)}
     </div>
     <div class="form-row mb-3">
-      ${yesNoField('hc-horariosRegulares','¿Tiene horarios regulares?',hc.horariosRegulares)}
-      ${yesNoField('hc-comidasFuera','¿Come fuera de casa?',hc.comidasFuera)}
+      ${yesNoField('hc-comeLleno','¿Come hasta sentirse muy lleno?',hc.comeLleno)}
+      ${yesNoField('hc-culpaComer','¿Siente culpa después de comer?',hc.culpaComer)}
+    </div>
+    <div class="form-row mb-3">
+      ${yesNoField('hc-dietasRepetidas','¿Ha realizado dietas repetidamente?',hc.dietasRepetidas)}
+      ${yesNoField('hc-horariosRegulares','¿Tiene horarios de comida regulares?',hc.horariosRegulares)}
+    </div>
+    <div class="form-row mb-3">
+      ${yesNoField('hc-comidasFuera','¿Come frecuentemente fuera de casa?',hc.comidasFuera)}
+      <div></div>
     </div>
     <div class="form-group mb-3"><label>Antecedentes personales (separados por coma)</label>
       <input class="form-control" id="hc-antecedentes" value="${(hc.antecedentes||[]).join(', ')}">
@@ -7207,7 +7320,7 @@ function buildHCEditForm(p) {
     <div class="form-group mb-3"><label>Antecedentes familiares (separados por coma)</label>
       <input class="form-control" id="hc-antecFam" value="${(hc.antecFam||[]).join(', ')}">
     </div>
-    <div class="form-group mb-3"><label>Síntomas (separados por coma)</label>
+    <div class="form-group mb-3"><label>Síntomas recientes (separados por coma)</label>
       <input class="form-control" id="hc-sintomas" value="${(hc.sintomas||[]).join(', ')}">
     </div>
     <div class="form-group mb-3"><label>Observaciones adicionales</label>
@@ -7231,25 +7344,36 @@ async function saveEditPatient(patientId) {
   const imc   = parseFloat(gv('ep-imc'))   || p.imc;
 
   // Gather HC fields
+  const HABITOS_LIST = ['Alcohol','Tabaco','Café','Ninguno'];
   const hcData = {
-    motivo:          gv('hc-motivo'),
-    objetivo:        gv('hc-objetivo'),
-    plazo:           gv('hc-plazo'),
-    medicamentos:    gv('hc-medicamentos'),
-    actividad:       gv('hc-actividad'),
-    ejercicio:       gv('hc-ejercicio'),
-    frecuencia:      gv('hc-frecuencia'),
-    sueno:           parseInt(gv('hc-sueno')) || null,
-    estres:          parseInt(gv('hc-estres')) || null,
-    metabolicas:     gv('hc-metabolicas'),
-    comeEstres:      parseBool(gv('hc-comeEstres')),
-    tieneAlergias:   parseBool(gv('hc-tieneAlergias')),
-    horariosRegulares: parseBool(gv('hc-horariosRegulares')),
-    comidasFuera:    parseBool(gv('hc-comidasFuera')),
-    antecedentes:    (gv('hc-antecedentes')||'').split(',').map(s=>s.trim()).filter(Boolean),
-    antecFam:        (gv('hc-antecFam')||'').split(',').map(s=>s.trim()).filter(Boolean),
-    sintomas:        (gv('hc-sintomas')||'').split(',').map(s=>s.trim()).filter(Boolean),
-    antecOtros:      gv('hc-antecOtros'),
+    motivo:           gv('hc-motivo'),
+    objetivo:         gv('hc-objetivo'),
+    plazo:            gv('hc-plazo'),
+    medicamentos:     gv('hc-medicamentos'),
+    actividad:        gv('hc-actividad'),
+    ejercicio:        gv('hc-ejercicio'),
+    frecuencia:       gv('hc-frecuencia'),
+    sueno:            parseInt(gv('hc-sueno')) || null,
+    estres:           parseInt(gv('hc-estres')) || null,
+    metabolicas:      gv('hc-metabolicas'),
+    alergias:         gv('hc-alergias'),
+    noConsume:        gv('hc-noConsume'),
+    habitos:          HABITOS_LIST.filter(h => document.getElementById('hc-habito-'+h.toLowerCase())?.checked),
+    habitosOtros:     gv('hc-habitosOtros'),
+    tieneAlergias:    parseBool(gv('hc-tieneAlergias')),
+    comeEstres:       parseBool(gv('hc-comeEstres')),
+    comeAburrido:     parseBool(gv('hc-comeAburrido')),
+    hambreEmocional:  parseBool(gv('hc-hambreEmocional')),
+    comeRapido:       parseBool(gv('hc-comeRapido')),
+    comeLleno:        parseBool(gv('hc-comeLleno')),
+    culpaComer:       parseBool(gv('hc-culpaComer')),
+    dietasRepetidas:  parseBool(gv('hc-dietasRepetidas')),
+    horariosRegulares:parseBool(gv('hc-horariosRegulares')),
+    comidasFuera:     parseBool(gv('hc-comidasFuera')),
+    antecedentes:     (gv('hc-antecedentes')||'').split(',').map(s=>s.trim()).filter(Boolean),
+    antecFam:         (gv('hc-antecFam')||'').split(',').map(s=>s.trim()).filter(Boolean),
+    sintomas:         (gv('hc-sintomas')||'').split(',').map(s=>s.trim()).filter(Boolean),
+    antecOtros:       gv('hc-antecOtros'),
   };
 
   const sbData = {
@@ -7278,16 +7402,39 @@ async function saveEditPatient(patientId) {
     // Save patient
     await SB.updatePaciente(patientId, sbData);
 
-    // Save HC
+    // Save HC — complete field mapping
     const hcSbData = {
-      motivo: hcData.motivo, objetivo: hcData.objetivo, plazo: hcData.plazo,
-      medicamentos: hcData.medicamentos, actividad: hcData.actividad,
-      ejercicio: hcData.ejercicio, frecuencia: hcData.frecuencia,
-      sueno: hcData.sueno, estres: hcData.estres, metabolicas: hcData.metabolicas,
-      come_estres: hcData.comeEstres, tiene_alergias: hcData.tieneAlergias,
-      horarios_regulares: hcData.horariosRegulares, comidas_fuera: hcData.comidasFuera,
-      antecedentes: hcData.antecedentes, antec_fam: hcData.antecFam,
-      sintomas: hcData.sintomas, antec_otros: hcData.antecOtros,
+      motivo:             hcData.motivo,
+      objetivo:           hcData.objetivo,
+      plazo:              hcData.plazo,
+      medicamentos:       hcData.medicamentos,
+      actividad:          hcData.actividad,
+      ejercicio:          hcData.ejercicio,
+      frecuencia:         hcData.frecuencia,
+      sueno:              hcData.sueno,
+      estres:             hcData.estres,
+      metabolicas:        hcData.metabolicas,
+      come_estres:        hcData.comeEstres,
+      come_aburrido:      hcData.comeAburrido,
+      come_emociones:     hcData.comeEmociones,
+      hambre_emocional:   hcData.hambreEmocional,
+      come_rapido:        hcData.comeRapido,
+      come_lleno:         hcData.comeLleno,
+      culpa_comer:        hcData.culpaComer,
+      culpa_exceso:       hcData.culpaExceso,
+      dietas_repetidas:   hcData.dietasRepetidas,
+      tiene_alergias:     hcData.tieneAlergias,
+      horarios_regulares: hcData.horariosRegulares,
+      comidas_fuera:      hcData.comidasFuera,
+      antecedentes:       hcData.antecedentes,
+      antec_fam:          hcData.antecFam,
+      sintomas:           hcData.sintomas,
+      antec_otros:        hcData.antecOtros,
+      habitos:            hcData.habitos        || [],
+      habitos_otros:      hcData.habitosOtros,
+      alergias:           hcData.alergias,
+      no_consume:         hcData.noConsume,
+      updated_at:         new Date().toISOString(),
     };
     await SB.upsertHistoria(patientId, hcSbData);
 
