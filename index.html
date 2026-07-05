@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#3F5A00">
 <title>NutriMachata — Dra. María Alejandra Chalas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=Playfair+Display:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -2122,7 +2123,7 @@ function renderHistoriasList(list) {
         <!-- Acciones -->
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0" onclick="event.stopPropagation()">
           <button class="btn btn-olive btn-sm" onclick="openHistoriaClinica('${p.id}')">Ver HC</button>
-          <button class="btn btn-outline btn-sm" onclick="printHistoriaClinica('${p.id}')">Imprimir</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadHistoriaClinica('${p.id}')">📥 Descargar HC</button>
           <button class="btn btn-outline btn-sm" onclick="openEvalModal('${p.id}')">Evaluar</button>
         </div>
       </div>
@@ -2605,7 +2606,7 @@ async function savePatient(id) {
         const emailVal = document.getElementById('pm-email')?.value?.trim();
         const passVal  = document.getElementById('pm-pass')?.value?.trim();
         if (emailVal) {
-          const autoPass = passVal || generatePassword();
+          const autoPass = passVal || generatePassword(sbData.nombre);
           await supa('usuarios', 'POST', {
             email: emailVal, password_hash: autoPass,
             rol: 'patient', nombre: sbData.nombre,
@@ -3042,9 +3043,21 @@ async function refreshData() {
   navigate(currentPage);
 }
 
-function generatePassword() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  return Array.from({length: 8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+function generatePassword(nombre = '') {
+  // Genera contraseñas fáciles de recordar
+  // Formato: NUTRI-NOMBRE-2024 o números simples
+  
+  if (nombre && nombre.trim()) {
+    // Tomar primeras 5 letras del nombre
+    const nombreParte = nombre.substring(0, 5).toUpperCase().replace(/[^A-Z]/g, '');
+    const anio = new Date().getFullYear();
+    return `NM-${nombreParte}-${anio}`;
+  }
+  
+  // Alternativa: números simple (1234567890 rotados)
+  const numeros = '123456789012345';
+  const random = Math.floor(Math.random() * (numeros.length - 6));
+  return numeros.substring(random, random + 6);
 }
 
 async function finishWizard() {
@@ -3246,14 +3259,14 @@ async function finishWizard() {
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-olive" style="flex:1" onclick="navigate('historias')">Ver Historias Clínicas</button>
             <button class="btn btn-outline" style="flex:1" onclick="openHistoriaClinica('${newPatient.id}')">Ver HC</button>
-            <button class="btn btn-outline" style="flex:1" onclick="printHistoriaClinica('${newPatient.id}')">Imprimir</button>
+            <button class="btn btn-outline" style="flex:1" onclick="downloadHistoriaClinica('${newPatient.id}')">📥 Descargar HC</button>
           </div>
         </div>
       </div>
     `;
 }
 
-function printHistoriaClinica(patientId) {
+function downloadHistoriaClinica(patientId) {
   const p = DB.patients.find(x=>x.id==patientId);
   if (!p) return;
   const hc = p.historiaClinica || {};
@@ -3357,7 +3370,7 @@ function printHistoriaClinica(patientId) {
   </div>
 </body></html>`;
 
-  _printHTML(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // ═══════════════════════════════════════════════
@@ -3649,7 +3662,7 @@ function renderHCFormView(p) {
     <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid var(--gray-100)">
       <div style="font-size:11px;color:var(--gray-400)">Recuerda guardar los cambios después de editar</div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-outline btn-sm" onclick="printHistoriaClinica('${p.id}')">Imprimir HC</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadHistoriaClinica('${p.id}')">📥 Descargar HC</button>
         <button class="btn btn-olive btn-sm" onclick="saveRec24('${p.id}')">💾 Guardar Recordatorio</button>
       </div>
     </div>
@@ -3891,7 +3904,7 @@ function openHistoriaClinica(patientId, activeTab) {
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="openEditPatientModal('${p.id}')">✏️ Editar</button>
         <button class="btn btn-outline btn-sm" onclick="downloadPatientReport('${p.id}')">⬇ Descargar</button>
-        <button class="btn btn-outline btn-sm" onclick="printHistoriaClinica('${p.id}')">Imprimir HC</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadHistoriaClinica('${p.id}')">📥 Descargar HC</button>
         <button class="btn btn-outline btn-sm" onclick="openEvalModal('${p.id}')">+ Evaluación</button>
         <button class="btn btn-olive btn-sm" onclick="openDietModal('${p.id}')">+ Dieta</button>
         <button class="btn btn-outline btn-sm" onclick="openReportModal('${p.id}')">Reporte</button>
@@ -4493,6 +4506,10 @@ function renderDiets() {
   DB.patients.forEach(p => {
     (p.dietas||[]).forEach(d => allDiets.push({...d,patientId:p.id,patientName:p.nombre,patientColor:p.color,patientInitials:p.initials}));
   });
+  
+  // Obtener plantillas de dietas
+  const templates = DB.settings?.dietTemplates || [];
+  
   document.getElementById('page-content').innerHTML = `
     <div class="card mb-4" style="padding:16px 20px">
       <div class="flex items-center gap-3">
@@ -4500,6 +4517,27 @@ function renderDiets() {
         <button class="btn btn-olive btn-sm" onclick="openDietModal(null)">Nuevo Plan Semanal</button>
       </div>
     </div>
+    
+    ${templates && templates.length > 0 ? `
+    <div class="card mb-4">
+      <div class="card-header"><div><div class="card-title">📋 Plantillas de Dietas Frecuentes</div><div class="card-subtitle">Reutiliza dietas que ya has creado</div></div></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+          ${templates.map((t,i) => `
+          <div style="border:1px solid var(--gray-200);border-radius:var(--radius);padding:12px;background:var(--beige)">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px">🥗 ${t.nombre}</div>
+            <div style="font-size:11px;color:var(--gray-500);margin-bottom:8px">${t.calorias} kcal</div>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-outline btn-xs" onclick="useDietTemplate(${i})">Usar</button>
+              <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteDietTemplate(${i})">🗑</button>
+            </div>
+          </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    ` : ''}
+    
     <div class="card">
       <div class="card-header"><div><div class="card-title">Planes Nutricionales</div><div class="card-subtitle">${allDiets.length} planes creados</div></div></div>
       ${allDiets.length ? `
@@ -4515,7 +4553,8 @@ function renderDiets() {
               <td><span class="badge badge-olive">${d.tipo||'Semanal'}</span></td>
               <td><div class="flex gap-2">
                 <button class="btn btn-outline btn-sm" onclick="openDietView('${d.patientId}','${d.id}')">Ver</button>
-                <button class="btn btn-olive btn-sm" onclick="printDiet('${d.patientId}','${d.id}')">Imprimir</button>
+                <button class="btn btn-olive btn-sm" onclick="downloadDiet('${d.patientId}','${d.id}')">📥 Descargar</button>
+                <button class="btn btn-ghost btn-sm" title="Guardar como plantilla" onclick="saveDietTemplate('${d.patientId}','${d.id}')" style="color:var(--info)">⭐</button>
                 <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteDiet('${d.patientId}','${d.id}')">🗑</button>
               </div></td>
             </tr>`).join('')}
@@ -4668,7 +4707,7 @@ function openDietView(patientId, dietId) {
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-outline btn-sm" onclick="closeModal('modal-diet');openDietModal('${patientId}',DB.patients.find(x=>x.id=='${patientId}').dietas.find(x=>x.id=='${dietId}'))">Editar</button>
-        <button class="btn btn-olive btn-sm" onclick="printDiet('${patientId}','${dietId}')">Imprimir</button>
+        <button class="btn btn-olive btn-sm" onclick="downloadDiet('${patientId}','${dietId}')">📥 Descargar</button>
       </div>
     </div>
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
@@ -4697,7 +4736,7 @@ function openDietView(patientId, dietId) {
   openModal('modal-diet');
 }
 
-function printDiet(patientId, dietId) {
+function downloadDiet(patientId, dietId) {
   const p = DB.patients.find(x=>x.id==patientId);
   if(!p) return;
   const d = (p.dietas||[]).find(x=>x.id==dietId);
@@ -4723,7 +4762,7 @@ function printDiet(patientId, dietId) {
   const days = DIAS.filter(dia => COMIDAS.some(c => (weekPlan[c]||{})[dia]?.trim()));
   const useDays = days.length > 0 ? days : DIAS;
 
-  const win = null; // replaced by _printHTML
+  const win = null; // replaced by downloadPDF
   const dietHTML = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Plan Nutricional — ${p.nombre}</title>
@@ -4843,7 +4882,7 @@ ${d.indicaciones?`<div class="indicaciones"><div class="ind-title">📋 Indicaci
 
 </div>
 </body></html>`;
-  _printHTML(dietHTML, `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  downloadPDF(dietHTML, `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 function deleteDiet(patientId, dietId) {
@@ -4857,6 +4896,76 @@ function deleteDiet(patientId, dietId) {
     } catch(e) {
       console.error(e);
       notify('Error al eliminar plan','danger');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  PLANTILLAS DE DIETAS
+// ═══════════════════════════════════════════════
+function saveDietTemplate(patientId, dietId) {
+  const p = DB.patients.find(x=>x.id==patientId);
+  if (!p) return;
+  const d = (p.dietas||[]).find(x=>x.id==dietId);
+  if (!d) return;
+  
+  if (!DB.settings) DB.settings = {};
+  if (!DB.settings.dietTemplates) DB.settings.dietTemplates = [];
+  
+  // Verificar si ya existe
+  const exists = DB.settings.dietTemplates.some(t => t.id === d.id);
+  if (exists) {
+    notify('Esta dieta ya está en plantillas', 'info');
+    return;
+  }
+  
+  // Guardar como plantilla
+  const template = {
+    id: d.id,
+    nombre: d.nombre,
+    calorias: d.calorias,
+    tipo: d.tipo || 'Semanal',
+    weekPlan: d.weekPlan,
+    indicaciones: d.indicaciones,
+    savedDate: new Date().toLocaleDateString('es-DO')
+  };
+  
+  DB.settings.dietTemplates.push(template);
+  localStorage.setItem('nutrimachata_settings', JSON.stringify(DB.settings));
+  notify(`✓ "${d.nombre}" guardada como plantilla`, 'success');
+  renderDiets();
+}
+
+function useDietTemplate(templateIndex) {
+  const templates = DB.settings?.dietTemplates || [];
+  if (templateIndex < 0 || templateIndex >= templates.length) return;
+  
+  const template = templates[templateIndex];
+  
+  // Crear nueva dieta basada en la plantilla
+  const newDiet = {
+    id: 'diet_' + Date.now() + Math.random().toString(36).substr(2,9),
+    nombre: template.nombre + ' (Copia)',
+    calorias: template.calorias,
+    tipo: template.tipo,
+    fecha: new Date().toLocaleDateString('es-DO'),
+    weekPlan: JSON.parse(JSON.stringify(template.weekPlan || {})),
+    indicaciones: template.indicaciones || ''
+  };
+  
+  // Abrir modal para editar la nueva dieta
+  currentEditDietData = newDiet;
+  openDietModal(null, newDiet);
+  notify('Plantilla cargada - Ajusta según sea necesario', 'info');
+}
+
+function deleteDietTemplate(templateIndex) {
+  showConfirm('¿Eliminar esta plantilla?', () => {
+    if (DB.settings && DB.settings.dietTemplates) {
+      DB.settings.dietTemplates.splice(templateIndex, 1);
+      localStorage.setItem('nutrimachata_settings', JSON.stringify(DB.settings));
+      notify('Plantilla eliminada', 'success');
+      renderDiets();
     }
   });
 }
@@ -7731,6 +7840,33 @@ function _printHTML(htmlContent, filename) {
       }, 1500);
     }, 800);
   };
+}
+
+// Nueva función para descargar PDF directamente
+function downloadPDF(htmlContent, filename) {
+  const element = document.createElement('div');
+  element.innerHTML = htmlContent;
+  
+  const opt = {
+    margin: 5,
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+  
+  // Para dietas (landscape), ajustar orientación
+  if (filename.includes('Dieta')) {
+    opt.jsPDF.orientation = 'landscape';
+  }
+  
+  try {
+    html2pdf().set(opt).from(element).save();
+    notify('PDF descargado correctamente', 'success');
+  } catch(e) {
+    console.error('PDF error:', e);
+    notify('Error al descargar PDF', 'danger');
+  }
 }
 
 // ═══════════════════════════════════════════════
