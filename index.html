@@ -3401,28 +3401,30 @@ function renderEvaluations() {
   ) : allEvals;
   
   document.getElementById('page-content').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div class="card" style="padding:16px 20px">
-        <div class="flex items-center gap-3">
-          <div class="search-bar" style="flex:1">
-            <input 
-              class="form-control" 
-              id="eval-search-input"
-              placeholder="Buscar por paciente, fecha, peso, IMC..." 
-              style="padding-left:36px"
-              oninput="renderEvaluations()">
-          </div>
-          <button class="btn btn-olive btn-sm" onclick="openEvalModal(null)">+ Nueva Evaluación</button>
+    <div class="card mb-4" style="padding:16px 20px">
+      <div class="flex items-center gap-3">
+        <div class="search-bar" style="flex:1">
+          <input 
+            class="form-control" 
+            id="eval-search-input"
+            placeholder="🔍 Buscar por nombre, fecha, peso, IMC..." 
+            style="padding-left:36px"
+            oninput="renderEvaluations()">
         </div>
-        ${searchTerm ? `<div style="margin-top:8px;font-size:12px;color:var(--gray-500)">
-          <strong>${evalsFiltered.length}</strong> resultado${evalsFiltered.length !== 1 ? 's' : ''} encontrado${evalsFiltered.length !== 1 ? 's' : ''}
-        </div>` : ''}
+        <button class="btn btn-olive btn-sm" onclick="openEvalModal(null)">+ Nueva Evaluación</button>
       </div>
-      
-      <div class="card">
-        <div class="card-header">
-          <div><div class="card-title">Evaluaciones Nutricionales</div><div class="card-subtitle">${evalsFiltered.length} de ${allEvals.length} evaluaciones</div></div>
-        </div>
+      ${(() => {
+        const searchTerm = (document.getElementById('eval-search-input')?.value || '').toLowerCase();
+        return searchTerm ? `<div style="margin-top:8px;font-size:12px;color:var(--gray-500)">
+          📊 <strong>${document.querySelectorAll('table tbody tr').length || 0}</strong> resultado${document.querySelectorAll('table tbody tr').length !== 1 ? 's' : ''} encontrado${document.querySelectorAll('table tbody tr').length !== 1 ? 's' : ''}
+        </div>` : '';
+      })()}
+    </div>
+    
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">Evaluaciones Nutricionales</div><div class="card-subtitle">${evalsFiltered.length} de ${allEvals.length} evaluaciones</div></div>
+      </div>
         ${evalsFiltered.length ? `
         <div class="table-container">
           <table>
@@ -3455,7 +3457,6 @@ function renderEvaluations() {
           </div>
         </div>`}
       </div>
-    </div>
   `;
 }
 
