@@ -3409,7 +3409,7 @@ function renderEvaluations() {
             id="eval-search-input"
             placeholder="🔍 Buscar por nombre, fecha, peso, IMC..." 
             style="padding-left:36px"
-            oninput="renderEvaluations()">
+            oninput="filterEvaluationsTable()">
         </div>
         <button class="btn btn-olive btn-sm" onclick="openEvalModal(null)">+ Nueva Evaluación</button>
       </div>
@@ -3423,7 +3423,7 @@ function renderEvaluations() {
     
     <div class="card">
       <div class="card-header">
-        <div><div class="card-title">Evaluaciones Nutricionales</div><div class="card-subtitle">${evalsFiltered.length} de ${allEvals.length} evaluaciones</div></div>
+        <div><div class="card-title">Evaluaciones Nutricionales</div><div class="card-subtitle" id="eval-subtitle">${evalsFiltered.length} de ${allEvals.length} evaluaciones</div></div>
       </div>
         ${evalsFiltered.length ? `
         <div class="table-container">
@@ -3431,15 +3431,15 @@ function renderEvaluations() {
             <thead><tr><th>Paciente</th><th>Fecha</th><th>Peso</th><th>IMC</th><th>Estado</th><th>Observaciones</th><th>Acciones</th></tr></thead>
             <tbody>
               ${evalsFiltered.map(e => `
-              <tr style="cursor:pointer" onclick="openEvaluationDetail('${e.patientId}', '${e.id}')" onmouseover="this.style.background='var(--beige)'" onmouseout="this.style.background=''">
-                <td><div class="flex items-center gap-3"><div class="patient-avatar" style="background:${e.patientColor}">${e.patientInitials}</div><span style="font-size:14px;font-weight:500">${e.patientName}</span></div></td>
-                <td class="text-sm">${e.fecha}</td>
-                <td class="font-mono">${e.peso} kg</td>
+              <tr class="eval-row" style="cursor:pointer" onclick="openEvaluationDetail('${e.patientId}', '${e.id}')" onmouseover="this.style.background='var(--beige)'" onmouseout="this.style.background=''">
+                <td class="eval-name"><div class="flex items-center gap-3"><div class="patient-avatar" style="background:${e.patientColor}">${e.patientInitials}</div><span style="font-size:14px;font-weight:500">${e.patientName}</span></div></td>
+                <td class="text-sm eval-fecha">${e.fecha}</td>
+                <td class="font-mono eval-peso">${e.peso} kg</td>
                 <td>
-                  <div class="font-mono" style="font-weight:600;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</div>
+                  <div class="font-mono eval-imc" style="font-weight:600;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</div>
                 </td>
                 <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
-                <td class="text-sm text-muted">${e.obs || '—'}</td>
+                <td class="text-sm text-muted eval-obs">${e.obs || '—'}</td>
                 <td style="display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
                   <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${e.patientId}', '${e.id}')">✏️ Editar</button>
                   <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="deleteEvaluacion('${e.patientId}', '${e.id}')">🗑 Eliminar</button>
@@ -3618,6 +3618,41 @@ async function deleteEvaluacion(patientId, evalId) {
       if (currentPage === 'evaluations') renderEvaluations();
     } catch(e) { notify('Error al eliminar', 'danger'); console.error(e); }
   });
+}
+
+// Función para filtrar evaluaciones sin re-renderizar la página
+function filterEvaluationsTable() {
+  const searchInput = document.getElementById('eval-search-input');
+  if (!searchInput) return;
+  
+  const searchTerm = searchInput.value.toLowerCase();
+  const rows = document.querySelectorAll('.eval-row');
+  let visibleCount = 0;
+  
+  rows.forEach(row => {
+    const name = row.querySelector('.eval-name')?.textContent.toLowerCase() || '';
+    const fecha = row.querySelector('.eval-fecha')?.textContent || '';
+    const peso = row.querySelector('.eval-peso')?.textContent || '';
+    const imc = row.querySelector('.eval-imc')?.textContent || '';
+    const obs = row.querySelector('.eval-obs')?.textContent.toLowerCase() || '';
+    
+    const matches = !searchTerm || 
+      name.includes(searchTerm) ||
+      fecha.includes(searchTerm) ||
+      peso.includes(searchTerm) ||
+      imc.includes(searchTerm) ||
+      obs.includes(searchTerm);
+    
+    row.style.display = matches ? '' : 'none';
+    if (matches) visibleCount++;
+  });
+  
+  // Actualizar el subtítulo con el contador
+  const subtitle = document.getElementById('eval-subtitle');
+  if (subtitle) {
+    const total = document.querySelectorAll('.eval-row').length;
+    subtitle.textContent = `${visibleCount} de ${total} evaluaciones`;
+  }
 }
 
 function openEvaluationDetail(patientId, evalId) {
