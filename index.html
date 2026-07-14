@@ -1122,6 +1122,12 @@ const SB = {
     const r = await supa('evaluaciones', 'POST', data);
     return r && r[0] ? r[0] : null;
   },
+  async updateEvaluacion(id, data) {
+    return await supa(`evaluaciones?id=eq.${id}`, 'PATCH', data);
+  },
+  async deleteEvaluacion(id) {
+    return await supa(`evaluaciones?id=eq.${id}`, 'DELETE');
+  },
 
   // HISTORIAS
   async getHistoria(pacienteId) {
@@ -3401,7 +3407,10 @@ function renderEvaluations() {
               </td>
               <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
               <td class="text-sm text-muted">${e.obs || '—'}</td>
-              <td><button class="btn btn-outline btn-sm" onclick="openHistoriaClinica('${e.patientId}')">Ver HC</button></td>
+              <td style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${e.patientId}', '${e.id}')">✏️ Editar</button>
+                <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="deleteEvaluacion('${e.patientId}', '${e.id}')">🗑 Eliminar</button>
+              </td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -3479,6 +3488,101 @@ function openEvalModal(patientId) {
   openModal('modal-evaluation');
 }
 
+function editEvaluacion(patientId, evalId) {
+  console.log('Editando evaluación:', patientId, evalId);  // DEBUG
+  const patient = DB.patients.find(p => p.id == patientId);
+  if (!patient) { 
+    notify('Paciente no encontrado', 'danger');
+    return; 
+  }
+  
+  const eval_ = (patient.evaluaciones || []).find(e => e.id == evalId);
+  if (!eval_) { 
+    notify('Evaluación no encontrada', 'danger');
+    return; 
+  }
+  
+  // Abrir modal con datos de la evaluación
+  document.getElementById('eval-patient-name').textContent = patient.nombre;
+  document.getElementById('eval-modal-body').innerHTML = `
+    <input type="hidden" id="eval-id" value="${evalId}">
+    <input type="hidden" id="eval-patient-select" value="${patientId}">
+    <div class="form-row mb-4">
+      <div class="form-group"><label>Fecha *</label><input class="form-control" id="eval-fecha" type="date" value="${eval_.fecha}"></div>
+      <div class="form-group"><label>Peso (kg) *</label><input class="form-control" id="eval-peso" type="number" step="0.1" value="${eval_.peso || ''}" oninput="calcEvalIMC()"></div>
+    </div>
+    <div class="form-row mb-4">
+      <div class="form-group">
+        <label>Talla *</label>
+        <input class="form-control" id="eval-talla-cm" type="text"
+          value="${eval_.talla ? Math.round(eval_.talla * 100) : ''}"
+          oninput="calcEvalIMC()" placeholder="Ej: 165 cm ó 5'8&quot;">
+        <div style="font-size:11px;color:var(--gray-400);margin-top:3px">En cm o pies (5'8)</div>
+      </div>
+      <div class="form-group"><label>Presión Arterial</label><input class="form-control" id="eval-presion" value="${eval_.presion || ''}" placeholder="120/80"></div>
+    </div>
+    <div id="eval-imc-indicator"></div>
+    <input type="hidden" id="eval-talla" value="${eval_.talla || ''}">
+
+    <div style="background:var(--beige);border-radius:var(--radius);padding:14px 16px;margin:16px 0 4px">
+      <div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📏 Medidas Antropométricas (cm)</div>
+      <div class="form-row mb-3">
+        <div class="form-group"><label>Cuello</label><input class="form-control" id="eval-cuello" type="number" step="0.1" value="${eval_.cuello || ''}" placeholder="cm"></div>
+        <div class="form-group"><label>Pecho</label><input class="form-control" id="eval-pecho" type="number" step="0.1" value="${eval_.pecho || ''}" placeholder="cm"></div>
+        <div class="form-group"><label>Muñeca</label><input class="form-control" id="eval-muneca" type="number" step="0.1" value="${eval_.muneca || ''}" placeholder="cm"></div>
+      </div>
+      <div class="form-row mb-3">
+        <div class="form-group"><label>Cintura</label><input class="form-control" id="eval-cintura" type="number" step="0.1" value="${eval_.cintura || ''}" placeholder="cm"></div>
+        <div class="form-group"><label>Abdomen</label><input class="form-control" id="eval-abdomen" type="number" step="0.1" value="${eval_.abdomen || ''}" placeholder="cm"></div>
+        <div class="form-group"><label>Cadera</label><input class="form-control" id="eval-cadera" type="number" step="0.1" value="${eval_.cadera || ''}" placeholder="cm"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Muslo</label><input class="form-control" id="eval-muslo" type="number" step="0.1" value="${eval_.muslo || ''}" placeholder="cm"></div>
+        <div class="form-group"><label>% Grasa Corporal</label><input class="form-control" id="eval-grasa" type="number" step="0.1" value="${eval_.grasa || eval_.porcentaje_grasa || ''}" placeholder="%"></div>
+        <div class="form-group"><label>Frec. Cardíaca (lpm)</label><input class="form-control" id="eval-fc" type="number" step="1" value="${eval_.fc || eval_.frecuencia_cardiaca || ''}" placeholder="lpm"></div>
+      </div>
+    </div>
+
+    <div class="form-group mt-4">
+      <label>Estado Clínico</label>
+      <div id="eval-estado-display" style="padding:10px 14px;background:var(--beige);border-radius:var(--radius);font-weight:600;font-size:13px;color:var(--gray-500);border:1px solid var(--gray-200)">
+        ${eval_.estado || 'Calculando...'}
+      </div>
+      <input type="hidden" id="eval-estado" value="${eval_.estado || ''}">
+    </div>
+    <div class="form-group mt-4"><label>Observaciones</label>
+      <textarea class="form-textarea" id="eval-obs" placeholder="Observaciones clínicas, notas de la evaluación...">${eval_.obs || ''}</textarea>
+    </div>
+    <div class="modal-footer" style="padding:20px 0 0;margin-top:20px;border-top:1px solid var(--gray-100)">
+      <button class="btn btn-danger btn-sm" onclick="deleteEvaluacion('${patientId}', '${evalId}')">🗑 Eliminar</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn btn-outline" onclick="closeModal('modal-evaluation')">Cancelar</button>
+        <button class="btn btn-olive" onclick="saveEvaluation()">Guardar Cambios</button>
+      </div>
+    </div>
+  `;
+  setTimeout(() => {
+    calcEvalIMC();
+    console.log('calcEvalIMC ejecutado');
+  }, 100);
+  openModal('modal-evaluation');
+}
+
+async function deleteEvaluacion(patientId, evalId) {
+  showConfirm('¿Eliminar esta evaluación?', async () => {
+    try {
+      await SB.deleteEvaluacion(evalId);
+      const patient = DB.patients.find(p => p.id == patientId);
+      if (patient && patient.evaluaciones) {
+        patient.evaluaciones = patient.evaluaciones.filter(e => e.id != evalId);
+      }
+      closeModal('modal-evaluation');
+      notify('Evaluación eliminada', 'success');
+      if (currentPage === 'evaluations') renderEvaluations();
+    } catch(e) { notify('Error al eliminar', 'danger'); console.error(e); }
+  });
+}
+
 function parseTalla(val) {
   // Accepts: "165", "1.65", "5'8", "5'8"", "5 8"
   if (!val) return null;
@@ -3519,6 +3623,7 @@ function calcEvalIMC() {
 }
 
 async function saveEvaluation() {
+  const evalId = document.getElementById('eval-id')?.value; // Para editar
   const pid = document.getElementById('eval-patient-select').value;
   if (!pid) { notify('Seleccione un paciente', 'danger'); return; }
   const peso  = parseFloat(document.getElementById('eval-peso').value);
@@ -3540,30 +3645,53 @@ async function saveEvaluation() {
   const muslo   = parseFloat(document.getElementById('eval-muslo')?.value) || null;
   const grasa   = parseFloat(document.getElementById('eval-grasa')?.value) || null;
   const fc      = parseFloat(document.getElementById('eval-fc')?.value) || null;
+
   try {
     const evalData = {
       paciente_id: pid, fecha, peso, talla, imc, presion, estado, obs,
       cuello, pecho, muneca, cintura, abdomen, cadera, muslo,
       porcentaje_grasa: grasa, frecuencia_cardiaca: fc
     };
-    const created = await SB.createEvaluacion(evalData);
+    
+    if (evalId) {
+      // Actualizar evaluación existente
+      await SB.updateEvaluacion(evalId, evalData);
+      const p = DB.patients.find(x => x.id == pid);
+      if (p && p.evaluaciones) {
+        const idx = p.evaluaciones.findIndex(e => e.id == evalId);
+        if (idx >= 0) {
+          p.evaluaciones[idx] = { id: evalId, fecha, peso, talla, imc, presion, estado, obs,
+            cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc };
+        }
+      }
+      notify('Evaluación actualizada correctamente', 'success');
+    } else {
+      // Crear nueva evaluación
+      const created = await SB.createEvaluacion(evalData);
+      const p = DB.patients.find(x => x.id == pid);
+      if (p) {
+        if (!p.evaluaciones) p.evaluaciones = [];
+        p.evaluaciones.push({ id: created ? created.id : ('local-'+Date.now()), fecha, peso, talla, imc, presion, estado, obs,
+          cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc });
+      }
+      notify('Evaluación guardada correctamente', 'success');
+    }
+    
     // Update paciente weight in Supabase
     await SB.updatePaciente(pid, { peso, talla, imc, presion, estado: getImcCategory(imc), updated_at: new Date().toISOString() });
-    // Update local — use == to handle string/int mismatch
     const p = DB.patients.find(x => x.id == pid);
     if (p) {
-      if (!p.evaluaciones) p.evaluaciones = [];
-      p.evaluaciones.push({ id: created ? created.id : ('local-'+Date.now()), fecha, peso, talla, imc, presion, estado, obs,
-        cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc });
       p.peso = peso; p.talla = talla; p.imc = imc;
       p.presion = presion || p.presion;
       p.estado = getImcCategory(imc);
     }
     closeModal('modal-evaluation');
-    notify('Evaluación guardada correctamente', 'success');
     if (currentPage === 'evaluations') renderEvaluations();
     if (currentPage === 'patients') renderPatients();
-  } catch(e) { console.error(e); notify('Error al guardar evaluación', 'danger'); }
+  } catch(e) { 
+    console.error('Error al guardar evaluación:', e); 
+    notify('Error al guardar evaluación: ' + (e.message || 'Error desconocido'), 'danger'); 
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -5579,10 +5707,13 @@ function openAppointmentModal(defaultDate, existingApt) {
     <!-- Tab: Paciente registrado -->
     <div id="tab-paciente" style="display:${initTab==='paciente'?'block':'none'}">
       <div class="form-group mb-3"><label>Paciente *</label>
-        <select class="form-select" id="apt-patient">
-          <option value="">Seleccionar paciente...</option>
-          ${DB.patients.map(p => `<option value="${p.id}" ${existingApt && existingApt.patientId == p.id ? 'selected' : ''}>${p.nombre}</option>`).join('')}
-        </select>
+        <div style="position:relative;z-index:10">
+          <input class="form-control" id="apt-patient-search" type="text" placeholder="Buscar paciente por nombre..." autocomplete="off"
+            value="${existingApt && existingApt.patientId ? (DB.patients.find(p => p.id == existingApt.patientId)?.nombre || '') : ''}"
+            oninput="filterPacientesApt(this.value)">
+          <input type="hidden" id="apt-patient" value="${existingApt && existingApt.patientId ? existingApt.patientId : ''}">
+          <div id="apt-patient-list" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--gray-200);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:200px;overflow-y:auto;display:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+        </div>
       </div>
     </div>
 
@@ -5612,6 +5743,9 @@ function openAppointmentModal(defaultDate, existingApt) {
     </div>
     <div class="form-group mb-3"><label>Descripción</label>
       <input class="form-control" id="apt-desc" value="${existingApt ? (existingApt.descripcion || '') : ''}" placeholder="Ej: Primera consulta · Control mensual">
+    </div>
+    <div class="form-group mb-3"><label>📝 Notas del Paciente</label>
+      <textarea class="form-textarea" id="apt-notas" placeholder="Agregar notas específicas sobre el paciente, observaciones importantes, recomendaciones..." style="min-height:80px">${existingApt ? (existingApt.notas || '') : ''}</textarea>
     </div>
     <div class="form-group mb-4"><label>Estado</label>
       <select class="form-select" id="apt-estado">
@@ -5644,6 +5778,34 @@ function aptSwitchTab(tab) {
   });
 }
 
+function filterPacientesApt(search) {
+  const list = document.getElementById('apt-patient-list');
+  const searchInput = document.getElementById('apt-patient-search');
+  const filtered = DB.patients.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+  
+  if (!search.trim()) {
+    list.style.display = 'none';
+    return;
+  }
+  
+  list.innerHTML = filtered.map(p => `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background 0.15s"
+      onmouseover="this.style.background='rgba(94,140,42,0.05)'" onmouseout="this.style.background=''"
+      onclick="selectPacienteApt('${p.id}', '${p.nombre}')">
+      <div style="font-weight:500;font-size:14px">${p.nombre}</div>
+      <div style="font-size:12px;color:var(--gray-400)">${p.cedula || 'Sin cédula'} • ${p.edad || '—'} años</div>
+    </div>
+  `).join('');
+  
+  list.style.display = filtered.length > 0 ? 'block' : 'none';
+}
+
+function selectPacienteApt(id, nombre) {
+  document.getElementById('apt-patient-search').value = nombre;
+  document.getElementById('apt-patient').value = id;
+  document.getElementById('apt-patient-list').style.display = 'none';
+}
+
 async function saveAppointment() {
   const fecha  = document.getElementById('apt-fecha').value;
   const hora   = document.getElementById('apt-hora').value;
@@ -5661,12 +5823,13 @@ async function saveAppointment() {
   if (tabManualVisible && !nombreManual) { notify('Ingrese el nombre del paciente', 'danger'); return; }
 
   const desc   = document.getElementById('apt-desc').value;
+  const notas  = document.getElementById('apt-notas').value;
   const estado = document.getElementById('apt-estado').value;
   const eid    = document.getElementById('apt-id')?.value || null;
 
   const citaData = {
     paciente_id:     pid || null,
-    fecha, hora, descripcion: desc, estado,
+    fecha, hora, descripcion: desc, estado, notas,
     nombre_manual:   nombreManual   || null,
     telefono_manual: telefonoManual || null,
     email_manual:    emailManual    || null,
@@ -5680,7 +5843,7 @@ async function saveAppointment() {
       await SB.updateCita(eid, citaData);
       const apt = DB.appointments.find(a => a.id == eid);
       if (apt) Object.assign(apt, {
-        patientId: pid || null, fecha, hora: hora.substring(0,5), descripcion: desc, estado,
+        patientId: pid || null, fecha, hora: hora.substring(0,5), descripcion: desc, estado, notas,
         nombreManual, telefonoManual, emailManual,
       });
       notify('Cita actualizada', 'success');
@@ -5688,7 +5851,7 @@ async function saveAppointment() {
       const created = await SB.createCita(citaData);
       if (created && created.id) {
         DB.appointments.push({
-          id: created.id, patientId: pid || null, fecha, hora: hora.substring(0,5), descripcion: desc, estado,
+          id: created.id, patientId: pid || null, fecha, hora: hora.substring(0,5), descripcion: desc, estado, notas,
           nombreManual, telefonoManual, emailManual,
         });
         notify(`Cita agendada para ${displayName}`, 'success');
@@ -6484,7 +6647,16 @@ function printPatientDiet(patientId, dietId) {
 function renderMyHistory() {
   const patientId = DB.currentUser.patientId;
   const p = DB.patients.find(x => x.id == patientId || x.email === DB.currentUser.email);
-  const evals = p ? [...(p.evaluaciones || [])].sort((a,b) => a.fecha.localeCompare(b.fecha)) : [];
+  let evals = p ? [...(p.evaluaciones || [])].sort((a,b) => a.fecha.localeCompare(b.fecha)) : [];
+  
+  // Eliminar duplicados: mantener solo la última evaluación por fecha
+  const evalsByDate = {};
+  evals.forEach(e => {
+    if (!evalsByDate[e.fecha] || (e.id > evalsByDate[e.fecha].id)) {
+      evalsByDate[e.fecha] = e;
+    }
+  });
+  evals = Object.values(evalsByDate).sort((a,b) => a.fecha.localeCompare(b.fecha));
 
   const firstEval = evals[0]   || null;
   const lastEval  = evals[evals.length - 1] || null;
@@ -6536,7 +6708,7 @@ function renderMyHistory() {
         ${evals.length ? `
         <div class="table-container">
           <table>
-            <thead><tr><th>Fecha</th><th>Peso</th><th>Δ Peso</th><th>IMC</th><th>Δ IMC</th><th>Estado</th><th>Presión</th><th>Observaciones</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Peso</th><th>Δ Peso</th><th>IMC</th><th>Δ IMC</th><th>Estado</th><th>Presión</th><th>Observaciones</th><th>Acciones</th></tr></thead>
             <tbody>
               ${[...evals].reverse().map((e, ri) => {
                 const prevE = evals[evals.length - 2 - ri];
@@ -6551,6 +6723,7 @@ function renderMyHistory() {
                   <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
                   <td class="text-sm">${e.presion||'—'}</td>
                   <td class="text-sm text-muted" style="max-width:180px">${e.obs||'—'}</td>
+                  <td><button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="deleteMyEvaluacion('${e.id}')">🗑</button></td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -6609,6 +6782,27 @@ function renderMyHistory() {
       });
     }, 100);
   }
+}
+
+async function deleteMyEvaluacion(evalId) {
+  showConfirm('¿Eliminar esta evaluación? Esta acción no se puede deshacer.', async () => {
+    try {
+      const patientId = DB.currentUser.patientId;
+      const p = DB.patients.find(x => x.id == patientId || x.email === DB.currentUser.email);
+      
+      await SB.deleteEvaluacion(evalId);
+      
+      if (p && p.evaluaciones) {
+        p.evaluaciones = p.evaluaciones.filter(e => e.id != evalId);
+      }
+      
+      notify('Evaluación eliminada correctamente', 'success');
+      if (currentPage === 'my-history') renderMyHistory();
+    } catch(e) {
+      console.error(e);
+      notify('Error al eliminar la evaluación', 'danger');
+    }
+  });
 }
 
 function renderMyAppointments() {
