@@ -3387,38 +3387,74 @@ function renderEvaluations() {
   DB.patients.forEach(p => {
     (p.evaluaciones || []).forEach(e => allEvals.push({ ...e, patientId: p.id, patientName: p.nombre, patientColor: p.color, patientInitials: p.initials }));
   });
+  
+  // Obtener término de búsqueda
+  const searchTerm = (document.getElementById('eval-search-input')?.value || '').toLowerCase();
+  
+  // Filtrar evaluaciones según búsqueda
+  const evalsFiltered = searchTerm ? allEvals.filter(e => 
+    e.patientName.toLowerCase().includes(searchTerm) ||
+    e.fecha.includes(searchTerm) ||
+    (e.peso && e.peso.toString().includes(searchTerm)) ||
+    (e.imc && e.imc.toString().includes(searchTerm)) ||
+    (e.obs && e.obs.toLowerCase().includes(searchTerm))
+  ) : allEvals;
+  
   document.getElementById('page-content').innerHTML = `
-    <div class="card">
-      <div class="card-header">
-        <div><div class="card-title">Evaluaciones Nutricionales</div><div class="card-subtitle">${allEvals.length} evaluaciones registradas</div></div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="padding:16px 20px">
+        <div class="flex items-center gap-3">
+          <div class="search-bar" style="flex:1">
+            <input 
+              class="form-control" 
+              id="eval-search-input"
+              placeholder="Buscar por paciente, fecha, peso, IMC..." 
+              style="padding-left:36px"
+              oninput="renderEvaluations()">
+          </div>
+          <button class="btn btn-olive btn-sm" onclick="openEvalModal(null)">+ Nueva Evaluación</button>
+        </div>
+        ${searchTerm ? `<div style="margin-top:8px;font-size:12px;color:var(--gray-500)">
+          <strong>${evalsFiltered.length}</strong> resultado${evalsFiltered.length !== 1 ? 's' : ''} encontrado${evalsFiltered.length !== 1 ? 's' : ''}
+        </div>` : ''}
       </div>
-      ${allEvals.length ? `
-      <div class="table-container">
-        <table>
-          <thead><tr><th>Paciente</th><th>Fecha</th><th>Peso</th><th>IMC</th><th>Estado</th><th>Observaciones</th><th>Acciones</th></tr></thead>
-          <tbody>
-            ${allEvals.map(e => `
-            <tr>
-              <td><div class="flex items-center gap-3"><div class="patient-avatar" style="background:${e.patientColor}">${e.patientInitials}</div><span style="font-size:14px;font-weight:500">${e.patientName}</span></div></td>
-              <td class="text-sm">${e.fecha}</td>
-              <td class="font-mono">${e.peso} kg</td>
-              <td>
-                <div class="font-mono" style="font-weight:600;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</div>
-              </td>
-              <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
-              <td class="text-sm text-muted">${e.obs || '—'}</td>
-              <td style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${e.patientId}', '${e.id}')">✏️ Editar</button>
-                <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="deleteEvaluacion('${e.patientId}', '${e.id}')">🗑 Eliminar</button>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>` : `
-      <div class="card-body">
-        <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Sin evaluaciones</div><div class="empty-text">Comience registrando la primera evaluación nutricional de un paciente</div>
-        <button class="btn btn-olive" onclick="openEvalModal(null)">+ Primera Evaluación</button></div>
-      </div>`}
+      
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Evaluaciones Nutricionales</div><div class="card-subtitle">${evalsFiltered.length} de ${allEvals.length} evaluaciones</div></div>
+        </div>
+        ${evalsFiltered.length ? `
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Paciente</th><th>Fecha</th><th>Peso</th><th>IMC</th><th>Estado</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+            <tbody>
+              ${evalsFiltered.map(e => `
+              <tr style="cursor:pointer" onclick="openEvaluationDetail('${e.patientId}', '${e.id}')" onmouseover="this.style.background='var(--beige)'" onmouseout="this.style.background=''">
+                <td><div class="flex items-center gap-3"><div class="patient-avatar" style="background:${e.patientColor}">${e.patientInitials}</div><span style="font-size:14px;font-weight:500">${e.patientName}</span></div></td>
+                <td class="text-sm">${e.fecha}</td>
+                <td class="font-mono">${e.peso} kg</td>
+                <td>
+                  <div class="font-mono" style="font-weight:600;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</div>
+                </td>
+                <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
+                <td class="text-sm text-muted">${e.obs || '—'}</td>
+                <td style="display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
+                  <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${e.patientId}', '${e.id}')">✏️ Editar</button>
+                  <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="deleteEvaluacion('${e.patientId}', '${e.id}')">🗑 Eliminar</button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : `
+        <div class="card-body">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">${searchTerm ? 'Sin resultados' : 'Sin evaluaciones'}</div>
+            <div class="empty-text">${searchTerm ? 'No se encontraron evaluaciones que coincidan con tu búsqueda' : 'Comience registrando la primera evaluación nutricional de un paciente'}</div>
+            <button class="btn btn-olive mt-4" onclick="openEvalModal(null)">+ ${searchTerm ? 'Limpiar búsqueda' : 'Primera Evaluación'}</button>
+          </div>
+        </div>`}
+      </div>
     </div>
   `;
 }
@@ -3581,6 +3617,130 @@ async function deleteEvaluacion(patientId, evalId) {
       if (currentPage === 'evaluations') renderEvaluations();
     } catch(e) { notify('Error al eliminar', 'danger'); console.error(e); }
   });
+}
+
+function openEvaluationDetail(patientId, evalId) {
+  const patient = DB.patients.find(p => p.id == patientId);
+  if (!patient) return;
+  
+  const eval = (patient.evaluaciones || []).find(e => e.id == evalId);
+  if (!eval) return;
+  
+  currentPage = `eval-detail-${evalId}`;
+  
+  document.getElementById('page-title').textContent = patient.nombre;
+  document.getElementById('page-subtitle').textContent = `Evaluación del ${eval.fecha}`;
+  
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <button class="btn btn-ghost btn-sm" onclick="renderEvaluations()">← Volver a Evaluaciones</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${patientId}', '${evalId}')">✏️ Editar</button>
+        <button class="btn btn-outline btn-sm" onclick="openHistoriaClinica('${patientId}', 'resumen')">👤 Ir a Paciente</button>
+      </div>
+    </div>
+
+    <!-- HEADER -->
+    <div style="background:linear-gradient(135deg,var(--olive-dark) 0%,var(--olive) 60%,var(--olive-accent) 100%);border-radius:var(--radius-xl);padding:28px 32px;margin-bottom:24px;color:white">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;flex-shrink:0">${patient.initials}</div>
+        <div style="flex:1">
+          <div style="font-family:'Playfair Display',serif;font-size:24px;font-weight:500;margin-bottom:4px">${patient.nombre}</div>
+          <div style="opacity:0.8;font-size:13px;margin-bottom:10px">${patient.edad} años · ${patient.sexo==='F'?'Femenino':'Masculino'}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500">${eval.estado || 'N/A'}</span>
+            <span style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:12px">📅 ${eval.fecha}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MÉTRICAS PRINCIPALES -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+      <div class="card" style="padding:16px 20px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">Peso</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark);margin-bottom:4px">${eval.peso}</div>
+        <div style="font-size:13px;color:var(--gray-500)">kg</div>
+      </div>
+      
+      <div class="card" style="padding:16px 20px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">Talla</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--info);margin-bottom:4px">${eval.talla}</div>
+        <div style="font-size:13px;color:var(--gray-500)">m</div>
+      </div>
+      
+      <div class="card" style="padding:16px 20px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">IMC</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:${getImcColor(eval.imc)};margin-bottom:4px">${(eval.imc||0).toFixed(1)}</div>
+        <div style="font-size:13px"><span class="badge ${getImcBadge(eval.imc)}">${getImcCategory(eval.imc)}</span></div>
+      </div>
+      
+      <div class="card" style="padding:16px 20px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">Presión</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--warning);margin-bottom:4px">${eval.presion || '—'}</div>
+        <div style="font-size:13px;color:var(--gray-500)">mmHg</div>
+      </div>
+    </div>
+
+    <!-- MEDIDAS ANTROPOMÉTRICAS -->
+    ${(eval.cintura || eval.cadera || eval.abdomen || eval.muslo || eval.cuello || eval.pecho || eval.muneca) ? `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">Medidas Antropométricas</div></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+          ${eval.cuello ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Cuello</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.cuello} cm</div>
+          </div>` : ''}
+          ${eval.pecho ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Pecho</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.pecho} cm</div>
+          </div>` : ''}
+          ${eval.muneca ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Muñeca</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.muneca} cm</div>
+          </div>` : ''}
+          ${eval.cintura ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Cintura</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.cintura} cm</div>
+          </div>` : ''}
+          ${eval.abdomen ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Abdomen</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.abdomen} cm</div>
+          </div>` : ''}
+          ${eval.cadera ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Cadera</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.cadera} cm</div>
+          </div>` : ''}
+          ${eval.muslo ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Muslo</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.muslo} cm</div>
+          </div>` : ''}
+          ${eval.porcentaje_grasa ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">% Grasa</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.porcentaje_grasa}%</div>
+          </div>` : ''}
+          ${eval.frecuencia_cardiaca ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+            <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">FC</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.frecuencia_cardiaca} lpm</div>
+          </div>` : ''}
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- OBSERVACIONES -->
+    ${eval.obs ? `
+    <div class="card">
+      <div class="card-header"><div class="card-title">Observaciones y Notas</div></div>
+      <div class="card-body">
+        <div style="background:var(--beige);border-radius:var(--radius);padding:16px;border-left:4px solid var(--olive);line-height:1.6;color:var(--gray-700)">
+          ${eval.obs}
+        </div>
+      </div>
+    </div>
+    ` : ''}
+  `;
 }
 
 function parseTalla(val) {
@@ -4237,23 +4397,89 @@ function openHistoriaClinica(patientId, activeTab) {
 
     <!-- ── DIETAS ── -->
     <div id="hcp-dietas" style="display:${tab==='dietas'?'block':'none'}">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-        <button class="btn btn-olive btn-sm" onclick="openDietModal('${p.id}')">+ Nuevo Plan</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <h3 style="font-size:16px;font-weight:600;margin:0;color:var(--black)">Planes Nutricionales Asignados</h3>
+          <p style="font-size:13px;color:var(--gray-500);margin:4px 0 0">${dietas.length} plan${dietas.length!==1?'es':''} ${dietas.length>0?'creado'+(dietas.length!==1?'s':''):'sin asignar'}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-olive btn-sm" onclick="openDietModal('${p.id}')">+ Nuevo Plan</button>
+          <button class="btn btn-outline btn-sm" onclick="openUploadDietModal('${p.id}')">📄 Adjuntar PDF</button>
+        </div>
       </div>
-      ${dietas.length ? dietas.map(d=>`
-        <div class="card mb-3">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px">
-            <div>
-              <div style="font-weight:600;font-size:15px;margin-bottom:4px">${d.nombre}</div>
-              <div class="text-sm text-muted">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div>
+
+      ${dietas.length ? `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+        ${dietas.map((d, idx)=>{
+          const diasActivo = d.fecha ? Math.floor((new Date() - new Date(d.fecha)) / (1000 * 60 * 60 * 24)) : null;
+          const estado = d.activo !== false ? '✅ Activa' : '⏸️ Inactiva';
+          const esArchivo = d.tipoArchivo === 'pdf' || (d.archivoUrl && d.archivoUrl.includes('pdf'));
+          return `
+        <div class="card" style="position:relative;padding:0;overflow:hidden;border-left:4px solid ${esArchivo ? 'var(--info)' : 'var(--olive-accent)'}">
+          <div style="background:linear-gradient(135deg,rgba(94,140,42,0.05) 0%,transparent 100%);padding:16px 20px">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
+              <div>
+                <div style="font-weight:600;font-size:15px;color:var(--olive-dark);margin-bottom:4px">${esArchivo ? '📄' : '🥗'} ${d.nombre}</div>
+                <div style="font-size:12px;color:var(--gray-500)">${d.fecha ? 'Desde ' + d.fecha : 'Archivo adjunto'}</div>
+              </div>
+              <span class="badge badge-olive" style="font-size:11px;padding:3px 8px">${estado}</span>
             </div>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-outline btn-sm" onclick="openDietView('${p.id}','${d.id}')">Ver plan</button>
-              <button class="btn btn-olive btn-sm" onclick="printDiet('${p.id}','${d.id}')">🖨 PDF</button>
-              <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteDiet('${p.id}','${d.id}')">🗑</button>
+            
+            ${esArchivo ? `
+            <!-- ARCHIVO PDF -->
+            <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px;padding:12px;background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-100)">
+              <div>
+                <div style="font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:3px">📎 Archivo Adjunto</div>
+                <div style="font-size:14px;font-weight:600;color:var(--info);word-break:break-word">${d.nombre}</div>
+              </div>
+            </div>
+            ` : `
+            <!-- PLAN NUTRICIONAL -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;padding:12px;background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-100)">
+              <div>
+                <div style="font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:3px">Calorías/día</div>
+                <div style="font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark)">${d.calorias||'—'} <span style="font-size:11px;font-weight:400">kcal</span></div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:3px">Activo por</div>
+                <div style="font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:var(--info)">${diasActivo!==null?diasActivo:'—'} <span style="font-size:11px;font-weight:400">días</span></div>
+              </div>
+            </div>
+            `}
+
+            ${d.indicaciones ? `
+            <div style="background:var(--beige);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;border-left:2px solid var(--olive)">
+              <div style="font-size:10px;font-weight:600;color:var(--olive-dark);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">📝 Indicaciones</div>
+              <div style="font-size:12px;color:var(--gray-600);line-height:1.4">${d.indicaciones}</div>
+            </div>
+            ` : ''}
+
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--gray-100)">
+              ${esArchivo ? `
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="previewDietPDF('${p.id}','${d.id}')">👁️ Ver</button>
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="downloadDietFile('${p.id}','${d.id}')">⬇️ Descargar</button>
+              ` : `
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="openDietView('${p.id}','${d.id}')">👁️ Ver</button>
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="duplicateDiet('${p.id}','${d.id}')">📋 Duplicar</button>
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="printDiet('${p.id}','${d.id}')">🖨️ PDF</button>
+              `}
+              <button class="btn btn-ghost btn-xs" style="color:var(--danger);font-size:11px;padding:6px 8px;flex:1" onclick="deleteDiet('${p.id}','${d.id}')">🗑️</button>
             </div>
           </div>
-        </div>`).join('') : `<div class="empty-state"><div class="empty-icon">🥗</div><div class="empty-title">Sin planes nutricionales</div><button class="btn btn-olive mt-4" onclick="openDietModal('${p.id}')">+ Crear Plan</button></div>`}
+        </div>
+        `;}).join('')}
+      </div>
+      ` : `
+      <div class="empty-state" style="padding:40px 20px;text-align:center">
+        <div class="empty-icon" style="font-size:48px;margin-bottom:12px">🥗</div>
+        <div class="empty-title">Sin planes nutricionales</div>
+        <div class="empty-text" style="margin-bottom:16px">Aún no hay dietas asignadas a este paciente. Crea tu primer plan nutricional personalizado.</div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-olive" onclick="openDietModal('${p.id}')">+ Crear Plan</button>
+          <button class="btn btn-outline" onclick="openUploadDietModal('${p.id}')">📄 Adjuntar PDF</button>
+        </div>
+      </div>
+      `}
     </div>
 
     <!-- ── EVOLUCIÓN ── -->
@@ -5020,12 +5246,234 @@ function deleteDiet(patientId, dietId) {
       const p = DB.patients.find(x=>x.id==patientId);
       if (p) p.dietas = p.dietas.filter(d=>d.id!=dietId);
       if (currentPage==='diets') renderDiets();
+      if (currentPage.startsWith('paciente-')) openHistoriaClinica(patientId, 'dietas');
       notify('Plan eliminado','success');
     } catch(e) {
       console.error(e);
       notify('Error al eliminar plan','danger');
     }
   });
+}
+
+async function duplicateDiet(patientId, dietId) {
+  try {
+    const p = DB.patients.find(x=>x.id==patientId);
+    if (!p) return;
+    const dietOriginal = (p.dietas||[]).find(x=>x.id==dietId);
+    if (!dietOriginal) return;
+    
+    // Crear copia de la dieta
+    const newDiet = {
+      paciente_id: patientId,
+      nombre: dietOriginal.nombre + ' (Copia)',
+      fecha: new Date().toISOString().split('T')[0],
+      calorias: dietOriginal.calorias,
+      tipo: dietOriginal.tipo || 'Semanal',
+      indicaciones: dietOriginal.indicaciones,
+      weekPlan: JSON.parse(JSON.stringify(dietOriginal.weekPlan || {}))
+    };
+    
+    const created = await SB.createDieta(newDiet);
+    if (created && created.id) {
+      if (!p.dietas) p.dietas = [];
+      p.dietas.push({
+        id: created.id,
+        ...newDiet
+      });
+      notify('Plan duplicado correctamente', 'success');
+      if (currentPage.startsWith('paciente-')) openHistoriaClinica(patientId, 'dietas');
+    }
+  } catch(e) {
+    console.error(e);
+    notify('Error al duplicar plan', 'danger');
+  }
+}
+
+function openUploadDietModal(patientId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  
+  const modalHtml = `
+    <div style="text-align:center;padding:20px">
+      <div style="font-size:48px;margin-bottom:16px">📄</div>
+      <h3 style="font-size:16px;font-weight:600;margin:0 0 8px 0">Adjuntar Dieta en PDF</h3>
+      <p style="font-size:13px;color:var(--gray-500);margin:0 0 20px 0">Para ${p.nombre}</p>
+      
+      <div class="form-group mb-4">
+        <label>Nombre de la Dieta</label>
+        <input class="form-control" id="upload-diet-name" placeholder="Ej: Plan Hipocalórico Enero" value="">
+      </div>
+      
+      <div style="border:2px dashed var(--gray-300);border-radius:var(--radius);padding:24px;background:var(--beige);margin-bottom:16px;text-align:center;cursor:pointer" onclick="document.getElementById('diet-file-input').click()">
+        <input type="file" id="diet-file-input" accept=".pdf" style="display:none" onchange="handleDietFileSelect(this, '${patientId}')">
+        <div style="font-size:32px;margin-bottom:8px">📎</div>
+        <div style="font-weight:600;color:var(--olive-dark);margin-bottom:4px">Haz clic o arrastra un PDF</div>
+        <div style="font-size:12px;color:var(--gray-500)">Solo PDFs · Máx 10MB</div>
+      </div>
+      
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="closeModal('modal-evaluation')">Cancelar</button>
+        <button class="btn btn-olive" id="upload-diet-btn" onclick="uploadDietPDF('${patientId}')" style="display:none">Adjuntar PDF</button>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('eval-modal-body').innerHTML = modalHtml;
+  document.getElementById('eval-patient-name').textContent = 'Adjuntar Dieta';
+  openModal('modal-evaluation');
+}
+
+function handleDietFileSelect(input, patientId) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  if (file.type !== 'application/pdf') {
+    notify('Por favor selecciona un archivo PDF', 'danger');
+    input.value = '';
+    return;
+  }
+  
+  if (file.size > 10 * 1024 * 1024) {
+    notify('El archivo es demasiado grande (máx 10MB)', 'danger');
+    input.value = '';
+    return;
+  }
+  
+  // Guardar referencia del archivo
+  window._selectedDietFile = file;
+  
+  const fileName = document.getElementById('upload-diet-name').value || file.name.replace('.pdf', '');
+  document.getElementById('upload-diet-name').value = fileName;
+  document.getElementById('upload-diet-btn').style.display = 'inline-flex';
+  
+  notify(`Archivo seleccionado: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`, 'success');
+}
+
+async function uploadDietPDF(patientId) {
+  try {
+    const file = window._selectedDietFile;
+    const nombre = document.getElementById('upload-diet-name').value.trim();
+    
+    if (!file) {
+      notify('Selecciona un archivo primero', 'danger');
+      return;
+    }
+    
+    if (!nombre) {
+      notify('Ingresa un nombre para la dieta', 'danger');
+      return;
+    }
+    
+    // Leer archivo como base64
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const base64 = e.target.result.split(',')[1];
+        
+        const dietData = {
+          paciente_id: patientId,
+          nombre: nombre,
+          fecha: new Date().toISOString().split('T')[0],
+          tipoArchivo: 'pdf',
+          archivoBase64: base64,
+          archivoNombreOriginal: file.name,
+          activo: true
+        };
+        
+        const created = await SB.createDieta(dietData);
+        
+        if (created && created.id) {
+          const p = DB.patients.find(x => x.id == patientId);
+          if (p) {
+            if (!p.dietas) p.dietas = [];
+            p.dietas.push({
+              id: created.id,
+              ...dietData
+            });
+          }
+          
+          closeModal('modal-evaluation');
+          notify('Dieta adjuntada correctamente', 'success');
+          
+          if (currentPage.startsWith('paciente-')) {
+            openHistoriaClinica(patientId, 'dietas');
+          }
+        }
+        
+        window._selectedDietFile = null;
+      } catch(err) {
+        console.error(err);
+        notify('Error al procesar el archivo', 'danger');
+      }
+    };
+    reader.readAsDataURL(file);
+    
+  } catch(e) {
+    console.error(e);
+    notify('Error al adjuntar dieta', 'danger');
+  }
+}
+
+function previewDietPDF(patientId, dietId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  
+  const diet = (p.dietas || []).find(d => d.id == dietId);
+  if (!diet || !diet.archivoBase64) {
+    notify('No se puede visualizar el archivo', 'danger');
+    return;
+  }
+  
+  // Crear una ventana con el PDF
+  const pdfWindow = window.open();
+  pdfWindow.document.write(`
+    <html>
+      <head>
+        <title>${diet.nombre}</title>
+        <style>
+          body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #f0f0f0; }
+          .controls { background: var(--olive-dark); color: white; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+          .controls button { background: var(--olive); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+          .controls button:hover { background: var(--olive-accent); }
+          iframe { width: 100%; height: calc(100vh - 50px); border: none; }
+        </style>
+      </head>
+      <body>
+        <div class="controls">
+          <h3 style="margin:0">${diet.nombre}</h3>
+          <div>
+            <button onclick="window.print()">🖨️ Imprimir</button>
+            <button onclick="window.close()">Cerrar</button>
+          </div>
+        </div>
+        <embed src="data:application/pdf;base64,${diet.archivoBase64}" type="application/pdf" width="100%" height="100%">
+      </body>
+    </html>
+  `);
+}
+
+function downloadDietFile(patientId, dietId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  
+  const diet = (p.dietas || []).find(d => d.id == dietId);
+  if (!diet || !diet.archivoBase64) {
+    notify('No se puede descargar el archivo', 'danger');
+    return;
+  }
+  
+  try {
+    const link = document.createElement('a');
+    link.href = 'data:application/pdf;base64,' + diet.archivoBase64;
+    link.download = diet.nombre + '.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    notify('Descarga iniciada', 'success');
+  } catch(e) {
+    console.error(e);
+    notify('Error al descargar', 'danger');
+  }
 }
 
 // ═══════════════════════════════════════════════
