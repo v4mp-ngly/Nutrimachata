@@ -1166,7 +1166,8 @@ const SB = {
   },
   async createCita(data) {
     const r = await supa('citas', 'POST', data);
-    return r && r[0] ? r[0] : null;
+    if (Array.isArray(r)) return r[0] || null;
+    return r || null;
   },
   async updateCita(id, data) {
     return await supa(`citas?id=eq.${id}`, 'PATCH', data);
@@ -1192,6 +1193,24 @@ async function testSupabaseConnection() {
     console.error('Supabase connection test failed:', e.message);
     return false;
   }
+}
+
+const CITA_NOTAS_SEPARATOR = '\n\n[[NUTRIMACHATA_NOTAS]]\n';
+
+function encodeCitaDescripcion(descripcion, notas) {
+  const texto = (descripcion || '').trim();
+  const notasTexto = (notas || '').trim();
+  return notasTexto ? texto + CITA_NOTAS_SEPARATOR + notasTexto : texto;
+}
+
+function decodeCitaDescripcion(valor) {
+  const texto = valor || '';
+  const posicion = texto.indexOf(CITA_NOTAS_SEPARATOR);
+  if (posicion < 0) return { descripcion: texto, notas: '' };
+  return {
+    descripcion: texto.slice(0, posicion),
+    notas: texto.slice(posicion + CITA_NOTAS_SEPARATOR.length),
+  };
 }
 
 async function loadFromSupabase() {
@@ -1237,17 +1256,21 @@ async function loadFromSupabase() {
     });
 
     // Map citas
-    DB.appointments = citas.map(c => ({
-      id:            c.id,
-      patientId:     c.paciente_id || null,
-      fecha:         c.fecha,
-      hora:          c.hora ? c.hora.substring(0,5) : '',
-      descripcion:   c.descripcion || '',
-      estado:        c.estado || 'pendiente',
-      nombreManual:  c.nombre_manual || '',
-      telefonoManual:c.telefono_manual || '',
-      emailManual:   c.email_manual || '',
-    }));
+    DB.appointments = citas.map(c => {
+      const contenido = decodeCitaDescripcion(c.descripcion);
+      return {
+        id:            c.id,
+        patientId:     c.paciente_id || null,
+        fecha:         c.fecha,
+        hora:          c.hora ? c.hora.substring(0,5) : '',
+        descripcion:   contenido.descripcion,
+        notas:         contenido.notas,
+        estado:        c.estado || 'pendiente',
+        nombreManual:  c.nombre_manual || '',
+        telefonoManual:c.telefono_manual || '',
+        emailManual:   c.email_manual || '',
+      };
+    });
 
     DB.loaded = true;
     console.log(`✓ Supabase cargado: ${DB.patients.length} pacientes, ${DB.appointments.length} citas`);
@@ -1274,17 +1297,21 @@ async function loadFromSupabase() {
           const citasActuales = await supa('citas?order=fecha.asc,hora.asc&select=*');
           if (citasActuales && Array.isArray(citasActuales)) {
             // Mapear nuevas citas
-            const citasMapeadas = citasActuales.map(c => ({
-              id:            c.id,
-              patientId:     c.paciente_id || null,
-              fecha:         c.fecha,
-              hora:          c.hora ? c.hora.substring(0,5) : '',
-              descripcion:   c.descripcion || '',
-              estado:        c.estado || 'pendiente',
-              nombreManual:  c.nombre_manual || '',
-              telefonoManual:c.telefono_manual || '',
-              emailManual:   c.email_manual || '',
-            }));
+            const citasMapeadas = citasActuales.map(c => {
+              const contenido = decodeCitaDescripcion(c.descripcion);
+              return {
+                id:            c.id,
+                patientId:     c.paciente_id || null,
+                fecha:         c.fecha,
+                hora:          c.hora ? c.hora.substring(0,5) : '',
+                descripcion:   contenido.descripcion,
+                notas:         contenido.notas,
+                estado:        c.estado || 'pendiente',
+                nombreManual:  c.nombre_manual || '',
+                telefonoManual:c.telefono_manual || '',
+                emailManual:   c.email_manual || '',
+              };
+            });
             
             // Detectar cambios
             const citasAnteriores = DB.appointments;
@@ -6542,8 +6569,8 @@ function renderUpcomingApts() {
     const ini  = name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
     const col  = p ? p.color : '#5E8C2A';
     const tel  = a.telefonoManual || (p ? p.telefono : '');
-    return `<div style="padding:12px 0;border-bottom:1px solid var(--gray-100);cursor:pointer" onclick="calSelectedDate='${a.fecha}';setCalView('day')">
-      <div class="flex items-center gap-2 mb-1">
+    return `<div style="padding:12px 0;border-bottom:1px solid var(--gray-100)">
+      <div class="flex items-center gap-2 mb-1" onclick="calSelectedDate='${a.fecha}';setCalView('day')" style="cursor:pointer">
         <div class="patient-avatar" style="width:28px;height:28px;font-size:11px;background:${col}">${ini}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:500">${name}</div>
@@ -6551,7 +6578,11 @@ function renderUpcomingApts() {
         </div>
         <span class="badge ${a.estado==='confirmada'?'badge-success':a.estado==='completada'?'badge-neutral':'badge-warning'}" style="margin-left:auto">${a.estado}</span>
       </div>
-      ${a.descripcion?`<div class="text-xs text-muted" style="padding-left:36px">${a.descripcion}</div>`:''}
+      ${a.descripcion?`<div class="text-xs text-muted" style="padding-left:36px;margin-bottom:8px">${a.descripcion}</div>`:''}
+      <div style="padding-left:36px;display:flex;gap:6px">
+        <button class="btn btn-olive btn-xs" onclick="event.stopPropagation();editAppointment('${a.id}')" style="flex:1;font-size:11px;padding:4px 8px">✏️ Editar</button>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();deleteAppointment('${a.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px">🗑</button>
+      </div>
     </div>`;
   }).join('') || '<p class="text-muted text-sm" style="padding:12px 0">No hay citas próximas</p>';
 }
@@ -6770,7 +6801,7 @@ async function _guardarCitaSinValidacion(fecha, hora, pid, nombreManual, telefon
 
   const citaData = {
     paciente_id:     pid || null,
-    fecha, hora, descripcion: desc, estado, notas,
+    fecha, hora, descripcion: encodeCitaDescripcion(desc, notas), estado,
     nombre_manual:   nombreManual   || null,
     telefono_manual: telefonoManual || null,
     email_manual:    emailManual    || null,
@@ -6782,7 +6813,11 @@ async function _guardarCitaSinValidacion(fecha, hora, pid, nombreManual, telefon
   try {
     if (eid) {
       // ACTUALIZAR cita existente
-      await SB.updateCita(eid, citaData);
+      const updated = await SB.updateCita(eid, citaData);
+      if (!updated) {
+        notify('Error al actualizar la cita en la base de datos', 'danger');
+        return;
+      }
       const apt = DB.appointments.find(a => a.id == eid);
       if (apt) Object.assign(apt, {
         patientId: pid || null, fecha, hora: hora.substring(0,5), descripcion: desc, estado, notas,
