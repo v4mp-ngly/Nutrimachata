@@ -4534,28 +4534,6 @@ function openHistoriaClinica(patientId, activeTab) {
           </div>`).join('')}
       </div>
 
-      <!-- Charts row -->
-      <div style="display:grid;grid-template-columns:${hasCharts ? '1fr 1fr' : '1fr'};gap:16px;margin-bottom:${lastEval.obs ? '16px' : '0'}">
-        ${hasCharts ? `
-        <div class="card">
-          <div class="card-header" style="padding:14px 16px 10px">
-            <div class="card-title" style="font-size:13px">Peso</div>
-            <div style="font-size:11px;color:var(--gray-400)">${weights[0]} → ${weights[weights.length-1]} kg</div>
-          </div>
-          <div style="padding:0 12px 12px"><div style="height:160px"><canvas id="hcp-resumen-weight"></canvas></div></div>
-        </div>
-        <div class="card">
-          <div class="card-header" style="padding:14px 16px 10px">
-            <div class="card-title" style="font-size:13px">IMC</div>
-            <div style="font-size:11px;color:var(--gray-400)">${imcVals[0].toFixed(1)} → ${imcVals[imcVals.length-1].toFixed(1)}</div>
-          </div>
-          <div style="padding:0 12px 12px"><div style="height:160px"><canvas id="hcp-resumen-imc"></canvas></div></div>
-        </div>` : `
-        <div style="background:var(--beige);border-radius:var(--radius-lg);padding:14px 18px;border:1px dashed var(--olive-light)">
-          <div style="font-size:12px;color:var(--gray-500)">📈 Agrega una segunda evaluación para ver gráficos de evolución</div>
-        </div>`}
-      </div>
-
       <!-- Observaciones if present -->
       ${lastEval.obs ? `
       <div style="background:var(--beige);border-left:3px solid var(--olive);border-radius:0 var(--radius) var(--radius) 0;padding:10px 14px">
@@ -4663,7 +4641,7 @@ function openHistoriaClinica(patientId, activeTab) {
               ` : `
                 <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="openDietView('${p.id}','${d.id}')">👁️ Ver</button>
                 <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="duplicateDiet('${p.id}','${d.id}')">📋 Duplicar</button>
-                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="printDiet('${p.id}','${d.id}')">🖨️ PDF</button>
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="downloadDiet('${p.id}','${d.id}')">🖨️ PDF</button>
               `}
               <button class="btn btn-ghost btn-xs" style="color:var(--danger);font-size:11px;padding:6px 8px;flex:1" onclick="deleteDiet('${p.id}','${d.id}')">🗑️</button>
             </div>
@@ -6031,7 +6009,7 @@ function renderDietTemplates() {
           <div style="padding:12px">
             <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">Tamaño: ${(t.size / 1024).toFixed(1)}KB</div>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-olive btn-sm" onclick="event.stopPropagation();useDietTemplate(${i})" style="flex:1;font-size:11px">Usar</button>
+          <button class="btn btn-olive btn-sm" onclick="event.stopPropagation();usePdfDietTemplate(${i})" style="flex:1;font-size:11px">Usar</button>
               <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteTemplate(${i})" style="color:var(--danger)">🗑</button>
             </div>
           </div>
@@ -6167,7 +6145,7 @@ function previewTemplate(index) {
 /**
  * Usar una plantilla para crear una nueva dieta
  */
-function useDietTemplate(index) {
+function usePdfDietTemplate(index) {
   const t = dietTemplates[index];
   
   // Pasar información de la plantilla al modal de crear dieta
@@ -7669,8 +7647,8 @@ function showPatientDietTab(idx) {
 function printPatientDiet(patientId, dietId) {
   const p = DB.patients.find(x => x.id == patientId || x.id == parseInt(patientId));
   if (!p) { notify('No se encontró el paciente', 'danger'); return; }
-  // Use the same printDiet function that doctors use
-  printDiet(p.id, dietId);
+  // Usa el mismo generador de PDF disponible para el personal clínico.
+  downloadDiet(p.id, dietId);
 }
 
 function renderMyHistory() {
@@ -9142,7 +9120,7 @@ function getFieldChartColor(field, evals) {
 }
 
 // Funciones auxiliares para cerrar bloques pendientes
-function _closePendingBlocks() {}));
+function _closePendingBlocks() {}
 
 </script>
 </body>
