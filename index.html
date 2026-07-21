@@ -824,7 +824,7 @@
         <label>Contraseña</label>
         <input class="form-control" id="login-password" type="password" value="" placeholder="••••••••">
       </div>
-      <button class="btn-primary" onclick="doLogin()">Iniciar sesión</button>
+      <button class="btn-primary" id="login-submit" type="button">Iniciar sesión</button>
 
       <div style="display:flex;align-items:center;gap:12px;margin:20px 0">
         <div style="flex:1;height:1px;background:var(--gray-200)"></div>
@@ -1595,6 +1595,31 @@ async function doLogin() {
   }
 }
 
+// Expone las acciones de acceso y evita depender de la resolución de nombres
+// de los atributos HTML al ejecutar la aplicación desde distintos servidores.
+window.doLogin = doLogin;
+window.setRole = setRole;
+
+function bindLoginControls() {
+  const loginSubmitButton = document.getElementById('login-submit');
+  if (loginSubmitButton && !loginSubmitButton.dataset.loginBound) {
+    loginSubmitButton.addEventListener('click', doLogin);
+    loginSubmitButton.dataset.loginBound = 'true';
+  }
+
+  ['login-email', 'login-password'].forEach(id => {
+    const field = document.getElementById(id);
+    if (field && !field.dataset.loginBound) {
+      field.addEventListener('keydown', event => {
+        if (event.key === 'Enter') doLogin();
+      });
+      field.dataset.loginBound = 'true';
+    }
+  });
+}
+
+bindLoginControls();
+
 
 // ═══════════════════════════════════════════════
 //  REGISTRO PÚBLICO DE PACIENTE (desde login)
@@ -1981,11 +2006,12 @@ function prefillPatientLogin(email, pass) {
         <label>Contraseña</label>
         <input class="form-control" id="login-password" type="password" value="${pass}">
       </div>
-      <button class="btn-primary" onclick="doLogin()">Iniciar sesión →</button>
+      <button class="btn-primary" id="login-submit" type="button">Iniciar sesión →</button>
       <div class="login-footer">Plataforma segura SSL · Datos encriptados</div>
     </div>
   `;
   DB.loginRole = 'patient';
+  bindLoginControls();
 }
 
 function doLogout() {
