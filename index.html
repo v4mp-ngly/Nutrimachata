@@ -959,6 +959,19 @@
   </div>
 </div>
 
+<!-- MODAL: REPORTE DETALLADO DE EVALUACIÓN -->
+<div id="modal-eval-report" class="modal-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📊 Reporte de Evaluación</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-eval-report')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-eval-report-content"></div>
+  </div>
+</div>
+
 <div id="modal-diet" class="modal-overlay">
   <div class="modal modal-xl">
     <div class="modal-header">
@@ -4608,11 +4621,11 @@ function openHistoriaClinica(patientId, activeTab) {
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-olive btn-sm" onclick="openEvalModal('${p.id}')">+ Nueva Evaluación</button>
       </div>
-      ${evals.length ? `<div class="hc-timeline">${[...evals].reverse().map(e=>`<div class="hc-event">
+      ${evals.length ? `<div class="hc-timeline">${[...evals].reverse().map(e=>`<div class="hc-event" onclick="viewEvaluationReport('${p.id}','${e.id}')" style="cursor:pointer;transition:all 0.2s">
           <div class="hc-event-dot eval"></div>
           <div class="hc-event-content">
             <div class="hc-event-date">${e.fecha}</div>
-            <div class="hc-event-title">Evaluación Nutricional</div>
+            <div class="hc-event-title" style="color:#5E8C2A">📊 Evaluación Nutricional</div>
             <div class="hc-event-body">
               <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:8px">
                 <span>⚖️ Peso: <strong>${e.peso} kg</strong></span>
@@ -4932,7 +4945,7 @@ function switchHCTab(tab, btn) {
 function _svgChart(labels, values, opts) {
   const { color='#5E8C2A', width=540, height=150, unit='', refMin=null, refMax=null } = opts || {};
   if (!values || !values.length) return '';
-  const PAD = { top:14, right:14, bottom:26, left:42 };
+  const PAD = { top:20, right:16, bottom:28, left:48 };
   const W = width - PAD.left - PAD.right;
   const H = height - PAD.top - PAD.bottom;
   const vMin = Math.min(...values); const vMax = Math.max(...values);
@@ -4942,46 +4955,76 @@ function _svgChart(labels, values, opts) {
   const toY = (v) => PAD.top + H - ((v - yMin) / (yMax - yMin)) * H;
   const useBar = values.length <= 3;
   let inner = '';
+  
+  // Crear gradiente para el área bajo la línea
+  const gradientId = 'grad_' + Math.random().toString(36).substr(2, 9);
+  let defs = `<defs><linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:${color};stop-opacity:0.3" />
+    <stop offset="100%" style="stop-color:${color};stop-opacity:0.05" />
+  </linearGradient></defs>`;
+  
   // Reference band
   if (refMin !== null && refMax !== null) {
     const ry1 = toY(Math.min(refMax, yMax)); const ry2 = toY(Math.max(refMin, yMin));
-    if (ry2 > ry1) inner += `<rect x="${PAD.left}" y="${ry1.toFixed(1)}" width="${W}" height="${(ry2-ry1).toFixed(1)}" fill="#5E8C2A" opacity="0.1"/>`;
+    if (ry2 > ry1) inner += `<rect x="${PAD.left}" y="${ry1.toFixed(1)}" width="${W}" height="${(ry2-ry1).toFixed(1)}" fill="#5E8C2A" opacity="0.08"/>`;
   }
-  // Grid
+  
+  // Grid mejorado
   for (let s = 0; s <= 4; s++) {
     const v = yMin + (yMax-yMin)*(s/4); const y = toY(v).toFixed(1);
-    inner += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left+W}" y2="${y}" stroke="#e8e6e0" stroke-width="1"/>`;
-    inner += `<text x="${PAD.left-4}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="9" fill="#aaa" font-family="monospace">${v.toFixed(1)}</text>`;
+    inner += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left+W}" y2="${y}" stroke="#e8e6e0" stroke-width="0.8" opacity="0.6"/>`;
+    inner += `<text x="${PAD.left-6}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="8.5" fill="#999" font-family="'DM Mono', monospace" font-weight="500">${v.toFixed(1)}</text>`;
   }
-  // Axes
-  inner += `<line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1"/>`;
-  inner += `<line x1="${PAD.left}" y1="${PAD.top+H}" x2="${PAD.left+W}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1"/>`;
+  
+  // Axes mejorados
+  inner += `<line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1.2" opacity="0.8"/>`;
+  inner += `<line x1="${PAD.left}" y1="${PAD.top+H}" x2="${PAD.left+W}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1.2" opacity="0.8"/>`;
+  
   if (useBar) {
+    // Barras mejoradas
     const step = W / values.length; const bw = Math.min(50, step*0.6);
     values.forEach((v,i) => {
       const x = PAD.left + step*i + step/2 - bw/2; const y = toY(v); const bh = PAD.top+H-y;
-      inner += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" fill="${color}" opacity="${i===values.length-1?1:0.55}" rx="3"/>`;
-      inner += `<text x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${color}" font-family="monospace" font-weight="700">${v}${unit}</text>`;
+      const isLast = i === values.length-1;
+      const opacity = isLast ? 1 : 0.6;
+      inner += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" fill="${color}" opacity="${opacity}" rx="4" ry="4"/>`;
+      if (isLast) {
+        inner += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" fill="none" stroke="${color}" stroke-width="2" opacity="0.4" rx="4" ry="4"/>`;
+      }
+      inner += `<text x="${(x+bw/2).toFixed(1)}" y="${(y-8).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${color}" font-family="'DM Mono', monospace">${v}${unit}</text>`;
     });
   } else {
+    // Línea con gradiente mejorada
     const pts = values.map((v,i)=>`${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
     const area = `M${toX(0).toFixed(1)},${(PAD.top+H).toFixed(1)} ${values.map((v,i)=>`L${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')} L${toX(values.length-1).toFixed(1)},${(PAD.top+H).toFixed(1)} Z`;
-    inner += `<path d="${area}" fill="${color}" opacity="0.12"/>`;
-    inner += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    inner += `<path d="${area}" fill="url(#${gradientId})"/>`;
+    inner += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
     values.forEach((v,i) => {
-      inner += `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>`;
+      const isLast = i === values.length-1;
+      const r = isLast ? 5.5 : 4;
+      const strokeW = isLast ? 2 : 1.5;
+      inner += `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="${r}" fill="${color}" stroke="white" stroke-width="${strokeW}"/>`;
+      if (isLast) {
+        inner += `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="${r}" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
+      }
     });
-    // First and last value labels
-    inner += `<text x="${toX(0).toFixed(1)}" y="${(toY(values[0])-7).toFixed(1)}" text-anchor="start" font-size="10" fill="${color}" font-family="monospace" font-weight="700">${values[0]}${unit}</text>`;
-    inner += `<text x="${toX(values.length-1).toFixed(1)}" y="${(toY(values[values.length-1])-7).toFixed(1)}" text-anchor="end" font-size="10" fill="${color}" font-family="monospace" font-weight="700">${values[values.length-1]}${unit}</text>`;
+    // Etiquetas de inicio y fin mejoradas
+    inner += `<text x="${toX(0).toFixed(1)}" y="${(toY(values[0])-10).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${color}" font-family="'DM Mono', monospace">${values[0]}${unit}</text>`;
+    inner += `<text x="${toX(values.length-1).toFixed(1)}" y="${(toY(values[values.length-1])-10).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${color}" font-family="'DM Mono', monospace">${values[values.length-1]}${unit}</text>`;
   }
-  // X labels
+  
+  // Etiquetas X mejoradas
   const idxs = values.length<=5 ? values.map((_,i)=>i) : [0, Math.floor(values.length/2), values.length-1];
   idxs.forEach(i => {
     const lbl = (labels[i]||'').replace(/^20/,'').replace(/-/g,'/');
-    inner += `<text x="${toX(i).toFixed(1)}" y="${(PAD.top+H+14).toFixed(1)}" text-anchor="middle" font-size="9" fill="#999" font-family="sans-serif">${lbl}</text>`;
+    inner += `<text x="${toX(i).toFixed(1)}" y="${(PAD.top+H+16).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="#888" font-family="'DM Sans', sans-serif" font-weight="500">${lbl}</text>`;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="white" rx="6"/>${inner}</svg>`;
+  
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.08))">
+    ${defs}
+    <rect width="${width}" height="${height}" fill="white" rx="8" ry="8" opacity="0"/>
+    ${inner}
+  </svg>`;
 }
 function _svgToDataURL(svg) {
   return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
@@ -5007,6 +5050,12 @@ async function downloadPatientReport(patientId) {
   // Build SVG charts synchronously
   let weightChartHTML = '';
   let imcChartHTML = '';
+  let measureChartsHTML = '';
+  
+  // Última evaluación y sus datos
+  const lastEval = evals.length > 0 ? evals[evals.length - 1] : null;
+  const prevEval = evals.length > 1 ? evals[evals.length - 2] : null;
+  
   if (evals.length >= 2) {
     const labels  = evals.map(e => e.fecha);
     const weights = evals.map(e => e.peso);
@@ -5015,6 +5064,83 @@ async function downloadPatientReport(patientId) {
     const iSVG = _svgChart(labels, imcVals,  { color:'#C47A1A', unit:'',   width:540, height:150, refMin:18.5, refMax:24.9 });
     weightChartHTML = `<h2 style="margin:14px 0 6px">Evolución de Peso</h2><div style="background:#fafaf8;border-radius:8px;padding:6px;border:1px solid #e8e6e0;margin-bottom:12px"><img src="${_svgToDataURL(wSVG)}" style="width:100%;height:auto;display:block"></div>`;
     imcChartHTML    = `<h2 style="margin:14px 0 6px">Evolución de IMC</h2><div style="background:#fafaf8;border-radius:8px;padding:6px;border:1px solid #e8e6e0;margin-bottom:12px"><img src="${_svgToDataURL(iSVG)}" style="width:100%;height:auto;display:block"><div style="font-size:9px;color:#aaa;text-align:right;margin-top:2px">Banda verde = rango normal 18.5–24.9</div></div>`;
+    
+    // Crear gráficos de medidas adicionales si existen
+    const measures = [
+      { key: 'cintura', label: 'Cintura', unit: ' cm', color: '#2A6A8C', icon: '📏' },
+      { key: 'cadera', label: 'Cadera', unit: ' cm', color: '#7A9D3C', icon: '📏' },
+      { key: 'grasa', label: '% Grasa Corporal', unit: '%', color: '#C47A1A', icon: '🔬' },
+      { key: 'fc', label: 'Frecuencia Cardíaca', unit: ' lpm', color: '#C44A2A', icon: '❤️' }
+    ];
+    
+    let measuresCharts = '';
+    measures.forEach(m => {
+      const mValues = evals.map(e => e[m.key]).filter(v => v != null && v > 0);
+      if (mValues.length >= 2) {
+        const mSVG = _svgChart(labels, evals.map(e => e[m.key] || 0), { color: m.color, unit: m.unit, width: 270, height: 130 });
+        measuresCharts += `<div style="flex:1;background:#fafaf8;border-radius:8px;padding:8px;border:1px solid #e8e6e0">
+          <div style="font-size:10px;font-weight:700;color:#555;margin-bottom:6px">${m.icon} ${m.label}</div>
+          <img src="${_svgToDataURL(mSVG)}" style="width:100%;height:auto;display:block">
+        </div>`;
+      }
+    });
+    
+    if (measuresCharts) {
+      measureChartsHTML = `<h2 style="margin:14px 0 6px">Evolución de Medidas Antropométricas</h2>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        ${measuresCharts}
+      </div>`;
+    }
+  }
+  
+  // Sección de Últimas Medidas con la información más reciente
+  let lastMeasuresHTML = '';
+  if (lastEval) {
+    const changes = [];
+    if (prevEval) {
+      if (lastEval.peso && prevEval.peso) changes.push({ label: 'Peso', val: lastEval.peso, prev: prevEval.peso, unit: 'kg' });
+      if (lastEval.imc && prevEval.imc) changes.push({ label: 'IMC', val: parseFloat(lastEval.imc).toFixed(1), prev: parseFloat(prevEval.imc).toFixed(1), unit: '' });
+      if (lastEval.cintura && prevEval.cintura) changes.push({ label: 'Cintura', val: lastEval.cintura, prev: prevEval.cintura, unit: 'cm' });
+      if (lastEval.cadera && prevEval.cadera) changes.push({ label: 'Cadera', val: lastEval.cadera, prev: prevEval.cadera, unit: 'cm' });
+      if (lastEval.grasa && prevEval.grasa) changes.push({ label: '% Grasa', val: lastEval.grasa, prev: prevEval.grasa, unit: '%' });
+      if (lastEval.fc && prevEval.fc) changes.push({ label: 'FC', val: lastEval.fc, prev: prevEval.fc, unit: 'lpm' });
+    }
+    
+    lastMeasuresHTML = `<h2 style="margin:14px 0 6px">Última Evaluación – ${lastEval.fecha}</h2>
+    <div style="background:#EAF3D8;border-radius:8px;padding:12px;margin-bottom:12px;border-left:4px solid #5E8C2A">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Peso</div>
+          <div style="font-size:18px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${lastEval.peso || '—'} kg</div>
+          ${prevEval && lastEval.peso && prevEval.peso ? `<div style="font-size:9px;color:#666;margin-top:2px">${parseFloat((lastEval.peso - prevEval.peso).toFixed(1)) > 0 ? '+' : ''}${parseFloat((lastEval.peso - prevEval.peso).toFixed(1))} kg</div>` : ''}
+        </div>
+        <div>
+          <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">IMC</div>
+          <div style="font-size:18px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${(lastEval.imc||0).toFixed(1)}</div>
+          ${lastEval.imc ? `<div style="font-size:9px;color:#666;margin-top:2px">${lastEval.imc < 18.5 ? 'Bajo peso' : lastEval.imc < 25 ? 'Normal' : lastEval.imc < 30 ? 'Sobrepeso' : 'Obesidad'}</div>` : ''}
+        </div>
+        ${lastEval.cintura ? `<div>
+          <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Cintura</div>
+          <div style="font-size:18px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${lastEval.cintura || '—'} cm</div>
+          ${prevEval && lastEval.cintura && prevEval.cintura ? `<div style="font-size:9px;color:#666;margin-top:2px">${parseFloat((lastEval.cintura - prevEval.cintura).toFixed(1)) > 0 ? '+' : ''}${parseFloat((lastEval.cintura - prevEval.cintura).toFixed(1))} cm</div>` : ''}
+        </div>` : ''}
+        ${lastEval.cadera ? `<div>
+          <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Cadera</div>
+          <div style="font-size:18px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${lastEval.cadera || '—'} cm</div>
+          ${prevEval && lastEval.cadera && prevEval.cadera ? `<div style="font-size:9px;color:#666;margin-top:2px">${parseFloat((lastEval.cadera - prevEval.cadera).toFixed(1)) > 0 ? '+' : ''}${parseFloat((lastEval.cadera - prevEval.cadera).toFixed(1))} cm</div>` : ''}
+        </div>` : ''}
+        ${lastEval.grasa ? `<div>
+          <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">% Grasa</div>
+          <div style="font-size:18px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${lastEval.grasa || '—'}%</div>
+          ${prevEval && lastEval.grasa && prevEval.grasa ? `<div style="font-size:9px;color:#666;margin-top:2px">${parseFloat((lastEval.grasa - prevEval.grasa).toFixed(2)) > 0 ? '+' : ''}${parseFloat((lastEval.grasa - prevEval.grasa).toFixed(2))}%</div>` : ''}
+        </div>` : ''}
+        ${lastEval.fc ? `<div>
+          <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">FC</div>
+          <div style="font-size:18px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${lastEval.fc || '—'} lpm</div>
+          ${prevEval && lastEval.fc && prevEval.fc ? `<div style="font-size:9px;color:#666;margin-top:2px">${parseFloat((lastEval.fc - prevEval.fc).toFixed(0)) > 0 ? '+' : ''}${parseFloat((lastEval.fc - prevEval.fc).toFixed(0))} lpm</div>` : ''}
+        </div>` : ''}
+      </div>
+    </div>`;
   }
 
   const expHTML_start = `<!DOCTYPE html>
@@ -5074,6 +5200,8 @@ tbody tr:nth-child(even) td{background:#F5FAF0}
   <div class="info-item"><label>Enfermedades</label><span>${p.enfermedades||'—'}</span></div>
   <div class="info-item"><label>Presión arterial</label><span>${p.presion||'—'}</span></div>
 </div>
+${lastMeasuresHTML}
+${measureChartsHTML}
 ${weightChartHTML}${imcChartHTML}
 ${evals.length ? `<h2>Historial de evaluaciones</h2><table><thead><tr><th>Fecha</th><th>Peso</th><th>IMC</th><th>Presión</th>${evals.some(e=>e.grasa)?'<th>% Grasa</th>':''}${evals.some(e=>e.cintura)?'<th>Cintura</th>':''}${evals.some(e=>e.cadera)?'<th>Cadera</th>':''}<th>Observaciones</th></tr></thead><tbody>${[...evals].reverse().map(e=>`<tr><td style="font-family:'DM Mono',monospace">${e.fecha}</td><td style="font-weight:600">${e.peso} kg</td><td style="font-weight:600">${(e.imc||0).toFixed(1)}</td><td>${e.presion||'—'}</td>${evals.some(ev=>ev.grasa)?`<td>${e.grasa!=null?e.grasa+'%':'—'}</td>`:''}${evals.some(ev=>ev.cintura)?`<td>${e.cintura!=null?e.cintura+' cm':'—'}</td>`:''}${evals.some(ev=>ev.cadera)?`<td>${e.cadera!=null?e.cadera+' cm':'—'}</td>`:''}<td style="color:#666">${e.obs||'—'}</td></tr>`).join('')}</tbody></table>` : ''}
 ${dietas.length ? `<h2>Planes nutricionales</h2>${dietas.map(d=>`<div class="diet-card"><div class="diet-name">🥗 ${d.nombre}</div><div class="diet-meta">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div>${d.indicaciones?`<div style="font-size:10px;color:#555;margin-top:4px">${d.indicaciones}</div>`:''}</div>`).join('')}` : ''}
@@ -5081,6 +5209,223 @@ ${dietas.length ? `<h2>Planes nutricionales</h2>${dietas.map(d=>`<div class="die
 </div>
 </body></html>`;
   _printHTML(expHTML_start, `Expediente_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VER REPORTE DETALLADO DE UNA EVALUACIÓN (MODAL)
+// ═══════════════════════════════════════════════════════════════
+function viewEvaluationReport(patientId, evalId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  const eval_ = (p.evaluaciones || []).find(e => e.id == evalId);
+  if (!eval_) return;
+  
+  const today = new Date().toLocaleDateString('es-DO', {year:'numeric',month:'long',day:'numeric'});
+  
+  // HTML del modal con el reporte
+  const reportHTML = `
+  <div style="display:flex;flex-direction:column;gap:16px;max-height:70vh;overflow-y:auto;padding:20px">
+    <!-- Encabezado -->
+    <div style="background:#3F5A00;color:white;padding:20px;border-radius:10px;display:flex;justify-content:space-between;align-items:start">
+      <div>
+        <h1 style="font-family:'Playfair Display',serif;font-size:24px;margin:0 0 8px 0;font-weight:500">${p.nombre}</h1>
+        <p style="margin:0;opacity:0.85">Evaluación del ${eval_.fecha}</p>
+      </div>
+      <div style="text-align:right;font-size:12px;opacity:0.8">
+        <div>${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'}</div>
+        <div>${p.cedula || '—'}</div>
+      </div>
+    </div>
+
+    <!-- Datos principales en grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:#EAF3D8;padding:16px;border-radius:8px;border-left:4px solid #5E8C2A">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">⚖️ Peso</div>
+        <div style="font-size:22px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace">${eval_.peso || '—'} kg</div>
+      </div>
+      <div style="background:#FFF3E0;padding:16px;border-radius:8px;border-left:4px solid #C47A1A">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">📊 IMC</div>
+        <div style="font-size:22px;font-weight:700;color:#C47A1A;font-family:'DM Mono',monospace">${(eval_.imc||0).toFixed(1)}</div>
+        <div style="font-size:9px;color:#666;margin-top:4px">
+          ${eval_.imc ? (eval_.imc < 18.5 ? 'Bajo peso' : eval_.imc < 25 ? 'Normal' : eval_.imc < 30 ? 'Sobrepeso' : 'Obesidad') : '—'}
+        </div>
+      </div>
+      ${eval_.talla ? `<div style="background:#E3F2FD;padding:16px;border-radius:8px;border-left:4px solid #2A6A8C">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">📏 Talla</div>
+        <div style="font-size:22px;font-weight:700;color:#2A6A8C;font-family:'DM Mono',monospace">${eval_.talla} m</div>
+      </div>` : ''}
+      ${eval_.presion ? `<div style="background:#FCE4EC;padding:16px;border-radius:8px;border-left:4px solid #C44A2A">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">❤️ Presión</div>
+        <div style="font-size:22px;font-weight:700;color:#C44A2A;font-family:'DM Mono',monospace">${eval_.presion}</div>
+      </div>` : ''}
+    </div>
+
+    <!-- Medidas antropométricas si existen -->
+    ${eval_.cintura || eval_.cadera || eval_.grasa || eval_.fc ? `
+    <div style="border-top:1px solid #e0e0e0;padding-top:16px">
+      <h3 style="margin:0 0 12px 0;font-size:14px;color:#333;font-weight:600">📐 Medidas Antropométricas</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px">
+        ${eval_.cintura ? `<div style="background:#f5f5f5;padding:12px;border-radius:8px;text-align:center">
+          <div style="font-size:9px;color:#999;text-transform:uppercase;margin-bottom:4px">Cintura</div>
+          <div style="font-size:18px;font-weight:700;color:#333">${eval_.cintura} cm</div>
+        </div>` : ''}
+        ${eval_.cadera ? `<div style="background:#f5f5f5;padding:12px;border-radius:8px;text-align:center">
+          <div style="font-size:9px;color:#999;text-transform:uppercase;margin-bottom:4px">Cadera</div>
+          <div style="font-size:18px;font-weight:700;color:#333">${eval_.cadera} cm</div>
+        </div>` : ''}
+        ${eval_.grasa ? `<div style="background:#f5f5f5;padding:12px;border-radius:8px;text-align:center">
+          <div style="font-size:9px;color:#999;text-transform:uppercase;margin-bottom:4px">% Grasa</div>
+          <div style="font-size:18px;font-weight:700;color:#333">${eval_.grasa}%</div>
+        </div>` : ''}
+        ${eval_.fc ? `<div style="background:#f5f5f5;padding:12px;border-radius:8px;text-align:center">
+          <div style="font-size:9px;color:#999;text-transform:uppercase;margin-bottom:4px">FC</div>
+          <div style="font-size:18px;font-weight:700;color:#333">${eval_.fc} lpm</div>
+        </div>` : ''}
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Observaciones -->
+    ${eval_.obs ? `
+    <div style="background:#F5F5F5;padding:14px;border-radius:8px;border-left:3px solid #999">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;font-weight:600;margin-bottom:6px">📝 Observaciones</div>
+      <div style="font-size:13px;color:#333;line-height:1.6">${eval_.obs}</div>
+    </div>
+    ` : ''}
+
+    <!-- Estado y fecha -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid #e0e0e0;padding-top:12px">
+      ${eval_.estado ? `<div>
+        <div style="font-size:9px;color:#999;text-transform:uppercase;margin-bottom:2px">Estado</div>
+        <div style="font-size:12px;font-weight:600;color:#333">${eval_.estado}</div>
+      </div>` : ''}
+      <div style="text-align:right">
+        <div style="font-size:9px;color:#999;text-transform:uppercase;margin-bottom:2px">Generado</div>
+        <div style="font-size:11px;color:#666">${today}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botones de acción -->
+  <div style="border-top:1px solid #e0e0e0;padding:16px;display:flex;gap:10px;justify-content:flex-end;background:#fafaf8">
+    <button class="btn btn-outline" onclick="closeModal('modal-eval-report')">❌ Cerrar</button>
+    <button class="btn btn-olive" onclick="downloadEvalReport('${patientId}','${evalId}')">📥 Descargar PDF</button>
+  </div>
+  `;
+
+  document.getElementById('modal-eval-report-content').innerHTML = reportHTML;
+  openModal('modal-eval-report');
+}
+
+// Descargar evaluación como PDF
+function downloadEvalReport(patientId, evalId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  const eval_ = (p.evaluaciones || []).find(e => e.id == evalId);
+  if (!eval_) return;
+
+  const today = new Date().toLocaleDateString('es-DO', {year:'numeric',month:'long',day:'numeric'});
+  
+  const pdfHTML = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Evaluación — ${p.nombre}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'DM Sans',sans-serif;color:#1a1a1a;font-size:11px;line-height:1.6;background:white}
+.page{max-width:190mm;margin:0 auto;padding:12mm 14mm}
+.header{background:#3F5A00;color:white;padding:20px;border-radius:10px;margin-bottom:20px}
+.header h1{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:8px;font-weight:500}
+.header .subtitle{opacity:0.85;font-size:13px}
+.header .patient-info{margin-top:12px;font-size:11px;opacity:0.8}
+.card{background:#EAF3D8;padding:16px;border-radius:8px;border-left:4px solid #5E8C2A;margin-bottom:12px}
+.card-label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.card-value{font-size:20px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace}
+.card-status{font-size:9px;color:#666;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.section-title{font-size:12px;color:#3F5A00;border-bottom:2px solid #C8DFA0;padding-bottom:6px;margin:16px 0 10px;font-weight:600}
+.measure-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.measure-box{background:#f5f5f5;padding:10px;border-radius:6px;text-align:center}
+.measure-label{font-size:8px;color:#999;text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.measure-value{font-size:16px;font-weight:700;color:#333;font-family:'DM Mono',monospace}
+.obs-box{background:#F5F5F5;padding:12px;border-radius:8px;border-left:3px solid #999;margin-bottom:12px}
+.obs-label{font-size:9px;color:#666;text-transform:uppercase;font-weight:600;margin-bottom:6px;display:block}
+.obs-text{font-size:11px;color:#333;line-height:1.6}
+.footer{margin-top:20px;padding-top:12px;border-top:1px solid #C8DFA0;font-size:9px;color:#999;text-align:center}
+@media print{.page{padding:10mm}}
+</style></head>
+<body><div class="page">
+<div class="header">
+  <h1>${p.nombre}</h1>
+  <div class="subtitle">Evaluación Nutricional — ${eval_.fecha}</div>
+  <div class="patient-info">
+    ${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'} · ${p.cedula ? 'C.I. ' + p.cedula : ''}
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="card-label">⚖️ Peso</div>
+    <div class="card-value">${eval_.peso || '—'} kg</div>
+  </div>
+  <div class="card" style="border-left-color:#C47A1A;background:#FFF3E0">
+    <div class="card-label" style="color:#C47A1A">📊 IMC</div>
+    <div class="card-value" style="color:#C47A1A">${(eval_.imc||0).toFixed(1)}</div>
+    <div class="card-status">${eval_.imc ? (eval_.imc < 18.5 ? 'Bajo peso' : eval_.imc < 25 ? 'Normal' : eval_.imc < 30 ? 'Sobrepeso' : 'Obesidad') : '—'}</div>
+  </div>
+</div>
+
+${eval_.talla || eval_.presion ? `
+<div class="grid">
+  ${eval_.talla ? `<div style="background:#E3F2FD;padding:16px;border-radius:8px;border-left:4px solid #2A6A8C">
+    <div class="card-label">📏 Talla</div>
+    <div class="card-value" style="color:#2A6A8C">${eval_.talla} m</div>
+  </div>` : '<div></div>'}
+  ${eval_.presion ? `<div style="background:#FCE4EC;padding:16px;border-radius:8px;border-left:4px solid #C44A2A">
+    <div class="card-label">❤️ Presión</div>
+    <div class="card-value" style="color:#C44A2A">${eval_.presion}</div>
+  </div>` : '<div></div>'}
+</div>
+` : ''}
+
+${eval_.cintura || eval_.cadera || eval_.grasa || eval_.fc ? `
+<div>
+  <div class="section-title">📐 Medidas Antropométricas</div>
+  <div class="measure-grid">
+    ${eval_.cintura ? `<div class="measure-box">
+      <div class="measure-label">Cintura</div>
+      <div class="measure-value">${eval_.cintura} cm</div>
+    </div>` : ''}
+    ${eval_.cadera ? `<div class="measure-box">
+      <div class="measure-label">Cadera</div>
+      <div class="measure-value">${eval_.cadera} cm</div>
+    </div>` : ''}
+    ${eval_.grasa ? `<div class="measure-box">
+      <div class="measure-label">% Grasa</div>
+      <div class="measure-value">${eval_.grasa}%</div>
+    </div>` : ''}
+    ${eval_.fc ? `<div class="measure-box">
+      <div class="measure-label">FC</div>
+      <div class="measure-value">${eval_.fc} lpm</div>
+    </div>` : ''}
+  </div>
+</div>
+` : ''}
+
+${eval_.obs ? `
+<div class="obs-box">
+  <label class="obs-label">📝 Observaciones</label>
+  <div class="obs-text">${eval_.obs}</div>
+</div>
+` : ''}
+
+<div class="footer">
+  <strong>${p.nombre}</strong> · Evaluación del ${eval_.fecha} · Generado el ${today}
+</div>
+</div></body></html>`;
+
+  _printHTML(pdfHTML, `Evaluacion_${p.nombre.replace(/\\s+/g,'_')}_${eval_.fecha}.pdf`);
 }
 
 
@@ -6660,7 +7005,7 @@ function openAppointmentModal(defaultDate, existingApt) {
         <input class="form-control" id="apt-fecha" type="date" value="${dateVal}" oninput="onAptDateChanged()">
       </div>
       <div class="form-group"><label>Hora *</label>
-        <input class="form-control" id="apt-hora" type="time" value="${horaVal}" oninput="onAptTimeChanged()">
+        <input class="form-control" id="apt-hora" type="time" value="${horaVal}" oninput="onAptTimeChanged()" step="1800">
       </div>
     </div>
     <div class="form-group mb-3"><label>Descripción</label>
