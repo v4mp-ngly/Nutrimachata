@@ -1041,6 +1041,52 @@
   </div>
 </div>
 
+<!-- MODAL VISTA PREVIA PDF DIETA -->
+<div id="modal-preview-pdf" class="modal-overlay">
+  <div class="modal modal-xl">
+    <div class="modal-body" id="modal-preview-pdf-content"></div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR DIETA PDF -->
+<div id="modal-edit-diet-pdf" class="modal-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">Editar Dieta</div>
+      <button class="modal-close" onclick="closeModal('modal-edit-diet-pdf')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;gap:12px">
+        <div>
+          <label style="font-weight:600;font-size:13px;color:var(--gray-700);display:block;margin-bottom:6px">Nombre de la dieta</label>
+          <input type="text" id="edit-diet-nombre" class="form-control" placeholder="Ej: Dieta Hipocalórica">
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-weight:600;font-size:13px;color:var(--gray-700);display:block;margin-bottom:6px">Fecha</label>
+            <input type="date" id="edit-diet-fecha" class="form-control">
+          </div>
+          
+          <div>
+            <label style="font-weight:600;font-size:13px;color:var(--gray-700);display:block;margin-bottom:6px">Calorías/día</label>
+            <input type="number" id="edit-diet-calorias" class="form-control" placeholder="Ej: 1800">
+          </div>
+        </div>
+        
+        <div>
+          <label style="font-weight:600;font-size:13px;color:var(--gray-700);display:block;margin-bottom:6px">Indicaciones (opcional)</label>
+          <textarea id="edit-diet-indicaciones" class="form-control" placeholder="Notas sobre la dieta..." style="min-height:80px"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-diet-pdf')">Cancelar</button>
+      <button class="btn btn-olive" onclick="saveDietChanges()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <script>
 
 // ═══════════════════════════════════════════════
@@ -4703,6 +4749,7 @@ function openHistoriaClinica(patientId, activeTab) {
             <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--gray-100)">
               ${esArchivo ? `
                 <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="previewDietPDF('${p.id}','${d.id}')">👁️ Ver</button>
+                <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="editDietPDF('${p.id}','${d.id}')">✏️ Editar</button>
                 <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="downloadDietFile('${p.id}','${d.id}')">⬇️ Descargar</button>
               ` : `
                 <button class="btn btn-outline btn-xs" style="flex:1;font-size:11px;padding:6px 8px" onclick="openDietView('${p.id}','${d.id}')">👁️ Ver</button>
@@ -6002,32 +6049,38 @@ function previewDietPDF(patientId, dietId) {
     return;
   }
   
-  // Crear una ventana con el PDF
-  const pdfWindow = window.open();
-  pdfWindow.document.write(`
-    <html>
-      <head>
-        <title>${diet.nombre}</title>
-        <style>
-          body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #f0f0f0; }
-          .controls { background: var(--olive-dark); color: white; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
-          .controls button { background: var(--olive); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-          .controls button:hover { background: var(--olive-accent); }
-          iframe { width: 100%; height: calc(100vh - 50px); border: none; }
-        </style>
-      </head>
-      <body>
-        <div class="controls">
-          <h3 style="margin:0">${diet.nombre}</h3>
-          <div>
-            <button onclick="window.print()">🖨️ Imprimir</button>
-            <button onclick="window.close()">Cerrar</button>
-          </div>
+  // Obtener objetivo del paciente
+  const hc = DB.historias_clinicas.find(h => h.paciente_id == patientId);
+  const objetivo = hc ? hc.motivo : 'Sin objetivo';
+  
+  // Mostrar modal con vista previa
+  const content = document.getElementById('modal-preview-pdf-content');
+  if (!content) return;
+  
+  content.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="margin:0;margin-bottom:4px">${diet.nombre}</h3>
+        <div style="font-size:12px;color:var(--gray-500)">
+          ${diet.fecha ? 'Fecha: ' + diet.fecha : ''} | 
+          ${diet.calorias ? diet.calorias + ' kcal/día' : ''} | 
+          <strong>Objetivo: ${objetivo}</strong>
         </div>
-        <embed src="data:application/pdf;base64,${diet.archivobase64}" type="application/pdf" width="100%" height="100%">
-      </body>
-    </html>
-  `);
+      </div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-preview-pdf')" style="padding:4px 8px">✕</button>
+    </div>
+    
+    <div style="border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;background:#f9f9f9;height:500px;margin-bottom:16px">
+      <embed src="data:application/pdf;base64,${diet.archivobase64}" type="application/pdf" width="100%" height="100%">
+    </div>
+    
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal('modal-preview-pdf')">Cerrar</button>
+      <button class="btn btn-olive" onclick="downloadDietFile('${patientId}','${dietId}')">⬇️ Descargar PDF</button>
+    </div>
+  `;
+  
+  openModal('modal-preview-pdf');
 }
 
 function downloadDietFile(patientId, dietId) {
@@ -6052,6 +6105,90 @@ function downloadDietFile(patientId, dietId) {
     console.error(e);
     notify('Error al descargar', 'danger');
   }
+}
+
+// ═══════════════════════════════════════════════
+//  EDITAR DIETA PDF
+// ═══════════════════════════════════════════════
+function editDietPDF(patientId, dietId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  
+  const diet = (p.dietas || []).find(d => d.id == dietId);
+  if (!diet) return;
+  
+  // Guardar datos actuales para guardar después
+  window._editingDiet = { patientId, dietId, diet };
+  
+  // Cargar los datos en el formulario
+  document.getElementById('edit-diet-nombre').value = diet.nombre || '';
+  document.getElementById('edit-diet-fecha').value = diet.fecha || '';
+  document.getElementById('edit-diet-calorias').value = diet.calorias || '';
+  document.getElementById('edit-diet-indicaciones').value = diet.indicaciones || '';
+  
+  openModal('modal-edit-diet-pdf');
+}
+
+async function saveDietChanges() {
+  if (!window._editingDiet) {
+    notify('Error: no hay dieta siendo editada', 'danger');
+    return;
+  }
+  
+  const { patientId, dietId, diet } = window._editingDiet;
+  
+  // Obtener valores del formulario
+  const nombre = document.getElementById('edit-diet-nombre').value.trim();
+  const fecha = document.getElementById('edit-diet-fecha').value;
+  const calorias = document.getElementById('edit-diet-calorias').value;
+  const indicaciones = document.getElementById('edit-diet-indicaciones').value.trim();
+  
+  if (!nombre) {
+    notify('El nombre de la dieta es obligatorio', 'warning');
+    return;
+  }
+  
+  try {
+    // Preparar datos para actualizar (SIN tocar el PDF)
+    const dietData = {
+      nombre: nombre,
+      fecha: fecha || diet.fecha,
+      calorias: calorias ? parseInt(calorias) : diet.calorias,
+      indicaciones: indicaciones
+      // NO incluimos: archivobase64, archivonombreoriginal, tipoarchivo
+      // El PDF permanece igual
+    };
+    
+    // Actualizar en Supabase
+    const updated = await SB.updateDieta(dietId, dietData);
+    
+    if (updated) {
+      // Actualizar en la BD local
+      const p = DB.patients.find(x => x.id == patientId);
+      if (p) {
+        const d = p.dietas.find(x => x.id == dietId);
+        if (d) {
+          d.nombre = nombre;
+          d.fecha = fecha || d.fecha;
+          d.calorias = calorias ? parseInt(calorias) : d.calorias;
+          d.indicaciones = indicaciones;
+        }
+      }
+      
+      closeModal('modal-edit-diet-pdf');
+      notify('Dieta actualizada correctamente', 'success');
+      
+      // Actualizar vista si es necesario
+      if (currentPage.startsWith('paciente-')) {
+        openHistoriaClinica(patientId, 'dietas');
+      }
+    }
+  } catch(e) {
+    console.error(e);
+    notify('Error al guardar los cambios', 'danger');
+  }
+  
+  window._editingDiet = null;
 }
 
 // ═══════════════════════════════════════════════
