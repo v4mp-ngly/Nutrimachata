@@ -5953,8 +5953,8 @@ async function uploadDietPDF(patientId) {
           nombre: nombre,
           fecha: new Date().toISOString().split('T')[0],
           tipoArchivo: 'pdf',
-          archivoBase64: base64,
-          archivoNombreOriginal: file.name,
+          archivobase64: base64,
+          archivonombreoriginal: file.name,
           activo: true
         };
         
@@ -5997,7 +5997,7 @@ function previewDietPDF(patientId, dietId) {
   if (!p) return;
   
   const diet = (p.dietas || []).find(d => d.id == dietId);
-  if (!diet || !diet.archivoBase64) {
+  if (!diet || !diet.archivobase64) {
     notify('No se puede visualizar el archivo', 'danger');
     return;
   }
@@ -6024,7 +6024,7 @@ function previewDietPDF(patientId, dietId) {
             <button onclick="window.close()">Cerrar</button>
           </div>
         </div>
-        <embed src="data:application/pdf;base64,${diet.archivoBase64}" type="application/pdf" width="100%" height="100%">
+        <embed src="data:application/pdf;base64,${diet.archivobase64}" type="application/pdf" width="100%" height="100%">
       </body>
     </html>
   `);
@@ -6035,14 +6035,14 @@ function downloadDietFile(patientId, dietId) {
   if (!p) return;
   
   const diet = (p.dietas || []).find(d => d.id == dietId);
-  if (!diet || !diet.archivoBase64) {
+  if (!diet || !diet.archivobase64) {
     notify('No se puede descargar el archivo', 'danger');
     return;
   }
   
   try {
     const link = document.createElement('a');
-    link.href = 'data:application/pdf;base64,' + diet.archivoBase64;
+    link.href = 'data:application/pdf;base64,' + diet.archivobase64;
     link.download = diet.nombre + '.pdf';
     document.body.appendChild(link);
     link.click();
