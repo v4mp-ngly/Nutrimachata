@@ -6050,8 +6050,7 @@ function previewDietPDF(patientId, dietId) {
   }
   
   // Obtener objetivo del paciente
-  const hc = DB.historias_clinicas.find(h => h.paciente_id == patientId);
-  const objetivo = hc ? hc.motivo : 'Sin objetivo';
+  const objetivo = p.objetivo || 'Sin objetivo especificado';
   
   // Mostrar modal con vista previa
   const content = document.getElementById('modal-preview-pdf-content');
