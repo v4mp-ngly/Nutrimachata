@@ -1503,6 +1503,22 @@ function mapPaciente(p, evals, dietas, hc) {
           ? JSON.parse(d.week_plan)
           : (d.week_plan && typeof d.week_plan === 'object' ? d.week_plan : {});
       } catch(e) { weekPlan = {}; }
+      
+      // Asegurar que weekPlan tiene la estructura correcta con todas las comidas y días
+      // Comidas: Desayuno, Media mañana, Almuerzo, Merienda, Cena
+      // Días: Lunes, Martes, Miércoles, Jueves, Viernes, Sábado, Domingo
+      const comidas = ['Desayuno','Media mañana','Almuerzo','Merienda','Cena'];
+      const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+      const emptyWeekPlan = {};
+      comidas.forEach(c => {
+        emptyWeekPlan[c] = {};
+        dias.forEach(d => {
+          emptyWeekPlan[c][d] = '';
+        });
+      });
+      // Merges: propiedades de emptyWeekPlan primero, luego sobrescribe con weekPlan existente
+      weekPlan = { ...emptyWeekPlan, ...weekPlan };
+      
       return {
         id: d.id,
         nombre: d.nombre,
@@ -5557,7 +5573,22 @@ function getEmptyWeekPlan() {
 
 function openDietModal(patientId, existingDiet) {
   const patient = patientId ? DB.patients.find(p=>p.id==patientId) : null;
-  const weekPlan = existingDiet ? existingDiet.weekPlan : getEmptyWeekPlan();
+  
+  // Inicializar weekPlan: usar el existente o crear uno vacío
+  let weekPlan = {};
+  if (existingDiet && existingDiet.weekPlan && typeof existingDiet.weekPlan === 'object') {
+    weekPlan = existingDiet.weekPlan;
+  } else {
+    // Crear estructura vacía si no existe
+    const comidas = ['Desayuno','Media mañana','Almuerzo','Merienda','Cena'];
+    const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+    comidas.forEach(c => {
+      weekPlan[c] = {};
+      dias.forEach(d => {
+        weekPlan[c][d] = '';
+      });
+    });
+  }
   document.getElementById('diet-modal-subtitle').textContent = patient ? patient.nombre : 'Nuevo plan semanal';
   document.getElementById('diet-modal-body').innerHTML = `
     <div class="form-row mb-4">
@@ -5677,6 +5708,20 @@ function openDietView(patientId, dietId) {
   if(!p) return;
   const d = (p.dietas||[]).find(x=>x.id==dietId);
   if(!d) return;
+  
+  // Asegurar que weekPlan está inicializado (por si acaso viene null/undefined)
+  if (!d.weekPlan || typeof d.weekPlan !== 'object') {
+    const comidas = ['Desayuno','Media mañana','Almuerzo','Merienda','Cena'];
+    const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+    d.weekPlan = {};
+    comidas.forEach(c => {
+      d.weekPlan[c] = {};
+      dias.forEach(day => {
+        d.weekPlan[c][day] = '';
+      });
+    });
+  }
+  
   document.getElementById('diet-modal-subtitle').textContent = p.nombre+' — '+d.fecha;
   document.getElementById('diet-modal-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -5703,7 +5748,7 @@ function openDietView(patientId, dietId) {
             <td style="padding:10px 10px;font-size:12px;font-weight:700;color:var(--olive-dark);background:var(--beige);border-bottom:1px solid var(--gray-200);border-right:1px solid var(--gray-200);vertical-align:middle">
               <div style="font-size:18px;margin-bottom:3px">${COMIDAS_ICONS[ci]}</div>${comida}
             </td>
-            ${DIAS.map(dia=>{const content=d.weekPlan&&d.weekPlan[comida]?(d.weekPlan[comida][dia]||''):'';
+            ${DIAS.map(dia=>{const content=(d.weekPlan&&d.weekPlan[comida]&&d.weekPlan[comida][dia])?d.weekPlan[comida][dia]:'';
               return `<td style="padding:10px 9px;font-size:12px;color:var(--gray-700);border-bottom:1px solid var(--gray-200);border-left:1px solid var(--gray-200);vertical-align:top;line-height:1.6;min-width:95px">${content.replace(/\n/g,'<br>')||'<span style="color:var(--gray-300)">—</span>'}</td>`;
             }).join('')}
           </tr>`).join('')}
