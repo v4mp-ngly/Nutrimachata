@@ -4683,7 +4683,7 @@ function openHistoriaClinica(patientId, activeTab) {
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-olive btn-sm" onclick="openEvalModal('${p.id}')">+ Nueva Evaluación</button>
       </div>
-      ${evals.length ? `<div class="hc-timeline">${[...evals].reverse().map(e=>`<div class="hc-event" onclick="viewEvaluationReport('${p.id}','${e.id}')" style="cursor:pointer;transition:all 0.2s">
+      ${evals.length ? `<div class="hc-timeline">${[...evals].reverse().map(e=>`<div class="hc-event" onclick="openEvaluationDetail('${p.id}','${e.id}')" style="cursor:pointer;transition:all 0.2s">
           <div class="hc-event-dot eval"></div>
           <div class="hc-event-content">
             <div class="hc-event-date">${e.fecha}</div>
@@ -7654,9 +7654,45 @@ function generateReportHTML(p) {
     ${lastEval ? `
     <div class="divider"></div>
     <div style="font-size:12px;font-weight:600;color:var(--black);margin:10px 0 6px">Última evaluación — ${lastEval.fecha}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      ${[['Peso',lastEval.peso+' kg'],['IMC',(lastEval.imc||0).toFixed(1)],lastEval.presion?['Presión',lastEval.presion]:null,lastEval.grasa!=null?['% Grasa',lastEval.grasa+'%']:null,lastEval.cintura!=null?['Cintura',lastEval.cintura+' cm']:null].filter(Boolean).map(([l,v])=>`<div style="background:var(--beige);border-radius:var(--radius);padding:6px 12px;text-align:center"><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;margin-bottom:2px">${l}</div><div style="font-size:14px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark)">${v}</div></div>`).join('')}
+    
+    <!-- RESUMEN RÁPIDO -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      ${[['Peso',lastEval.peso+' kg'],['IMC',(lastEval.imc||0).toFixed(1)],lastEval.presion?['Presión',lastEval.presion]:null].filter(Boolean).map(([l,v])=>`<div style="background:var(--beige);border-radius:var(--radius);padding:8px 14px;text-align:center"><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:2px">${l}</div><div style="font-size:15px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark)">${v}</div></div>`).join('')}
     </div>
+    
+    <!-- TABLA COMPLETA DE MEDIDAS ANTROPOMÉTRICAS -->
+    <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;margin-bottom:10px;font-size:12px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--beige);border-bottom:1px solid var(--gray-200)">
+            <th style="text-align:left;padding:10px 12px;font-weight:600;color:var(--olive-dark);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Medida</th>
+            <th style="text-align:center;padding:10px 12px;font-weight:600;color:var(--olive-dark);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${[
+            ['Peso', lastEval.peso ? lastEval.peso + ' kg' : '—'],
+            ['Talla', lastEval.talla ? lastEval.talla + ' m' : '—'],
+            ['IMC', lastEval.imc ? (lastEval.imc).toFixed(1) : '—'],
+            ['% Grasa', lastEval.grasa != null ? lastEval.grasa + '%' : '—'],
+            ['Cuello', lastEval.cuello != null ? lastEval.cuello + ' cm' : '—'],
+            ['Pecho', lastEval.pecho != null ? lastEval.pecho + ' cm' : '—'],
+            ['Muñeca', lastEval.muneca != null ? lastEval.muneca + ' cm' : '—'],
+            ['Cintura', lastEval.cintura != null ? lastEval.cintura + ' cm' : '—'],
+            ['Abdomen', lastEval.abdomen != null ? lastEval.abdomen + ' cm' : '—'],
+            ['Cadera', lastEval.cadera != null ? lastEval.cadera + ' cm' : '—'],
+            ['Muslo', lastEval.muslo != null ? lastEval.muslo + ' cm' : '—'],
+            ['FC', lastEval.fc != null ? lastEval.fc + ' lpm' : '—'],
+          ].map(([label, value], idx) => `
+            <tr style="border-bottom:${idx < 11 ? '1px solid var(--gray-100)' : 'none'}">
+              <td style="padding:8px 12px;color:var(--gray-600);font-weight:500">${label}</td>
+              <td style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-weight:600;color:var(--olive-dark)">${value}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    
     ${lastEval.obs?`<div style="background:var(--beige);border-left:3px solid var(--olive);padding:8px 12px;border-radius:0 var(--radius) var(--radius) 0;font-size:12px;color:var(--gray-700);margin-bottom:10px"><strong>Obs:</strong> ${lastEval.obs}</div>`:''}
     `:''}
     ${dietas.length?`<div class="divider"></div><div style="font-size:12px;font-weight:600;color:var(--black);margin:10px 0 6px">Planes Nutricionales</div>${dietas.slice(0,3).map(d=>`<div style="background:var(--beige);border:1px solid var(--olive-pale);border-radius:var(--radius);padding:8px 12px;margin-bottom:6px"><div style="font-weight:600;color:var(--olive-dark)">🥗 ${d.nombre}</div><div style="font-size:11px;color:var(--gray-500)">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div></div>`).join('')}`:''}
@@ -9704,6 +9740,192 @@ function getFieldChartColor(field, evals) {
   const improving = field.lower ? last < first : last > first;
   if (Math.abs(last - first) < 0.01) return '#2A6A8C'; // neutral = blue
   return improving ? '#2D7A4A' : '#C47A1A';             // green or orange
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVALUACIÓN ANTROPOMÉTRICA — Cálculos de Índices y Visualización
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══ CÁLCULOS DE ÍNDICES ═══
+
+function calcIndicesCinturaCadera(cintura, cadera, sexo) {
+  if (!cintura || !cadera) return { valor: null, estado: '—', color: '#A8A59D', badge: 'neutral' };
+  const icc = (parseFloat(cintura) / parseFloat(cadera)).toFixed(2);
+  let estado, color, badge;
+  if (sexo === 'M') {
+    if (icc < 0.90) { estado = 'Normal'; color = '#2D7A4A'; badge = 'success'; }
+    else if (icc < 1.0) { estado = 'Alto'; color = '#C47A1A'; badge = 'warning'; }
+    else { estado = 'Muy Alto'; color = '#C44A2A'; badge = 'danger'; }
+  } else {
+    if (icc < 0.80) { estado = 'Normal'; color = '#2D7A4A'; badge = 'success'; }
+    else if (icc < 0.85) { estado = 'Alto'; color = '#C47A1A'; badge = 'warning'; }
+    else { estado = 'Muy Alto'; color = '#C44A2A'; badge = 'danger'; }
+  }
+  return { valor: icc, estado, color, badge };
+}
+
+function calcIndicesCinturaEstatura(cintura, talla) {
+  if (!cintura || !talla) return { valor: null, estado: '—', color: '#A8A59D', badge: 'neutral' };
+  const ice = (parseFloat(cintura) / (parseFloat(talla) * 100)).toFixed(2);
+  let estado, color, badge;
+  if (ice < 0.50) { estado = 'Normal'; color = '#2D7A4A'; badge = 'success'; }
+  else if (ice < 0.60) { estado = 'Alto'; color = '#C47A1A'; badge = 'warning'; }
+  else { estado = 'Muy Alto'; color = '#C44A2A'; badge = 'danger'; }
+  return { valor: ice, estado, color, badge };
+}
+
+function calcTMB(peso, talla, edad, sexo) {
+  if (!peso || !talla || !edad) return null;
+  const p = parseFloat(peso);
+  const t = parseFloat(talla) * 100;
+  const e = parseInt(edad);
+  let tmb;
+  if (sexo === 'M') {
+    tmb = (10 * p) + (6.25 * t) - (5 * e) + 5;
+  } else {
+    tmb = (10 * p) + (6.25 * t) - (5 * e) - 161;
+  }
+  return Math.round(tmb);
+}
+
+function calcComposicionCorporal(peso, porcentajeGrasa, talla, sexo) {
+  const p = parseFloat(peso);
+  const grasa = parseFloat(porcentajeGrasa) || null;
+  const masaGrasa = grasa ? (p * grasa / 100).toFixed(1) : null;
+  const masaMagra = masaGrasa ? (p - masaGrasa).toFixed(1) : null;
+  const t = parseFloat(talla);
+  const masaOsea = (3.02 * Math.pow(t * t, 0.365) * 0.0001).toFixed(1);
+  const aguaCorporal = grasa ? (60 - (grasa * 0.4)).toFixed(1) : (60).toFixed(1);
+  return { masaGrasa, masaMagra, masaOsea, aguaCorporal, porcentajeGrasa: grasa ? grasa.toFixed(1) : null };
+}
+
+function getEstadoIndice(valor, tipo) {
+  if (!valor) return { estado: '—', color: '#A8A59D', badge: 'neutral' };
+  const v = parseFloat(valor);
+  switch(tipo) {
+    case 'imc':
+      if (v < 18.5) return { estado: 'Bajo peso', color: '#2A6A8C', badge: 'info' };
+      if (v < 25) return { estado: 'Normal', color: '#2D7A4A', badge: 'success' };
+      if (v < 30) return { estado: 'Sobrepeso', color: '#C47A1A', badge: 'warning' };
+      if (v < 35) return { estado: 'Obesidad I', color: '#C44A2A', badge: 'danger' };
+      return { estado: 'Obesidad II+', color: '#8C1A1A', badge: 'danger' };
+    case 'presion':
+      if (v < 120) return { estado: 'Normal', color: '#2D7A4A', badge: 'success' };
+      if (v < 140) return { estado: 'Elevada', color: '#C47A1A', badge: 'warning' };
+      return { estado: 'Alta', color: '#C44A2A', badge: 'danger' };
+    default:
+      return { estado: '—', color: '#A8A59D', badge: 'neutral' };
+  }
+}
+
+function getEvalChange(evals, field) {
+  if (!evals || evals.length < 2) return null;
+  const actual = parseFloat(evals[evals.length - 1][field]);
+  const anterior = parseFloat(evals[evals.length - 2][field]);
+  if (isNaN(actual) || isNaN(anterior)) return null;
+  const diff = (actual - anterior).toFixed(1);
+  const pct = ((diff / anterior) * 100).toFixed(1);
+  return { valor: diff, porcentaje: pct, direccion: diff < 0 ? 'down' : diff > 0 ? 'up' : 'flat' };
+}
+
+function renderBodyFigure(eval_) {
+  const medidas = {
+    cuello: eval_.cuello,
+    pecho: eval_.pecho,
+    cintura: eval_.cintura,
+    cadera: eval_.cadera,
+    muslo: eval_.muslo,
+  };
+  return `<svg width="220" height="320" viewBox="0 0 100 150" style="max-width:100%"><circle cx="50" cy="15" r="8" fill="none" stroke="#5E8C2A" stroke-width="0.5"/>${medidas.cuello ? `<line x1="50" y1="23" x2="50" y2="30" stroke="#2D7A4A" stroke-width="1.5"/><text x="55" y="27" font-size="6" fill="#2D7A4A">${medidas.cuello}cm</text>` : ''}<path d="M 40 30 Q 35 50 40 70 Q 50 75 60 70 Q 65 50 60 30" fill="none" stroke="#5E8C2A" stroke-width="1"/>${medidas.pecho ? `<line x1="35" y1="40" x2="65" y2="40" stroke="#F4A460" stroke-width="1.5"/><text x="70" y="42" font-size="6" fill="#F4A460">${medidas.pecho}cm</text>` : ''}${medidas.cintura ? `<line x1="30" y1="55" x2="70" y2="55" stroke="#2D7A4A" stroke-width="2"/><text x="72" y="57" font-size="6" fill="#2D7A4A">${medidas.cintura}cm</text>` : ''}${medidas.cadera ? `<line x1="25" y1="70" x2="75" y2="70" stroke="#C47A1A" stroke-width="1.5"/><text x="78" y="72" font-size="6" fill="#C47A1A">${medidas.cadera}cm</text>` : ''}<line x1="40" y1="70" x2="35" y2="130" stroke="#5E8C2A" stroke-width="0.8"/><line x1="60" y1="70" x2="65" y2="130" stroke="#5E8C2A" stroke-width="0.8"/>${medidas.muslo ? `<line x1="32" y1="80" x2="38" y2="80" stroke="#7A9D3C" stroke-width="1.5"/><text x="32" y="85" font-size="6" fill="#7A9D3C">${medidas.muslo}cm</text>` : ''}<circle cx="35" cy="135" r="2" fill="#5E8C2A"/><circle cx="65" cy="135" r="2" fill="#5E8C2A"/></svg>`;
+}
+
+function openEvaluationDetail(patientId, evalId) {
+  const p = DB.patients.find(x => x.id == patientId);
+  if (!p) return;
+  const evals = p.evaluaciones || [];
+  const eval_ = evals.find(e => e.id == evalId);
+  if (!eval_) return;
+  
+  const icc = calcIndicesCinturaCadera(eval_.cintura, eval_.cadera, p.sexo);
+  const ice = calcIndicesCinturaEstatura(eval_.cintura, eval_.talla);
+  const tmb = calcTMB(eval_.peso, eval_.talla, p.edad, p.sexo);
+  const composicion = calcComposicionCorporal(eval_.peso, eval_.grasa, eval_.talla, p.sexo);
+  const imc_estado = getEstadoIndice(eval_.imc, 'imc');
+  const presion_estado = getEstadoIndice(eval_.presion ? eval_.presion.split('/')[0] : null, 'presion');
+  const pesoChange = getEvalChange(evals, 'peso');
+  
+  const html = `
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px;background:var(--olive-dark);border-radius:var(--radius-lg);color:white">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">${p.initials}</div>
+      <div style="flex:1">
+        <div style="font-size:20px;font-weight:600;margin-bottom:4px">${p.nombre}</div>
+        <div style="font-size:13px;opacity:0.8;margin-bottom:8px">${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'} · ${p.cedula || '—'}</div>
+        <div style="font-size:12px;opacity:0.7">Evaluación: ${eval_.fecha}</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="openHistoriaClinica('${patientId}')">← Volver</button>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+      <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:16px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:4px">PESO</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono';margin-bottom:8px;color:var(--olive-dark)">${eval_.peso || '—'}<span style="font-size:18px;opacity:0.6"> kg</span></div>
+        ${pesoChange ? `<div style="font-size:13px;color:${pesoChange.direccion === 'down' ? '#2D7A4A' : '#C44A2A'};font-weight:600">${pesoChange.direccion === 'down' ? '📉' : '📈'} ${pesoChange.valor} kg</div>` : '<div style="font-size:12px;color:var(--gray-400)">Sin cambios</div>'}
+      </div>
+      <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:16px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:4px">TALLA</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono';margin-bottom:8px;color:var(--olive-dark)">${eval_.talla || '—'}<span style="font-size:18px;opacity:0.6"> m</span></div>
+        <div style="font-size:13px;color:var(--gray-400)">Sin cambios</div>
+      </div>
+      <div style="background:white;border:1px solid ${imc_estado.color}20;border-radius:var(--radius-lg);padding:16px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:4px">IMC</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono';margin-bottom:8px;color:${imc_estado.color}">${eval_.imc ? eval_.imc.toFixed(1) : '—'}</div>
+        <div style="font-size:12px;font-weight:600;color:${imc_estado.color};background:${imc_estado.color}15;padding:4px 8px;border-radius:var(--radius-sm);display:inline-block">${imc_estado.estado}</div>
+      </div>
+      <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:16px;text-align:center">
+        <div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:4px">PRESIÓN</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono';margin-bottom:8px;color:var(--olive-dark)">${eval_.presion || '—'}<span style="font-size:18px;opacity:0.6"> mmHg</span></div>
+        <div style="font-size:12px;font-weight:600;color:${presion_estado.color};background:${presion_estado.color}15;padding:4px 8px;border-radius:var(--radius-sm);display:inline-block">${presion_estado.estado}</div>
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;margin-bottom:20px">
+      <div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px">Medidas Antropométricas</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          ${[['Cuello',eval_.cuello,'cm'],['Pecho',eval_.pecho,'cm'],['Muñeca',eval_.muneca,'cm'],['Cintura',eval_.cintura,'cm'],['Abdomen',eval_.abdomen,'cm'],['Cadera',eval_.cadera,'cm'],['Muslo',eval_.muslo,'cm'],['% Grasa',eval_.grasa,'%']].map(([l,v,u])=>`<div style="background:var(--beige);border-radius:var(--radius);padding:12px;text-align:center;border:1px solid var(--gray-200)"><div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:4px">${l}</div><div style="font-size:20px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark);margin-bottom:2px">${v||'—'}</div><div style="font-size:10px;color:var(--gray-400)">${v?u:'—'}</div></div>`).join('')}
+        </div>
+      </div>
+      <div style="background:var(--beige);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)">${renderBodyFigure(eval_)}</div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+      <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px">Composición Corporal</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px">${[['Masa Grasa',composicion.masaGrasa,'kg'],['Masa Magra',composicion.masaMagra,'kg'],['Masa Ósea',composicion.masaOsea,'kg'],['Agua Corporal',composicion.aguaCorporal,'%']].map(([l,v,u])=>`<div style="text-align:center"><div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;font-weight:600">${l}</div><div style="font-size:16px;font-weight:700;color:var(--olive-dark);margin-top:4px">${v||'—'} ${v?u:''}</div></div>`).join('')}</div>
+      </div>
+      <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px">Índices y Clasificaciones</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--beige);border-radius:var(--radius-sm)"><span style="font-size:12px;color:var(--gray-600)">Índice Cintura-Cadera</span><span style="font-weight:700;color:${icc.color}">${icc.valor||'—'}</span><span style="font-size:11px;font-weight:600;color:${icc.color};background:${icc.color}20;padding:2px 8px;border-radius:12px">${icc.estado}</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--beige);border-radius:var(--radius-sm)"><span style="font-size:12px;color:var(--gray-600)">Índice Cintura-Estatura</span><span style="font-weight:700;color:${ice.color}">${ice.valor||'—'}</span><span style="font-size:11px;font-weight:600;color:${ice.color};background:${ice.color}20;padding:2px 8px;border-radius:12px">${ice.estado}</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--beige);border-radius:var(--radius-sm)"><span style="font-size:12px;color:var(--gray-600)">Tasa Metabólica Basal</span><span style="font-weight:700;color:var(--olive-dark)">${tmb?tmb+' kcal':'—'}</span></div>
+        </div>
+      </div>
+    </div>
+    
+    ${eval_.obs ? `<div style="background:var(--beige);border-left:4px solid var(--olive);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:16px;margin-bottom:20px"><div style="font-size:12px;font-weight:600;color:var(--olive-dark);text-transform:uppercase;margin-bottom:6px">Observaciones</div><div style="font-size:13px;color:var(--gray-700);line-height:1.6">${eval_.obs}</div></div>` : ''}
+    
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-outline btn-sm" onclick="openEvalModal('${patientId}','${evalId}')">✏️ Editar</button>
+      <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="if(confirm('¿Eliminar esta evaluación?')) deleteEvaluation('${patientId}','${evalId}')">🗑️ Eliminar</button>
+    </div>
+  `;
+  
+  currentPage = 'paciente-eval-detail-' + patientId + '-' + evalId;
+  document.getElementById('page-title').textContent = 'Evaluación Antropométrica';
+  document.getElementById('page-subtitle').textContent = 'Análisis completo de composición corporal y medidas';
+  document.getElementById('page-content').innerHTML = html;
 }
 
 // Funciones auxiliares para cerrar bloques pendientes
