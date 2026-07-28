@@ -4659,7 +4659,7 @@ function openHistoriaClinica(patientId, activeTab) {
         ${dietas.map((d, idx)=>{
           const diasActivo = d.fecha ? Math.floor((new Date() - new Date(d.fecha)) / (1000 * 60 * 60 * 24)) : null;
           const estado = d.activo !== false ? '✅ Activa' : '⏸️ Inactiva';
-          const esArchivo = d.tipoArchivo === 'pdf' || (d.archivoUrl && d.archivoUrl.includes('pdf'));
+          const esArchivo = d.tipoarchivo === 'pdf' || (d.archivoUrl && d.archivoUrl.includes('pdf'));
           return `
         <div class="card" style="position:relative;padding:0;overflow:hidden;border-left:4px solid ${esArchivo ? 'var(--info)' : 'var(--olive-accent)'}">
           <div style="background:linear-gradient(135deg,rgba(94,140,42,0.05) 0%,transparent 100%);padding:16px 20px">
@@ -5952,7 +5952,7 @@ async function uploadDietPDF(patientId) {
           paciente_id: patientId,
           nombre: nombre,
           fecha: new Date().toISOString().split('T')[0],
-          tipoArchivo: 'pdf',
+          tipoarchivo: 'pdf',
           archivobase64: base64,
           archivonombreoriginal: file.name,
           activo: true
