@@ -1407,6 +1407,44 @@ tbody td{padding:12px 13px;font-size:12px}tbody tr:hover{background:#f7faF3!impo
 @media(max-width:1024px){.sidebar{width:220px}.main-content{margin-left:220px}.patient-page-grid{grid-template-columns:1fr}.patient-summary-panel{position:static}.summary-stat-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:768px){.main-content{margin-left:0}.sidebar{width:280px}.mini-metric-grid{grid-template-columns:repeat(2,1fr)}.page-content{padding:14px}.dash-charts-row,.dash-bottom-row,.dash-sparklines-row{grid-template-columns:1fr!important}}
 
+
+/* ===== PATIENTS RESPONSIVE MODERN LAYOUT ===== */
+.patients-page{width:100%;min-width:0}
+.patients-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-bottom:18px}
+.patients-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.patients-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,340px);gap:18px;align-items:start}
+.patients-list-pane{min-width:0}
+.patient-preview-pane{min-width:0;position:sticky;top:82px}
+.patient-toolbar{background:#fff;border:1.5px solid var(--gray-200);border-radius:var(--radius-lg);padding:12px 14px;margin-bottom:14px}
+.patient-toolbar-row{display:grid;grid-template-columns:minmax(220px,1fr) minmax(150px,190px);gap:10px;align-items:center}
+.patient-directory{background:#fff;border:1.5px solid var(--gray-200);border-radius:var(--radius-lg);overflow:hidden}
+.patient-directory .table-container{width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.patient-directory table{width:100%;min-width:820px;table-layout:auto}
+.patient-directory th,.patient-directory td{padding-left:12px!important;padding-right:12px!important}
+@media (max-width:1450px){
+ .patients-workspace{grid-template-columns:minmax(0,1fr) 300px;gap:14px}
+ .patient-directory table{min-width:780px}
+ .patient-directory th,.patient-directory td{padding-left:9px!important;padding-right:9px!important}
+}
+@media (max-width:1180px){
+ .patients-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .patients-workspace{grid-template-columns:1fr}
+ .patient-preview-pane{position:static;display:none}
+ .patient-directory table{min-width:760px}
+}
+@media (max-width:760px){
+ .patients-actions .btn{flex:1 1 160px;justify-content:center}
+ .patients-kpis{grid-template-columns:1fr 1fr;gap:10px}
+ .patient-toolbar-row{grid-template-columns:1fr}
+ .patient-toolbar-row .form-select{width:100%!important}
+ .patient-directory-header{align-items:flex-start!important;gap:10px;flex-wrap:wrap}
+}
+@media (max-width:480px){
+ .patients-kpis{grid-template-columns:1fr}
+}
+/* Browser zoom effectively reduces CSS viewport width, so these breakpoints also
+   prevent the patient detail panel from pushing the table off-screen at 110-150% zoom. */
+
 </style>
 
 <style id="nm-modern-dashboard-style">
@@ -3109,15 +3147,15 @@ function renderPatients() {
   document.getElementById('page-subtitle').textContent = 'Gestiona y consulta la información de tus pacientes';
   
   document.getElementById('page-content').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-      <div></div>
+    <div class="patients-page">
+    <div class="patients-actions">
       <div style="display:flex;gap:9px;flex-wrap:wrap">
         <button class="btn btn-olive" onclick="openWizard()">＋ Nuevo Paciente</button>
         <button class="btn btn-outline" onclick="openSimplePatientModal()">Registro rápido</button>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+    <div class="patients-kpis">
       <div class="kpi-card" style="text-align:center">
         <div class="kpi-label">Pacientes Totales</div>
         <div class="kpi-value">${patients.length}</div>
@@ -3140,10 +3178,10 @@ function renderPatients() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px">
-      <div>
-        <div style="background:white;border:1.5px solid var(--gray-200);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;animation:fadeScale 0.4s ease-out">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="patients-workspace">
+      <div class="patients-list-pane">
+        <div class="patient-toolbar" style="animation:fadeScale 0.4s ease-out">
+          <div class="patient-toolbar-row">
             <div class="search-bar" style="flex:1;min-width:250px;position:relative">
               <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--gray-400)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input class="form-control" id="patient-search" placeholder="Buscar por nombre, teléfono o correo..." oninput="filterPatients()" style="padding-left:36px">
@@ -3156,8 +3194,8 @@ function renderPatients() {
           </div>
         </div>
         
-        <div style="background:white;border:1.5px solid var(--gray-200);border-radius:var(--radius-lg);overflow:hidden;animation:fadeScale 0.4s ease-out 0.1s both">
-          <div style="padding:16px 20px;border-bottom:1.5px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center">
+        <div class="patient-directory" style="animation:fadeScale 0.4s ease-out 0.1s both">
+          <div class="patient-directory-header" style="padding:16px 20px;border-bottom:1.5px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center">
             <div>
               <div style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:var(--olive-dark);margin-bottom:2px">Directorio de Pacientes</div>
               <div style="font-size:12px;color:var(--gray-400)" id="patient-count">${patients.length} pacientes registrados</div>
@@ -3183,7 +3221,7 @@ function renderPatients() {
         </div>
       </div>
 
-      <div style="animation:slideIn 0.4s ease-out 0.15s both">
+      <aside class="patient-preview-pane" style="animation:slideIn 0.4s ease-out 0.15s both">
         ${recent ? `
         <div style="background:linear-gradient(135deg, var(--olive-dark) 0%, var(--olive) 100%);border-radius:var(--radius-lg);overflow:hidden;color:white;box-shadow:0 8px 24px rgba(94,140,42,0.2)">
           <div style="padding:20px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(255,255,255,0.15)">
@@ -3243,7 +3281,8 @@ function renderPatients() {
           <div style="font-size:12px;color:var(--gray-400)">Comienza agregando tu primer paciente</div>
         </div>
         `}
-      </div>
+      </aside>
+    </div>
     </div>
   `;
   renderPatientsTable(patients);
@@ -4335,15 +4374,33 @@ function evalFollowupFields(values={}) {
     </div>`;
 }
 
+function resolveEvalPatientSearch() {
+  const input = document.getElementById('eval-patient-search');
+  const hidden = document.getElementById('eval-patient-select');
+  const status = document.getElementById('eval-patient-search-status');
+  if (!input || !hidden) return;
+  const q = input.value.trim().toLocaleLowerCase('es');
+  const matches = DB.patients.filter(p => String(p.nombre || '').trim().toLocaleLowerCase('es') === q);
+  if (matches.length === 1) {
+    hidden.value = matches[0].id;
+    if (status) { status.textContent = 'Paciente seleccionado: ' + matches[0].nombre; status.style.color = 'var(--olive-dark)'; }
+  } else {
+    hidden.value = '';
+    if (status) { status.textContent = q ? 'Selecciona un nombre exacto de la lista.' : 'Escribe el nombre y selecciona al paciente de la lista.'; status.style.color = 'var(--gray-400)'; }
+  }
+}
+
 function openEvalModal(patientId) {
   const patient = patientId ? DB.patients.find(p => p.id == patientId) : null;
   document.getElementById('eval-patient-name').textContent = patient ? patient.nombre : 'Seleccione paciente';
   document.getElementById('eval-modal-body').innerHTML = `
     ${!patientId ? `<div class="form-group mb-4"><label>Paciente *</label>
-      <select class="form-select" id="eval-patient-select">
-        <option value="">Seleccionar paciente...</option>
-        ${DB.patients.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')}
-      </select>
+      <input class="form-control" id="eval-patient-search" list="eval-patient-options" autocomplete="off" placeholder="Buscar paciente por nombre..." oninput="resolveEvalPatientSearch()">
+      <datalist id="eval-patient-options">
+        ${DB.patients.map(p => `<option value="${p.nombre}"></option>`).join('')}
+      </datalist>
+      <input type="hidden" id="eval-patient-select" value="">
+      <div id="eval-patient-search-status" style="font-size:11px;color:var(--gray-400);margin-top:5px">Escribe el nombre y selecciona al paciente de la lista.</div>
     </div>` : `<input type="hidden" id="eval-patient-select" value="${patientId}">`}
     <div class="form-row mb-4">
       <div class="form-group"><label>Fecha *</label><input class="form-control" id="eval-fecha" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
@@ -10548,7 +10605,8 @@ function openEvaluationDetail(patientId, evalId) {
     ${eval_.obs ? `<div style="background:var(--beige);border-left:4px solid var(--olive);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:16px;margin-bottom:20px"><div style="font-size:12px;font-weight:600;color:var(--olive-dark);text-transform:uppercase;margin-bottom:6px">Observaciones</div><div style="font-size:13px;color:var(--gray-700);line-height:1.6">${eval_.obs}</div></div>` : ''}
     
     <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--gray-200)">
-      <button class="btn btn-outline btn-sm" onclick="openEvalModal('${patientId}','${evalId}')">✏️ Editar</button>
+      <button class="btn btn-olive btn-sm" onclick="downloadEvalReport('${patientId}','${evalId}')">📥 Descargar PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${patientId}','${evalId}')">✏️ Editar</button>
       <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="if(confirm('¿Eliminar esta evaluación?')) deleteEvaluation('${patientId}','${evalId}')">🗑️ Eliminar</button>
     </div>
   `;
