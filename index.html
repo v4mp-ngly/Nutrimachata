@@ -6092,113 +6092,37 @@ function viewEvaluationReport(patientId, evalId) {
 function downloadEvalReport(patientId, evalId) {
   const p = DB.patients.find(x => x.id == patientId);
   if (!p) return;
-  const eval_ = (p.evaluaciones || []).find(e => e.id == evalId);
+  const evals = _evalChronoUpTo(p, evalId);
+  const eval_ = evals.find(e => e.id == evalId);
   if (!eval_) return;
-
+  const prev = evals.length > 1 ? evals[evals.length - 2] : null;
   const today = new Date().toLocaleDateString('es-DO', {year:'numeric',month:'long',day:'numeric'});
-  
-  const pdfHTML = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<title>Evaluación — ${p.nombre}</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'DM Sans',sans-serif;color:#1a1a1a;font-size:11px;line-height:1.6;background:white}
-.page{max-width:190mm;margin:0 auto;padding:12mm 14mm}
-.header{background:#3F5A00;color:white;padding:20px;border-radius:10px;margin-bottom:20px}
-.header h1{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:8px;font-weight:500}
-.header .subtitle{opacity:0.85;font-size:13px}
-.header .patient-info{margin-top:12px;font-size:11px;opacity:0.8}
-.card{background:#EAF3D8;padding:16px;border-radius:8px;border-left:4px solid #5E8C2A;margin-bottom:12px}
-.card-label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
-.card-value{font-size:20px;font-weight:700;color:#3F5A00;font-family:'DM Mono',monospace}
-.card-status{font-size:9px;color:#666;margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-.section-title{font-size:12px;color:#3F5A00;border-bottom:2px solid #C8DFA0;padding-bottom:6px;margin:16px 0 10px;font-weight:600}
-.measure-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.measure-box{background:#f5f5f5;padding:10px;border-radius:6px;text-align:center}
-.measure-label{font-size:8px;color:#999;text-transform:uppercase;margin-bottom:4px;font-weight:600}
-.measure-value{font-size:16px;font-weight:700;color:#333;font-family:'DM Mono',monospace}
-.obs-box{background:#F5F5F5;padding:12px;border-radius:8px;border-left:3px solid #999;margin-bottom:12px}
-.obs-label{font-size:9px;color:#666;text-transform:uppercase;font-weight:600;margin-bottom:6px;display:block}
-.obs-text{font-size:11px;color:#333;line-height:1.6}
-.footer{margin-top:20px;padding-top:12px;border-top:1px solid #C8DFA0;font-size:9px;color:#999;text-align:center}
-@media print{.page{padding:10mm}}
-</style></head>
-<body><div class="page">
-<div class="header">
-  <h1>${p.nombre}</h1>
-  <div class="subtitle">Evaluación Nutricional — ${eval_.fecha}</div>
-  <div class="patient-info">
-    ${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'} · ${p.cedula ? 'C.I. ' + p.cedula : ''}
-  </div>
-</div>
-
-<div class="grid">
-  <div class="card">
-    <div class="card-label">⚖️ Peso</div>
-    <div class="card-value">${eval_.peso || '—'} kg</div>
-  </div>
-  <div class="card" style="border-left-color:#C47A1A;background:#FFF3E0">
-    <div class="card-label" style="color:#C47A1A">📊 IMC</div>
-    <div class="card-value" style="color:#C47A1A">${(eval_.imc||0).toFixed(1)}</div>
-    <div class="card-status">${eval_.imc ? (eval_.imc < 18.5 ? 'Bajo peso' : eval_.imc < 25 ? 'Normal' : eval_.imc < 30 ? 'Sobrepeso' : 'Obesidad') : '—'}</div>
-  </div>
-</div>
-
-${eval_.talla || eval_.presion ? `
-<div class="grid">
-  ${eval_.talla ? `<div style="background:#E3F2FD;padding:16px;border-radius:8px;border-left:4px solid #2A6A8C">
-    <div class="card-label">📏 Talla</div>
-    <div class="card-value" style="color:#2A6A8C">${eval_.talla} m</div>
-  </div>` : '<div></div>'}
-  ${eval_.presion ? `<div style="background:#FCE4EC;padding:16px;border-radius:8px;border-left:4px solid #C44A2A">
-    <div class="card-label">❤️ Presión</div>
-    <div class="card-value" style="color:#C44A2A">${eval_.presion}</div>
-  </div>` : '<div></div>'}
-</div>
-` : ''}
-
-${eval_.cintura || eval_.cadera || eval_.grasa || eval_.fc ? `
-<div>
-  <div class="section-title">📐 Medidas Antropométricas</div>
-  <div class="measure-grid">
-    ${eval_.cintura ? `<div class="measure-box">
-      <div class="measure-label">Cintura</div>
-      <div class="measure-value">${eval_.cintura} cm</div>
-    </div>` : ''}
-    ${eval_.cadera ? `<div class="measure-box">
-      <div class="measure-label">Cadera</div>
-      <div class="measure-value">${eval_.cadera} cm</div>
-    </div>` : ''}
-    ${eval_.grasa ? `<div class="measure-box">
-      <div class="measure-label">% Grasa</div>
-      <div class="measure-value">${eval_.grasa}%</div>
-    </div>` : ''}
-    ${eval_.fc ? `<div class="measure-box">
-      <div class="measure-label">FC</div>
-      <div class="measure-value">${eval_.fc} lpm</div>
-    </div>` : ''}
-  </div>
-</div>
-` : ''}
-
-${eval_.obs ? `
-<div class="obs-box">
-  <label class="obs-label">📝 Observaciones</label>
-  <div class="obs-text">${eval_.obs}</div>
-</div>
-` : ''}
-
-<div class="footer">
-  <strong>${p.nombre}</strong> · Evaluación del ${eval_.fecha} · Generado el ${today}
-</div>
-</div></body></html>`;
-
+  const imcEstado = getImcCategory(parseFloat(eval_.imc)||0);
+  const comp = calcComposicionCorporal(eval_.peso, eval_.grasa, eval_.talla, p.sexo);
+  const measures=[['Cuello','cuello','cm'],['Pecho','pecho','cm'],['Muñeca','muneca','cm'],['Cintura','cintura','cm'],['Abdomen','abdomen','cm'],['Cadera','cadera','cm'],['Muslo','muslo','cm'],['% Grasa','grasa','%']];
+  const measureCards=measures.map(([l,k,u])=>`<div class="measure"><span>${l}</span><b>${eval_[k]??'—'}</b><small>${eval_[k]!=null?u:''}</small></div>`).join('');
+  const compare=measures.filter(([,k])=>eval_[k]!=null).map(([l,k,u])=>{const a=parseFloat(eval_[k]),b=prev?parseFloat(prev[k]):NaN,d=Number.isFinite(b)?a-b:null;return `<tr><td>${l}</td><td>${Number.isFinite(a)?a:'—'} ${u}</td><td>${Number.isFinite(b)?b+' '+u:'—'}</td><td>${d==null?'—':`${d>0?'↑':'↓'} ${Math.abs(d).toFixed(1)} ${u}`}</td></tr>`}).join('');
+  const pdfHTML = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte clínico — ${p.nombre}</title>
+  <style>*{box-sizing:border-box}body{margin:0;background:#fff;color:#20221d;font:10px Arial,sans-serif}.page{width:100%;padding:8mm 9mm}.top{background:#234000;color:white;padding:13px 16px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:19px;font-weight:700}.brand small{display:block;font-size:7px;letter-spacing:1px;font-weight:400}.report{font-size:13px;font-weight:700}.patient{margin:10px 0;border:1px solid #e5e7df;border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center}.patient h1{font-size:17px;margin:0 0 4px}.muted{color:#74776e}.section{border:1px solid #e8e9e4;border-radius:10px;padding:12px;margin:10px 0;break-inside:avoid}.title{font-size:11px;font-weight:800;margin-bottom:9px;text-transform:uppercase}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric,.measure{border:1px solid #e7e9e2;border-radius:9px;padding:10px;text-align:center;background:#fbfcf9}.metric span,.measure span{display:block;color:#8b8d84;text-transform:uppercase;font-size:7px;font-weight:700}.metric b{display:block;font-size:18px;color:#243900;margin:5px 0}.measure b{display:inline-block;font-size:16px;color:#243900;margin-top:5px}.measure small{color:#999;margin-left:3px}.measuregrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.charts{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.eval-trend-card{page-break-inside:avoid}table{width:100%;border-collapse:collapse}th,td{padding:6px;border-bottom:1px solid #eceee8;text-align:left;font-size:8px}th{color:#7b7e74;text-transform:uppercase}.note{background:#f4f7ed;border-left:4px solid #668e30;border-radius:7px;padding:10px;line-height:1.55}.footer{text-align:center;color:#999;border-top:1px solid #e4e6df;padding-top:8px;margin-top:10px;font-size:7px}@media print{.page{padding:6mm}.section{break-inside:avoid}}</style></head><body><div class="page">
+  <div class="top"><div class="brand">NutriMachata<small>NUTRICIÓN CONECTADA</small></div><div class="report">REPORTE CLÍNICO<br><span style="font-size:8px;font-weight:400">${today}</span></div></div>
+  <div class="patient"><div><h1>${p.nombre}</h1><div class="muted">${p.edad||'—'} años · ${p.sexo==='F'?'Femenino':'Masculino'} · Evaluación ${eval_.fecha}</div></div><div><b>Estado nutricional</b><br><span style="color:#587e28">${imcEstado}</span></div></div>
+  <div class="section"><div class="title">Resumen ejecutivo</div><div class="summary">
+    <div class="metric"><span>Peso actual</span><b>${eval_.peso||'—'} kg</b><small>${prev&&prev.peso!=null?`Anterior ${prev.peso} kg`:'Primera evaluación'}</small></div>
+    <div class="metric"><span>IMC</span><b>${eval_.imc?Number(eval_.imc).toFixed(1):'—'}</b><small>${imcEstado}</small></div>
+    <div class="metric"><span>% Grasa</span><b>${eval_.grasa||'—'}%</b><small>Composición corporal</small></div>
+    <div class="metric"><span>Presión arterial</span><b>${eval_.presion||'—'}</b><small>mmHg</small></div>
+  </div></div>
+  <div class="section"><div class="title">Medidas Antropométricas</div><div class="measuregrid">${measureCards}</div></div>
+  <div class="section"><div class="title">Evolución de medidas</div><div class="charts">${_evalMeasureChartsHTML(p, eval_.id, true)}</div></div>
+  <div class="section"><div class="title">Composición corporal</div><div class="summary">
+    <div class="metric"><span>Masa muscular / magra</span><b>${comp.masaMagra||'—'} kg</b></div><div class="metric"><span>Masa grasa</span><b>${comp.masaGrasa||'—'} kg</b></div><div class="metric"><span>Agua corporal</span><b>${comp.aguaCorporal||'—'} kg</b></div><div class="metric"><span>Masa ósea</span><b>${comp.masaOsea||'—'} kg</b></div>
+  </div></div>
+  ${prev?`<div class="section"><div class="title">Comparativo de medidas</div><table><thead><tr><th>Medida</th><th>Actual</th><th>Anterior</th><th>Cambio</th></tr></thead><tbody>${compare}</tbody></table></div>`:''}
+  ${eval_.obs?`<div class="section"><div class="title">Interpretación / observaciones</div><div class="note">${eval_.obs}</div></div>`:''}
+  <div class="footer">Documento generado por NutriMachata · Sistema de Gestión Nutricional · ${p.nombre} · ${eval_.fecha}</div>
+  </div></body></html>`;
   downloadPDF(pdfHTML, `Evaluacion_${p.nombre.replace(/\\s+/g,'_')}_${eval_.fecha}.pdf`);
 }
-
 
 
 // ═══════════════════════════════════════════════
@@ -10511,6 +10435,49 @@ function renderBodyFigure(eval_) {
   return `<svg width="220" height="320" viewBox="0 0 100 150" style="max-width:100%"><circle cx="50" cy="15" r="8" fill="none" stroke="#5E8C2A" stroke-width="0.5"/>${medidas.cuello ? `<line x1="50" y1="23" x2="50" y2="30" stroke="#2D7A4A" stroke-width="1.5"/><text x="55" y="27" font-size="6" fill="#2D7A4A">${medidas.cuello}cm</text>` : ''}<path d="M 40 30 Q 35 50 40 70 Q 50 75 60 70 Q 65 50 60 30" fill="none" stroke="#5E8C2A" stroke-width="1"/>${medidas.pecho ? `<line x1="35" y1="40" x2="65" y2="40" stroke="#F4A460" stroke-width="1.5"/><text x="70" y="42" font-size="6" fill="#F4A460">${medidas.pecho}cm</text>` : ''}${medidas.cintura ? `<line x1="30" y1="55" x2="70" y2="55" stroke="#2D7A4A" stroke-width="2"/><text x="72" y="57" font-size="6" fill="#2D7A4A">${medidas.cintura}cm</text>` : ''}${medidas.cadera ? `<line x1="25" y1="70" x2="75" y2="70" stroke="#C47A1A" stroke-width="1.5"/><text x="78" y="72" font-size="6" fill="#C47A1A">${medidas.cadera}cm</text>` : ''}<line x1="40" y1="70" x2="35" y2="130" stroke="#5E8C2A" stroke-width="0.8"/><line x1="60" y1="70" x2="65" y2="130" stroke="#5E8C2A" stroke-width="0.8"/>${medidas.muslo ? `<line x1="32" y1="80" x2="38" y2="80" stroke="#7A9D3C" stroke-width="1.5"/><text x="32" y="85" font-size="6" fill="#7A9D3C">${medidas.muslo}cm</text>` : ''}<circle cx="35" cy="135" r="2" fill="#5E8C2A"/><circle cx="65" cy="135" r="2" fill="#5E8C2A"/></svg>`;
 }
 
+function _evalChronoUpTo(p, evalId) {
+  const all = [...(p.evaluaciones || [])].sort((a,b) => {
+    const da = new Date(a.fecha || a.created_at || 0).getTime();
+    const db = new Date(b.fecha || b.created_at || 0).getTime();
+    return da - db;
+  });
+  const idx = all.findIndex(e => e.id == evalId);
+  return idx >= 0 ? all.slice(0, idx + 1) : all;
+}
+
+function _evalMeasureChartsHTML(p, evalId, compact=false) {
+  const evals = _evalChronoUpTo(p, evalId);
+  const fields = [
+    {key:'peso',label:'Evolución de Peso',unit:'kg'},
+    {key:'imc',label:'Evolución de IMC',unit:'kg/m²'},
+    {key:'grasa',label:'% Grasa Corporal',unit:'%'},
+    {key:'cuello',label:'Cuello',unit:'cm'},
+    {key:'pecho',label:'Pecho',unit:'cm'},
+    {key:'muneca',label:'Muñeca',unit:'cm'},
+    {key:'cintura',label:'Cintura',unit:'cm'},
+    {key:'abdomen',label:'Abdomen',unit:'cm'},
+    {key:'cadera',label:'Cadera',unit:'cm'},
+    {key:'muslo',label:'Muslo',unit:'cm'}
+  ];
+  const labels = evals.map(e => String(e.fecha || '').slice(0,10));
+  return fields.map(f => {
+    const pairs = evals.map((e,i)=>({v:parseFloat(e[f.key]),l:labels[i]})).filter(x=>Number.isFinite(x.v));
+    if (!pairs.length) return '';
+    const values=pairs.map(x=>x.v), labs=pairs.map(x=>x.l);
+    const svg=_svgChart(labs, values, {color:getFieldChartColor(f, evals),width:compact?440:520,height:compact?128:145,unit:f.unit});
+    const current=values[values.length-1];
+    const previous=values.length>1?values[values.length-2]:null;
+    const delta=previous===null?null:current-previous;
+    return `<div class="eval-trend-card" style="background:white;border:1px solid #e6e7e2;border-radius:12px;padding:${compact?'10px':'14px'};break-inside:avoid">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:5px">
+        <div><div style="font-size:${compact?'10px':'12px'};font-weight:700;color:#20221d">${f.label}</div><div style="font:700 ${compact?'17px':'21px'} 'DM Mono',monospace;color:#233600">${Number.isInteger(current)?current:current.toFixed(1)} <span style="font-size:10px;color:#8b8d84">${f.unit}</span></div></div>
+        ${delta===null?'':`<div style="font-size:10px;font-weight:700;color:${delta<=0?'#4f7f1f':'#b66b13'}">${delta>0?'↑':'↓'} ${Math.abs(delta).toFixed(1)} ${f.unit}</div>`}
+      </div>
+      <img alt="Gráfica ${f.label}" src="${_svgToDataURL(svg)}" style="display:block;width:100%;height:auto">
+    </div>`;
+  }).join('');
+}
+
 function openEvaluationDetail(patientId, evalId) {
   const p = DB.patients.find(x => x.id == patientId);
   if (!p) return;
@@ -10570,6 +10537,11 @@ function openEvaluationDetail(patientId, evalId) {
       <div style="background:var(--beige);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)">${renderBodyFigure(eval_)}</div>
     </div>
     
+    <div style="margin-bottom:20px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">Evolución de Medidas</div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${_evalMeasureChartsHTML(p, eval_.id)}</div>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
       <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:16px">
         <div style="font-size:14px;font-weight:600;margin-bottom:16px">Composición Corporal</div>
