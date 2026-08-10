@@ -2112,7 +2112,8 @@ function mapPaciente(p, evals, dietas, hc) {
       imc: parseFloat(e.imc),
       presion: e.presion || '',
       estado: e.estado || '',
-      obs: e.obs || '',
+      obs: cleanEvalObs(e.obs || ''),
+      ...decodeEvalFollowup(e.obs || ''),
       cuello: e.cuello || null,
       pecho: e.pecho || null,
       muneca: e.muneca || null,
@@ -4443,6 +4444,7 @@ function renderEvaluations() {
                 <td class="text-sm text-muted eval-obs">${e.obs || '—'}</td>
                 <td style="display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
                   <button class="btn btn-outline btn-sm" onclick="editEvaluacion('${e.patientId}', '${e.id}')">✏️ Editar</button>
+                  <button class="btn btn-olive btn-sm" onclick="downloadEvalReport('${e.patientId}', '${e.id}')">📥 PDF</button>
                   <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="deleteEvaluacion('${e.patientId}', '${e.id}')">🗑 Eliminar</button>
                 </td>
               </tr>`).join('')}
@@ -4459,6 +4461,31 @@ function renderEvaluations() {
         </div>`}
       </div>
   `;
+}
+
+function encodeEvalFollowup(data) {
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(data)))); } catch(e) { return ''; }
+}
+function decodeEvalFollowup(obs) {
+  const text = String(obs || '');
+  const m = text.match(/\[\[SEGUIMIENTO_JSON:([^\]]+)\]\]/);
+  if (!m) return {};
+  try { return JSON.parse(decodeURIComponent(escape(atob(m[1])))); } catch(e) { return {}; }
+}
+function cleanEvalObs(obs) {
+  return String(obs || '').replace(/\s*\[\[SEGUIMIENTO_JSON:[^\]]+\]\]\s*/g, '').trim();
+}
+function evalFollowupFields(values={}) {
+  const esc = v => String(v || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return `
+    <div style="background:#f7f8f1;border:1px solid var(--olive-pale);border-radius:var(--radius);padding:16px;margin:18px 0 4px">
+      <div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">🌱 Seguimiento del paciente</div>
+      <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Estas respuestas quedarán registradas en la evaluación y se agregarán automáticamente a la Historia Clínica.</div>
+      <div class="form-group mb-3"><label>¿Qué fue lo más difícil?</label><textarea class="form-textarea" id="eval-dificil" placeholder="Respuesta del paciente...">${esc(values.dificil)}</textarea></div>
+      <div class="form-group mb-3"><label>¿Qué fue lo más fácil?</label><textarea class="form-textarea" id="eval-facil" placeholder="Respuesta del paciente...">${esc(values.facil)}</textarea></div>
+      <div class="form-group mb-3"><label>¿Qué hábito ya no cuesta mantener?</label><textarea class="form-textarea" id="eval-habito" placeholder="Respuesta del paciente...">${esc(values.habito)}</textarea></div>
+      <div class="form-group"><label>¿Cuál será tu próximo objetivo?</label><textarea class="form-textarea" id="eval-proximo-objetivo" placeholder="Respuesta del paciente...">${esc(values.proximoObjetivo)}</textarea></div>
+    </div>`;
 }
 
 function openEvalModal(patientId) {
@@ -4506,6 +4533,8 @@ function openEvalModal(patientId) {
         <div class="form-group"><label>Frec. Cardíaca (lpm)</label><input class="form-control" id="eval-fc" type="number" step="1" placeholder="lpm"></div>
       </div>
     </div>
+
+    ${evalFollowupFields()}
 
     <div class="form-group mt-4">
       <label>Estado Clínico</label>
@@ -4580,6 +4609,8 @@ function editEvaluacion(patientId, evalId) {
         <div class="form-group"><label>Frec. Cardíaca (lpm)</label><input class="form-control" id="eval-fc" type="number" step="1" value="${eval_.fc || eval_.frecuencia_cardiaca || ''}" placeholder="lpm"></div>
       </div>
     </div>
+
+    ${evalFollowupFields(eval_)}
 
     <div class="form-group mt-4">
       <label>Estado Clínico</label>
@@ -4830,7 +4861,13 @@ async function saveEvaluation() {
   const imc     = parseFloat((peso / (talla * talla)).toFixed(1));
   const presion = document.getElementById('eval-presion').value;
   const estado  = document.getElementById('eval-estado').value || getImcCategory(imc);
-  const obs     = document.getElementById('eval-obs').value;
+  const obsVisible = document.getElementById('eval-obs').value;
+  const dificil = document.getElementById('eval-dificil')?.value.trim() || '';
+  const facil = document.getElementById('eval-facil')?.value.trim() || '';
+  const habito = document.getElementById('eval-habito')?.value.trim() || '';
+  const proximoObjetivo = document.getElementById('eval-proximo-objetivo')?.value.trim() || '';
+  const followupEncoded = encodeEvalFollowup({ dificil, facil, habito, proximoObjetivo });
+  const obs = cleanEvalObs(obsVisible) + (followupEncoded ? `\n[[SEGUIMIENTO_JSON:${followupEncoded}]]` : '');
   const fecha   = document.getElementById('eval-fecha').value;
   // New anthropometric fields
   const cuello  = parseFloat(document.getElementById('eval-cuello')?.value) || null;
@@ -4857,7 +4894,7 @@ async function saveEvaluation() {
       if (p && p.evaluaciones) {
         const idx = p.evaluaciones.findIndex(e => e.id == evalId);
         if (idx >= 0) {
-          p.evaluaciones[idx] = { id: evalId, fecha, peso, talla, imc, presion, estado, obs,
+          p.evaluaciones[idx] = { id: evalId, fecha, peso, talla, imc, presion, estado, obs: cleanEvalObs(obs), dificil, facil, habito, proximoObjetivo,
             cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc };
         }
       }
@@ -4868,7 +4905,7 @@ async function saveEvaluation() {
       const p = DB.patients.find(x => x.id == pid);
       if (p) {
         if (!p.evaluaciones) p.evaluaciones = [];
-        p.evaluaciones.push({ id: created ? created.id : ('local-'+Date.now()), fecha, peso, talla, imc, presion, estado, obs,
+        p.evaluaciones.push({ id: created ? created.id : ('local-'+Date.now()), fecha, peso, talla, imc, presion, estado, obs: cleanEvalObs(obs), dificil, facil, habito, proximoObjetivo,
           cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc });
       }
       notify('Evaluación guardada correctamente', 'success');
@@ -5003,6 +5040,21 @@ function renderHCFormView(p) {
       ${[['comeEstres','¿Come más cuando está estresado?'],['comeAburrido','¿Come por aburrimiento?'],['comeEmociones','¿Come por emociones?'],['hambreEmocional','¿Dificultad identificando hambre real/emocional?'],['comeRapido','¿Tiende a comer rápido?'],['comeLleno','¿Come hasta sentirse muy lleno?'],['culpaComer','¿Siente culpa después de comer?'],['culpaExceso','¿Culpa después de comer en exceso?'],['dietasRepetidas','¿Ha realizado dietas repetidamente?'],['horariosRegulares','¿Tiene horarios regulares?']].map(([k,q])=>yesno(hc[k],q)).join('')}
     </div>
     <div class="info-item"><label>Comidas fuera de casa</label><span>${hc.comidasFuera||'—'}</span></div>
+
+    ${section('Seguimiento de Evaluaciones')}
+    ${(p.evaluaciones||[]).filter(e=>e.dificil||e.facil||e.habito||e.proximoObjetivo).length ? `
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">
+        ${[...(p.evaluaciones||[])].filter(e=>e.dificil||e.facil||e.habito||e.proximoObjetivo).sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))).map(e=>`
+          <div style="border:1px solid var(--gray-200);border-left:4px solid var(--olive);border-radius:var(--radius);padding:14px;background:white">
+            <div style="font-size:11px;font-weight:700;color:var(--olive-dark);margin-bottom:10px">Evaluación · ${e.fecha||'Sin fecha'}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="info-item"><label>¿Qué fue lo más difícil?</label><span>${e.dificil||'—'}</span></div>
+              <div class="info-item"><label>¿Qué fue lo más fácil?</label><span>${e.facil||'—'}</span></div>
+              <div class="info-item"><label>¿Qué hábito ya no cuesta mantener?</label><span>${e.habito||'—'}</span></div>
+              <div class="info-item"><label>¿Cuál será tu próximo objetivo?</label><span>${e.proximoObjetivo||'—'}</span></div>
+            </div>
+          </div>`).join('')}
+      </div>` : `<div style="font-size:13px;color:var(--gray-400);padding:12px;background:var(--gray-50);border-radius:var(--radius);margin-bottom:16px">Aún no hay respuestas de seguimiento registradas.</div>`}
 
     ${section('Recordatorio de 24 Horas')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
@@ -6240,7 +6292,7 @@ ${eval_.obs ? `
 </div>
 </div></body></html>`;
 
-  _printHTML(pdfHTML, `Evaluacion_${p.nombre.replace(/\\s+/g,'_')}_${eval_.fecha}.pdf`);
+  downloadPDF(pdfHTML, `Evaluacion_${p.nombre.replace(/\\s+/g,'_')}_${eval_.fecha}.pdf`);
 }
 
 
@@ -10374,29 +10426,38 @@ function _printHTML(htmlContent, filename) {
 
 // Nueva función para descargar PDF directamente
 function downloadPDF(htmlContent, filename) {
+  if (typeof html2pdf === 'undefined') {
+    notify('El generador de PDF no está disponible. Revisa tu conexión e inténtalo de nuevo.', 'danger');
+    return;
+  }
+
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(htmlContent, 'text/html');
   const element = document.createElement('div');
-  element.innerHTML = htmlContent;
-  
+  element.style.background = '#fff';
+  element.style.width = '190mm';
+  element.style.margin = '0 auto';
+
+  // Copiar estilos definidos dentro del HTML del documento para conservar el diseño.
+  parsed.querySelectorAll('style').forEach(style => element.appendChild(style.cloneNode(true)));
+  Array.from(parsed.body.childNodes).forEach(node => element.appendChild(node.cloneNode(true)));
+
   const opt = {
-    margin: 5,
-    filename: filename,
+    margin: [5, 5, 5, 5],
+    filename: filename || `NutriMachata_${new Date().toISOString().split('T')[0]}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollY: 0 },
+    jsPDF: { orientation: filename && filename.includes('Dieta') ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' },
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['.card', '.measure-box', '.obs-box'] }
   };
-  
-  // Para dietas (landscape), ajustar orientación
-  if (filename.includes('Dieta')) {
-    opt.jsPDF.orientation = 'landscape';
-  }
-  
-  try {
-    html2pdf().set(opt).from(element).save();
-    notify('PDF descargado correctamente', 'success');
-  } catch(e) {
-    console.error('PDF error:', e);
-    notify('Error al descargar PDF', 'danger');
-  }
+
+  notify('Preparando el PDF...', 'success');
+  html2pdf().set(opt).from(element).save()
+    .then(() => notify('PDF descargado correctamente', 'success'))
+    .catch(e => {
+      console.error('PDF error:', e);
+      notify('Error al descargar PDF', 'danger');
+    });
 }
 
 // ═══════════════════════════════════════════════
