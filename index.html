@@ -8284,32 +8284,123 @@ function downloadReportPDF() {
     notify('Genera el reporte primero', 'warning');
     return;
   }
+
+  notify('Preparando el PDF completo...', 'success');
+
   const clone = source.cloneNode(true);
-  clone.querySelectorAll('.report-screen-only, button').forEach(el => el.remove());
+  clone.querySelectorAll('.report-screen-only, button, .report-actions').forEach(el => el.remove());
   clone.classList.add('pdf-export-mode');
-  clone.style.width = '1100px';
-  clone.style.maxWidth = '1100px';
-  clone.style.margin = '0 auto';
-  clone.style.background = '#ffffff';
+
+  // A4 real: trabajar al ancho de la hoja en vez de renderizar a 1100 px y reducirlo.
+  // Esto evita contenido cortado a la derecha y mejora los saltos entre paginas.
+  Object.assign(clone.style, {
+    width: '794px',
+    maxWidth: '794px',
+    minWidth: '794px',
+    margin: '0',
+    background: '#ffffff',
+    boxShadow: 'none',
+    overflow: 'visible'
+  });
+
+  // Reglas exclusivas del PDF. Las secciones grandes SI pueden continuar en otra pagina;
+  // las tarjetas pequenas se mantienen juntas siempre que sea posible.
+  const pdfStyle = document.createElement('style');
+  pdfStyle.textContent = `
+    .pdf-export-mode, .pdf-export-mode * { box-sizing: border-box !important; }
+    .pdf-export-mode { color: #182016 !important; overflow: visible !important; }
+    .pdf-export-mode .report-body { padding: 16px !important; overflow: visible !important; }
+    .pdf-export-mode .report-top { padding: 15px 18px !important; }
+    .pdf-export-mode .report-section {
+      break-inside: auto !important;
+      page-break-inside: auto !important;
+      overflow: visible !important;
+      margin-bottom: 10px !important;
+      padding: 11px !important;
+    }
+    .pdf-export-mode .patient-strip,
+    .pdf-export-mode .metric-card,
+    .pdf-export-mode .chart-card-pro,
+    .pdf-export-mode .composition-card,
+    .pdf-export-mode .measures-card,
+    .pdf-export-mode .clinical-note,
+    .pdf-export-mode .recommend-card,
+    .pdf-export-mode .history-card,
+    .pdf-export-mode .comparison-table {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .pdf-export-mode img { max-width: 100% !important; }
+    .pdf-export-mode .metric-grid { gap: 7px !important; }
+    .pdf-export-mode .metric-card { min-height: 100px !important; padding: 9px !important; }
+    .pdf-export-mode .chart-card-pro { min-height: 132px !important; padding: 8px !important; }
+    .pdf-export-mode .chart-card-pro img { height: 78px !important; }
+    .pdf-export-mode .recommend-grid { gap: 7px !important; }
+    .pdf-export-mode .recommend-card { min-height: 86px !important; padding: 8px !important; }
+    .pdf-export-mode .history-flow { gap: 8px !important; }
+    .pdf-export-mode .report-footer { padding: 8px 0 2px !important; }
+  `;
+
+  // html2canvas necesita que el clon exista realmente en el DOM para calcular bien
+  // imagenes, alturas, grids y saltos de pagina.
+  const staging = document.createElement('div');
+  Object.assign(staging.style, {
+    position: 'fixed',
+    left: '-10000px',
+    top: '0',
+    width: '794px',
+    background: '#fff',
+    zIndex: '-1'
+  });
+  staging.appendChild(pdfStyle);
+  staging.appendChild(clone);
+  document.body.appendChild(staging);
 
   const patientName = source.dataset.patient || 'Paciente';
   const safeName = patientName.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_');
   const filename = `Reporte_Clinico_${safeName}_${new Date().toISOString().split('T')[0]}.pdf`;
-  const opt = {
-    margin: [5, 5, 5, 5],
-    filename,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 1.7, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['css', 'legacy'], avoid: ['.report-section','.metric-card','.chart-card-pro','.recommend-card','.history-card','.clinical-note'] }
-  };
-  notify('Preparando el PDF...', 'success');
-  html2pdf().set(opt).from(clone).save().then(() => {
-    notify('PDF descargado correctamente', 'success');
-  }).catch(err => {
-    console.error('PDF error:', err);
-    notify('No se pudo descargar el PDF', 'danger');
-  });
+
+  const waitForImages = Promise.all(Array.from(clone.querySelectorAll('img')).map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener('load', resolve, { once:true });
+      img.addEventListener('error', resolve, { once:true });
+      setTimeout(resolve, 2500);
+    });
+  }));
+
+  const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready.catch(() => {}) : Promise.resolve();
+
+  Promise.all([waitForImages, fontsReady]).then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    .then(() => {
+      const opt = {
+        margin: [8, 7, 9, 7],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 794
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          avoid: ['.patient-strip','.metric-card','.chart-card-pro','.composition-card','.measures-card','.clinical-note','.recommend-card','.history-card','.comparison-table']
+        }
+      };
+      return html2pdf().set(opt).from(clone).save();
+    })
+    .then(() => notify('PDF completo descargado correctamente', 'success'))
+    .catch(err => {
+      console.error('PDF error:', err);
+      notify('No se pudo descargar el PDF', 'danger');
+    })
+    .finally(() => staging.remove());
 }
 
 function openReportModal(patientId, type) {
