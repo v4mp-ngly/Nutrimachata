@@ -8254,7 +8254,7 @@ function renderReports() {
       <div class="card-body">
         <div class="form-row">
           <div class="form-group" style="grid-column:1/-1">
-            <label>Paciente</label>
+            <label for="report-patient-select">Paciente</label>
             <select class="form-select" id="report-patient-select" style="max-width:300px">
               <option value="">Seleccionar paciente...</option>
               ${DB.patients.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')}
@@ -8375,6 +8375,9 @@ function downloadReportPDF() {
     background: '#fff',
     zIndex: '-1'
   });
+  // Copiar también los estilos reales del reporte al área de exportación.
+  // El estilo está fuera de .clinical-report, por eso clonarlo es imprescindible.
+  document.querySelectorAll('#report-modal-body style').forEach(styleEl => staging.appendChild(styleEl.cloneNode(true)));
   staging.appendChild(pdfStyle);
   staging.appendChild(clone);
   document.body.appendChild(staging);
@@ -8408,12 +8411,12 @@ function downloadReportPDF() {
           logging: false,
           scrollX: 0,
           scrollY: 0,
-          windowWidth: 794
+          windowWidth: 760
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         pagebreak: {
           mode: ['css', 'legacy'],
-          avoid: ['.patient-strip','.metric-card','.chart-card-pro','.composition-card','.measures-card','.clinical-note','.recommend-card','.history-card','.comparison-table']
+          avoid: ['.cr-head','.cr-patient','.cr-kpi','.cr-chart-card','.cr-box','.cr-comparison','.cr-access-item','tr']
         }
       };
       return html2pdf().set(opt).from(clone).save();
@@ -8441,51 +8444,207 @@ function generatePatientReport() {
 }
 
 function generateReportHTML(p) {
-  const evals=[...(p.evaluaciones||[])].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
-  const last=evals[evals.length-1]||{}; const prev=evals.length>1?evals[evals.length-2]:null;
-  const n=v=>Number.isFinite(parseFloat(v))?parseFloat(v):null; const fmt=v=>v==null||v===''?'—':v;
-  const imc=n(last.imc??p.imc), peso=n(last.peso??p.peso), grasa=n(last.grasa??last.porcentaje_grasa);
-  const comp=calcComposicionCorporal(peso||0,grasa||0);
-  const measures=[['Cuello','cuello'],['Pecho','pecho'],['Muñeca','muneca'],['Cintura','cintura'],['Abdomen','abdomen'],['Cadera','cadera'],['Muslo','muslo']];
-  const d=(k)=>prev&&n(last[k])!=null&&n(prev[k])!=null?n(last[k])-n(prev[k]):null;
-  const change=(k,u='')=>{const x=d(k);return x==null?'—':`${x>0?'+':''}${x.toFixed(1)}${u}`};
-  const labels=evals.map(e=>String(e.fecha||'').slice(5));
-  const chart=(title,key,unit='')=>{const getter=(e)=>key==='grasa'?n(e.grasa ?? e.porcentaje_grasa):n(e[key]);const series=evals.map(getter);const vals=series.filter(v=>v!=null);if(vals.length<2)return `<div class="chart-card-pro"><b>${title}</b><div class="chart-empty">Sin historial suficiente</div></div>`;const validPairs=evals.map((e,i)=>({label:labels[i],value:series[i]})).filter(x=>x.value!=null);const current=getter(last);return `<div class="chart-card-pro"><b>${title}</b><strong>${current!=null?current+unit:'—'}</strong><img src="${_svgToDataURL(_svgChart(validPairs.map(x=>x.label),validPairs.map(x=>x.value),{color:'#5E8C2A',unit,width:300,height:110}))}"></div>`};
-  const charts=[['Peso','peso',' kg'],['IMC','imc',''],['Grasa corporal','grasa',' %'],['Cintura','cintura',' cm'],['Abdomen','abdomen',' cm'],['Cadera','cadera',' cm'],['Muslo','muslo',' cm'],['Cuello','cuello',' cm']].map(x=>chart(...x)).join('');
-  const measureRows=measures.map(([l,k])=>`<tr><td>${l}</td><td>${fmt(last[k])}${last[k]!=null?' cm':''}</td><td>${prev?fmt(prev[k])+(prev[k]!=null?' cm':''):'—'}</td><td>${change(k,' cm')}</td></tr>`).join('');
-  const valueOf=(e,key)=>{if(!e)return null;if(key==='grasa')return n(e.grasa??e.porcentaje_grasa);if(key==='masaMuscular')return n(e.masaMuscular??e.masa_muscular);if(key==='tmb')return n(e.tmb);return n(e[key]);};
-  const pressureParts=e=>{const raw=String((e&&(e.presion??e.presionActual))||'');const m=raw.match(/(\d{2,3})\s*\/\s*(\d{2,3})/);return m?[Number(m[1]),Number(m[2])]:null;};
-  const spark=(key,color='#5E8C2A')=>{let vals=[];if(key==='presion'){vals=evals.map(e=>{const p=pressureParts(e);return p?p[0]:null;});}else vals=evals.map(e=>valueOf(e,key));const clean=vals.filter(v=>v!=null);if(clean.length<2)return '<span class="cr-no-trend">Sin historial</span>';const pts=vals.map((v,i)=>v==null?null:{label:String(evals[i].fecha||'').slice(5),value:v}).filter(Boolean);return `<img class="cr-spark" src="${_svgToDataURL(_svgChart(pts.map(x=>x.label),pts.map(x=>x.value),{color,unit:'',width:150,height:45,compact:true,smooth:true}))}">`;};
-  const compFor=e=>{const w=valueOf(e,'peso');const g=valueOf(e,'grasa');return w!=null&&g!=null?calcComposicionCorporal(w,g):{};};
-  const comparisonDefs=[
-    ['Peso','peso','kg',e=>valueOf(e,'peso')],
-    ['IMC','imc','',e=>valueOf(e,'imc')],
-    ['% Grasa','grasa','%',e=>valueOf(e,'grasa')],
-    ['Masa muscular','masaMuscular','kg',e=>valueOf(e,'masaMuscular')??n(compFor(e).masaMagra)],
-    ['Cintura','cintura','cm',e=>valueOf(e,'cintura')],
-    ['Presión arterial','presion','mmHg',e=>pressureParts(e)],
-    ['TMB','tmb','kcal',e=>valueOf(e,'tmb')]
+  const evals = [...(p.evaluaciones || [])].sort((a,b) => String(a.fecha || '').localeCompare(String(b.fecha || '')));
+  const last = evals[evals.length - 1] || {};
+  const prev = evals.length > 1 ? evals[evals.length - 2] : null;
+  const num = v => Number.isFinite(parseFloat(v)) ? parseFloat(v) : null;
+  const show = (v, fallback='—') => (v === null || v === undefined || v === '' || (typeof v === 'number' && !Number.isFinite(v))) ? fallback : v;
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const dateLabel = d => {
+    if (!d) return '—';
+    const dt = new Date(`${String(d).slice(0,10)}T12:00:00`);
+    if (Number.isNaN(dt.getTime())) return String(d);
+    return dt.toLocaleDateString('es-DO',{day:'2-digit',month:'short',year:'2-digit'}).replace('.', '');
+  };
+  const current = (key, e=last) => {
+    if (!e) return null;
+    if (key === 'grasa') return num(e.grasa ?? e.porcentaje_grasa);
+    if (key === 'masaMuscular') return num(e.masaMuscular ?? e.masa_muscular);
+    if (key === 'agua') return num(e.agua ?? e.aguaCorporal ?? e.agua_corporal);
+    if (key === 'grasaVisceral') return num(e.grasaVisceral ?? e.grasa_visceral);
+    if (key === 'tmb') return num(e.tmb);
+    return num(e[key]);
+  };
+  const pressure = e => {
+    const raw = String((e && (e.presion ?? e.presionActual)) || '');
+    const m = raw.match(/(\d{2,3})\s*\/\s*(\d{2,3})/);
+    return m ? [Number(m[1]), Number(m[2])] : null;
+  };
+  const peso = current('peso') ?? num(p.peso);
+  const imc = current('imc') ?? num(p.imc);
+  const grasa = current('grasa');
+  const comp = (peso != null && grasa != null) ? calcComposicionCorporal(peso, grasa) : {};
+  const muscleNow = current('masaMuscular') ?? num(comp.masaMagra);
+  const tmbNow = current('tmb');
+  const waterNow = current('agua') ?? num(comp.aguaCorporal);
+  const visceralNow = current('grasaVisceral');
+  const pressureNow = pressure(last) || pressure(p);
+
+  const seriesValue = (e, key) => {
+    if (key === 'masaMuscular') {
+      const direct = current('masaMuscular', e);
+      if (direct != null) return direct;
+      const w = current('peso', e), g = current('grasa', e);
+      if (w != null && g != null) return num(calcComposicionCorporal(w,g).masaMagra);
+      return null;
+    }
+    return current(key, e);
+  };
+
+  const lineChartSvg = (series, opts={}) => {
+    const width = opts.width || 520, height = opts.height || 175;
+    const pad = opts.compact ? {l:8,r:8,t:6,b:6} : {l:34,r:12,t:16,b:27};
+    const all = series.flatMap(s => s.values.filter(v => v != null && Number.isFinite(v)));
+    if (!all.length) return '';
+    let min = Math.min(...all), max = Math.max(...all);
+    if (min === max) { min -= 1; max += 1; }
+    const span = max-min, margin = span*0.14 || 1; min -= margin; max += margin;
+    const count = Math.max(1, ...series.map(s=>s.values.length));
+    const x = i => pad.l + (count <= 1 ? (width-pad.l-pad.r)/2 : i*(width-pad.l-pad.r)/(count-1));
+    const y = v => pad.t + (max-v)*(height-pad.t-pad.b)/(max-min);
+    const smoothPath = pts => {
+      if (!pts.length) return '';
+      if (pts.length === 1) return `M ${pts[0][0]} ${pts[0][1]}`;
+      let d = `M ${pts[0][0]} ${pts[0][1]}`;
+      for (let i=1;i<pts.length;i++) {
+        const prevPt = pts[i-1], pt = pts[i];
+        const midX = (prevPt[0]+pt[0])/2;
+        d += ` C ${midX} ${prevPt[1]}, ${midX} ${pt[1]}, ${pt[0]} ${pt[1]}`;
+      }
+      return d;
+    };
+    const colors = ['#5E8C2A','#3A6F36','#7A9D3C','#8B6F47'];
+    let grid='';
+    if (!opts.compact) {
+      for (let i=0;i<4;i++) {
+        const gy = pad.t + i*(height-pad.t-pad.b)/3;
+        const gv = max - i*(max-min)/3;
+        grid += `<line x1="${pad.l}" y1="${gy}" x2="${width-pad.r}" y2="${gy}" stroke="#e8eee2" stroke-width="1"/><text x="${pad.l-6}" y="${gy+3}" text-anchor="end" font-size="8" fill="#879184">${gv.toFixed(opts.decimals ?? 0)}</text>`;
+      }
+    }
+    let shapes='';
+    series.forEach((s,si)=>{
+      const pts = s.values.map((v,i)=>v==null?null:[x(i),y(v),i]).filter(Boolean);
+      if (!pts.length) return;
+      const color=s.color||colors[si%colors.length];
+      const d=smoothPath(pts);
+      if (si===0 && !opts.compact && opts.fill !== false && pts.length>1) {
+        const area = `${d} L ${pts[pts.length-1][0]} ${height-pad.b} L ${pts[0][0]} ${height-pad.b} Z`;
+        shapes += `<path d="${area}" fill="${color}" opacity="0.09"/>`;
+      }
+      shapes += `<path d="${d}" fill="none" stroke="${color}" stroke-width="${opts.compact?2.2:2.6}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      pts.forEach(pt=>{ shapes += `<circle cx="${pt[0]}" cy="${pt[1]}" r="${opts.compact?2.3:3.4}" fill="#fff" stroke="${color}" stroke-width="${opts.compact?1.7:2.2}"/>`; });
+    });
+    let labels='';
+    if (!opts.compact && opts.labels) {
+      opts.labels.forEach((lab,i)=>{ if(i<count) labels += `<text x="${x(i)}" y="${height-7}" text-anchor="middle" font-size="8" fill="#788273">${esc(lab)}</text>`; });
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#fff"/>${grid}${shapes}${labels}</svg>`;
+  };
+  const svgImg = (svg, cls='') => svg ? `<img class="${cls}" src="${_svgToDataURL(svg)}" alt="Gráfica de tendencia">` : '<div class="cr-chart-empty">Sin historial suficiente</div>';
+  const labels = evals.map(e=>dateLabel(e.fecha));
+  const values = key => evals.map(e=>seriesValue(e,key));
+  const pressureSys = evals.map(e=>pressure(e)?.[0] ?? null);
+  const pressureDia = evals.map(e=>pressure(e)?.[1] ?? null);
+
+  const reportCharts = [
+    {title:'Evolución del Peso', current: peso!=null?`${peso.toFixed(1)} kg`:'—', sub:'Peso corporal', series:[{values:values('peso')}]},
+    {title:'Composición Corporal', current: grasa!=null?`${grasa.toFixed(1)}% grasa`:'—', sub:'Grasa corporal y masa muscular', series:[{values:values('grasa'),color:'#5E8C2A'},{values:evals.map(e=>seriesValue(e,'masaMuscular')),color:'#355E3B'}], legend:['Grasa corporal','Masa muscular']},
+    {title:'Circunferencia de Cintura', current: current('cintura')!=null?`${current('cintura').toFixed(1)} cm`:'—', sub:'Seguimiento antropométrico', series:[{values:values('cintura')}]},
+    {title:'Presión Arterial', current: pressureNow?`${pressureNow[0]}/${pressureNow[1]} mmHg`:'—', sub:'Sistólica / diastólica', series:[{values:pressureSys,color:'#5E8C2A'},{values:pressureDia,color:'#355E3B'}], legend:['Sistólica','Diastólica']}
   ];
-  const fmtVal=(v,u)=>{if(v==null)return 'Sin dato';if(Array.isArray(v))return `${v[0]}/${v[1]}`;const num=n(v);return `${num!=null?(Number.isInteger(num)?num:num.toFixed(1)):v}${u?' '+u:''}`;};
-  const fmtDelta=(a,b,u,key)=>{if(a==null||b==null)return '<span class="cr-muted">Sin comparativo</span>';if(Array.isArray(a)&&Array.isArray(b)){const ds=a[0]-b[0],dd=a[1]-b[1];const cls=(ds<0&&dd<=0)?'down':(ds>0||dd>0)?'up':'same';const arrow=cls==='down'?'↓':cls==='up'?'↑':'→';return `<span class="cr-change ${cls}">${arrow} ${Math.abs(ds)}/${Math.abs(dd)} mmHg</span>`;}const diff=n(a)-n(b);if(!Number.isFinite(diff))return '<span class="cr-muted">Sin comparativo</span>';const cls=diff<0?'down':diff>0?'up':'same',arrow=diff<0?'↓':diff>0?'↑':'→';return `<span class="cr-change ${cls}">${arrow} ${Math.abs(diff).toFixed(1)}${u?' '+u:''}</span>`;};
-  const comparisonRows=comparisonDefs.map(([label,key,unit,getter])=>{const a=getter(last),b=prev?getter(prev):null;return `<tr><td><b>${label}</b></td><td>${fmtVal(a,unit)}</td><td>${prev?fmtVal(b,unit):'Sin evaluación anterior'}</td><td>${fmtDelta(a,b,unit,key)}</td><td>${spark(key)}</td></tr>`;}).join('');
-  const history=evals.slice().reverse().map(e=>`<tr><td>${fmt(e.fecha)}</td><td>${fmt(e.peso)} kg</td><td>${n(e.imc)!=null?n(e.imc).toFixed(1):'—'}</td><td>${fmt(e.grasa??e.porcentaje_grasa)}${(e.grasa??e.porcentaje_grasa)!=null?'%':''}</td><td>${fmt(e.cintura)}${e.cintura!=null?' cm':''}</td></tr>`).join('');
-  const obs=last.obs?String(last.obs):'Sin observaciones clínicas registradas en la última evaluación.';
-  const doctor=(DB.settings&&DB.settings.doctorName)||'Profesional de nutrición';
-  const accessEmail = p.email || p.usuario || '—';
-  const accessUser = (typeof USERS !== 'undefined' && accessEmail && USERS[accessEmail]) ? USERS[accessEmail] : null;
-  const accessPass = (accessUser && (accessUser.pass || accessUser.password_hash)) || p.password_hash || p.password || 'No disponible';
+  const chartCards = reportCharts.map(c=>{
+    const hasTwo = c.series.some(s=>s.values.filter(v=>v!=null).length>=2);
+    const svg = hasTwo ? lineChartSvg(c.series,{labels,width:520,height:170,decimals:0}) : '';
+    const legend = c.legend ? `<div class="cr-legend">${c.legend.map((x,i)=>`<span><i class="l${i+1}"></i>${x}</span>`).join('')}</div>` : '';
+    return `<div class="cr-chart-card"><div class="cr-chart-top"><div><b>${c.title}</b><small>${c.sub}</small></div><strong>${c.current}</strong></div>${svgImg(svg,'cr-line-chart')}${legend}</div>`;
+  }).join('');
+
+  const measures = [['Cuello','cuello'],['Pecho','pecho'],['Muñeca','muneca'],['Cintura','cintura'],['Abdomen','abdomen'],['Cadera','cadera'],['Muslo','muslo']];
+  const delta = (a,b) => (a!=null && b!=null) ? a-b : null;
+  const changeText = (a,b,unit='') => {
+    const d=delta(a,b); if(d==null) return '<span class="cr-muted">Sin comparativo</span>';
+    const arrow=d<0?'↓':d>0?'↑':'→';
+    return `<span class="cr-delta ${d<0?'down':d>0?'up':'same'}">${arrow} ${Math.abs(d).toFixed(1)}${unit?` ${unit}`:''}</span>`;
+  };
+  const measureRows = measures.map(([label,key])=>{
+    const a=current(key), b=prev?current(key,prev):null;
+    return `<tr><td><b>${label}</b></td><td>${a!=null?a.toFixed(1)+' cm':'Sin dato'}</td><td>${b!=null?b.toFixed(1)+' cm':'—'}</td><td>${changeText(a,b,'cm')}</td></tr>`;
+  }).join('');
+
+  const spark = (key, kind='single') => {
+    let s=[];
+    if (kind==='pressure') s=[{values:pressureSys,color:'#5E8C2A'},{values:pressureDia,color:'#355E3B'}];
+    else s=[{values:evals.map(e=>seriesValue(e,key)),color:'#5E8C2A'}];
+    const enough=s.some(q=>q.values.filter(v=>v!=null).length>=2);
+    return enough ? svgImg(lineChartSvg(s,{compact:true,width:145,height:42,fill:false}),'cr-spark') : '<span class="cr-muted">Sin historial</span>';
+  };
+  const prevComp = prev && current('peso',prev)!=null && current('grasa',prev)!=null ? calcComposicionCorporal(current('peso',prev),current('grasa',prev)) : {};
+  const comparison = [
+    ['Peso',peso,prev?current('peso',prev):null,'kg',()=>spark('peso')],
+    ['IMC',imc,prev?current('imc',prev):null,'',()=>spark('imc')],
+    ['% Grasa',grasa,prev?current('grasa',prev):null,'%',()=>spark('grasa')],
+    ['Masa muscular',muscleNow,prev?(current('masaMuscular',prev)??num(prevComp.masaMagra)):null,'kg',()=>spark('masaMuscular')],
+    ['Cintura',current('cintura'),prev?current('cintura',prev):null,'cm',()=>spark('cintura')],
+    ['Presión arterial',pressureNow,prev?pressure(prev):null,'mmHg',()=>spark('presion','pressure')],
+    ['TMB',tmbNow,prev?current('tmb',prev):null,'kcal',()=>spark('tmb')]
+  ];
+  const valueFmt=(v,u)=>Array.isArray(v)?`${v[0]}/${v[1]}`:(v!=null?`${Number.isInteger(v)?v:v.toFixed(1)}${u?` ${u}`:''}`:'Sin dato');
+  const comparisonRows = comparison.map(([label,a,b,u,sparkFn])=>{
+    let ch='<span class="cr-muted">Sin comparativo</span>';
+    if(Array.isArray(a)&&Array.isArray(b)){
+      const ds=a[0]-b[0], dd=a[1]-b[1], arrow=(ds<0&&dd<=0)?'↓':(ds>0||dd>0)?'↑':'→';
+      ch=`<span class="cr-delta ${arrow==='↓'?'down':arrow==='↑'?'up':'same'}">${arrow} ${Math.abs(ds)}/${Math.abs(dd)} mmHg</span>`;
+    } else ch=changeText(a,b,u);
+    return `<tr><td><b>${label}</b></td><td>${valueFmt(a,u)}</td><td>${prev?valueFmt(b,u):'—'}</td><td>${ch}</td><td class="trendcell">${sparkFn()}</td></tr>`;
+  }).join('');
+
+  const history = evals.slice().reverse().map(e=>`<tr><td>${esc(dateLabel(e.fecha))}</td><td>${current('peso',e)!=null?current('peso',e).toFixed(1)+' kg':'—'}</td><td>${current('imc',e)!=null?current('imc',e).toFixed(1):'—'}</td><td>${current('grasa',e)!=null?current('grasa',e).toFixed(1)+'%':'—'}</td><td>${current('cintura',e)!=null?current('cintura',e).toFixed(1)+' cm':'—'}</td></tr>`).join('');
+  const obs = esc(last.obs || last.observaciones || 'Sin observaciones clínicas registradas en la última evaluación.');
+  const rec = esc(last.recomendaciones || last.recomendacion || p.recomendaciones || 'Sin recomendaciones o indicaciones registradas en esta evaluación.');
+  const doctor = esc((DB.settings && DB.settings.doctorName) || 'Profesional de nutrición');
+  const clinic = esc((DB.settings && DB.settings.clinicName) || 'NutriMachata');
+  const accessEmail = esc(p.email || p.usuario || '—');
+  const accessUser = (typeof USERS !== 'undefined' && (p.email || p.usuario) && USERS[p.email || p.usuario]) ? USERS[p.email || p.usuario] : null;
+  const accessPass = esc((accessUser && accessUser.pass) || p.password || p.clave || 'No disponible');
+  const imcLabel = imc!=null ? getImcCategory(imc) : 'Sin dato';
+  const metric = (label,value,sub='')=>`<div class="cr-kpi"><small>${label}</small><b>${value}</b><span>${sub}</span></div>`;
+
   return `<style>
-    .clinical-report{font-family:Arial,sans-serif;background:#fff;color:#1d281a;max-width:900px;margin:auto;border:1px solid #e2e7dd;border-radius:10px;overflow:hidden}.cr-page{padding:28px 34px;background:#fff}.cr-page+.cr-page{border-top:8px solid #f2f5ed}.cr-head{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #5e8c2a;padding-bottom:10px;margin-bottom:15px}.cr-logo{height:58px;width:auto;object-fit:contain}.cr-title{text-align:right}.cr-title b{display:block;color:#315f0b;font-size:18px}.cr-title span{font-size:10px;color:#727a6e}.cr-patient{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;border:1px solid #dfe5d8;border-radius:8px;overflow:hidden;margin-bottom:16px}.cr-cell{padding:10px;border-left:1px solid #e6eae2}.cr-cell:first-child{border-left:0}.cr-cell small{display:block;font-size:8px;color:#7b8276;text-transform:uppercase;font-weight:700;margin-bottom:3px}.cr-cell strong{font-size:12px}.cr-section{margin:0 0 17px}.cr-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#315f0b;border-bottom:1px solid #dfe5d8;padding-bottom:6px;margin:0 0 10px}.cr-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.cr-metric{border:1px solid #e2e7dd;border-radius:8px;padding:11px;background:#fbfcf9}.cr-metric small{display:block;font-size:8px;color:#7c8378;text-transform:uppercase}.cr-metric b{display:block;font-size:20px;color:#284e09;margin:4px 0}.cr-metric em{font-style:normal;font-size:9px;color:#687164}.cr-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.cr-box{border:1px solid #e1e6dc;border-radius:8px;padding:11px}.cr-box h4{font-size:11px;color:#315f0b;margin:0 0 8px}.cr-note{border-left:3px solid #5e8c2a;background:#f5f8ef;padding:10px 12px;border-radius:4px;font-size:10px;line-height:1.6;white-space:pre-wrap}.cr-table{width:100%;border-collapse:collapse}.cr-table th{font-size:8px;text-transform:uppercase;color:#727a6e;background:#f5f7f2}.cr-table th,.cr-table td{padding:7px 8px;border-bottom:1px solid #e8ece5;text-align:left}.cr-table td{font-size:9px}.cr-comparison{border:1px solid #dfe5d8;border-radius:8px;overflow:hidden;background:#fff}.cr-comparison .cr-table th:nth-child(1){width:22%}.cr-comparison .cr-table th:nth-child(2),.cr-comparison .cr-table th:nth-child(3){width:18%}.cr-comparison .cr-table th:nth-child(4){width:18%}.cr-comparison .cr-table th:nth-child(5){width:24%}.cr-comparison .cr-table td{vertical-align:middle;padding:8px}.cr-spark{display:block;width:105px;height:34px;object-fit:contain;margin:auto}.cr-change{font-weight:700;white-space:nowrap}.cr-change.up{color:#4f8a23}.cr-change.down{color:#2f7b52}.cr-change.same{color:#687164}.cr-muted,.cr-no-trend{color:#92998e;font-size:8px}.cr-charts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.chart-card-pro{border:1px solid #e2e7dd;border-radius:8px;padding:9px;min-height:145px}.chart-card-pro b{font-size:9px;color:#586252}.chart-card-pro strong{display:block;font-size:16px;color:#315f0b;margin-top:3px}.chart-card-pro img{width:100%;height:95px;object-fit:contain}.chart-empty{height:90px;display:grid;place-items:center;color:#90978c;font-size:9px}.cr-footer{text-align:center;border-top:1px solid #e2e6de;padding-top:8px;color:#858b81;font-size:8px;margin-top:16px}
-    .pdf-export-mode{width:196mm!important;max-width:196mm!important;border:0!important;border-radius:0!important}.pdf-export-mode .cr-page{padding:8mm 7mm!important;break-after:page;page-break-after:always;min-height:0!important;overflow:visible!important}.pdf-export-mode .cr-page:last-child{break-after:auto;page-break-after:auto}.pdf-export-mode .cr-metric,.pdf-export-mode .cr-box,.pdf-export-mode .chart-card-pro,.pdf-export-mode tr{break-inside:avoid;page-break-inside:avoid}.pdf-export-mode .cr-charts{grid-template-columns:1fr 1fr!important}.pdf-export-mode .chart-card-pro{min-height:135px!important}.pdf-export-mode .chart-card-pro img{height:88px!important}
-  </style><div class="report-actions report-screen-only" style="display:flex;justify-content:flex-end;gap:10px;margin:0 0 14px;padding:0 2px"><button type="button" class="btn btn-outline" onclick="closeModal('modal-report')">Cerrar</button><button type="button" class="btn btn-outline" onclick="printReportPDF()">🖨️ Imprimir / Guardar PDF</button><button type="button" class="btn btn-olive" onclick="downloadReportPDF()">📥 Descarga directa</button></div><div class="clinical-report" data-patient="${p.nombre}">
-    <section class="cr-page"><div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}"><div class="cr-title"><b>Reporte Clínico Nutricional</b><span>Última evaluación: ${fmt(last.fecha)}</span></div></div>
-      <div class="cr-patient"><div class="cr-cell"><small>Paciente</small><strong>${p.nombre}</strong></div><div class="cr-cell"><small>Edad</small><strong>${fmt(p.edad)} años</strong></div><div class="cr-cell"><small>Sexo</small><strong>${p.sexo==='F'?'Femenino':p.sexo==='M'?'Masculino':'—'}</strong></div><div class="cr-cell"><small>Estado</small><strong>${p.activo===false?'Inactivo':'Activo'}</strong></div></div>
-      <div class="cr-section"><h3>Evaluación nutricional</h3><div class="cr-metrics"><div class="cr-metric"><small>Peso</small><b>${fmt(peso)} kg</b><em>${prev?`Anterior ${fmt(prev.peso)} kg`:'Evaluación inicial'}</em></div><div class="cr-metric"><small>IMC</small><b>${imc!=null?imc.toFixed(1):'—'}</b><em>${imc!=null?getImcCategory(imc):'Sin dato'}</em></div><div class="cr-metric"><small>Grasa corporal</small><b>${grasa!=null?grasa.toFixed(1)+'%':'—'}</b><em>${prev?`Cambio ${change('grasa','%')}`:'Sin comparativo'}</em></div><div class="cr-metric"><small>Presión arterial</small><b>${fmt(last.presion??p.presion)}</b><em>mmHg</em></div></div></div>
-      <div class="cr-two"><div class="cr-box"><h4>Composición corporal</h4><table class="cr-table"><tr><td>Masa magra</td><td>${Number.isFinite(Number(comp.masaMagra)) ? comp.masaMagra : '—'} kg</td></tr><tr><td>Masa grasa</td><td>${Number.isFinite(Number(comp.masaGrasa)) ? comp.masaGrasa : '—'} kg</td></tr><tr><td>Agua corporal</td><td>${Number.isFinite(Number(comp.aguaCorporal)) ? comp.aguaCorporal : '—'} kg</td></tr><tr><td>Masa ósea</td><td>${Number.isFinite(Number(comp.masaOsea)) ? comp.masaOsea : '—'} kg</td></tr></table></div><div class="cr-box"><h4>Interpretación clínica / observaciones</h4><div class="cr-note">${obs}</div></div></div>
-      <div class="cr-section" style="margin-top:16px"><h3>Medidas antropométricas</h3><table class="cr-table"><thead><tr><th>Medida</th><th>Actual</th><th>Anterior</th><th>Cambio</th></tr></thead><tbody>${measureRows}</tbody></table></div><div class="cr-footer">NutriMachata · Nutrición Conectada · ${doctor}</div></section>
-    <section class="cr-page"><div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}"><div class="cr-title"><b>Evolución clínica</b><span>${p.nombre}</span></div></div><div class="cr-section"><h3>Gráficas de evolución</h3><div class="cr-charts">${charts}</div></div><div class="cr-section"><h3>Comparativo de Medidas</h3><div class="cr-comparison"><table class="cr-table"><thead><tr><th>Medida</th><th>Actual (${fmt(last.fecha)})</th><th>Anterior (${prev?fmt(prev.fecha):'—'})</th><th>Cambio</th><th>Tendencia</th></tr></thead><tbody>${comparisonRows}</tbody></table></div></div><div class="cr-footer">NutriMachata · Evolución y comparativo basados en evaluaciones registradas</div></section>
-    <section class="cr-page"><div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}"><div class="cr-title"><b>Historial de evaluaciones</b><span>${p.nombre}</span></div></div><div class="cr-section"><h3>Historial clínico antropométrico</h3><table class="cr-table"><thead><tr><th>Fecha</th><th>Peso</th><th>IMC</th><th>% Grasa</th><th>Cintura</th></tr></thead><tbody>${history||'<tr><td colspan="5">Sin evaluaciones registradas</td></tr>'}</tbody></table></div><div class="cr-section"><h3>Observaciones de la última evaluación</h3><div class="cr-note">${obs}</div></div><div class="cr-section cr-access"><h3>Datos de acceso del paciente</h3><div class="cr-box"><table class="cr-table"><tr><td><strong>Correo / usuario</strong></td><td>${accessEmail}</td></tr><tr><td><strong>Contraseña</strong></td><td>${accessPass}</td></tr></table><div style="font-size:8px;color:#7b8276;margin-top:8px">Datos para el acceso del paciente a NutriMachata.</div></div></div><div class="cr-footer">Documento clínico confidencial · NutriMachata · ${doctor}</div></section>
+    .clinical-report{--green:#315f0b;--olive:#5E8C2A;--soft:#f5f8f1;--line:#dfe7d8;--ink:#24301f;font-family:Arial,sans-serif;background:#fff;color:var(--ink);max-width:980px;margin:auto;border:1px solid #e0e6db;border-radius:14px;overflow:hidden}.cr-page{background:#fff;padding:26px 32px}.cr-page+.cr-page{border-top:8px solid #f3f6ef}.cr-head{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--olive);padding-bottom:10px;margin-bottom:14px}.cr-logo{height:62px;max-width:210px;object-fit:contain}.cr-title{text-align:right}.cr-title b{display:block;color:var(--green);font-size:20px}.cr-title span{font-size:10px;color:#737d6d}.cr-patient{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;background:linear-gradient(90deg,#f6faf1,#fff);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px}.cr-cell{padding:10px 12px;border-left:1px solid #e6ece1}.cr-cell:first-child{border-left:0}.cr-cell small{display:block;font-size:8px;text-transform:uppercase;color:#7b8576;font-weight:700;margin-bottom:3px}.cr-cell strong{font-size:12px}.cr-section{margin-bottom:15px}.cr-section h3{font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.8px;margin:0 0 9px;padding-bottom:6px;border-bottom:1px solid var(--line)}.cr-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}.cr-kpi{background:#fbfcf9;border:1px solid var(--line);border-radius:8px;padding:9px;min-height:69px}.cr-kpi small{font-size:7px;color:#7b8576;text-transform:uppercase;font-weight:700}.cr-kpi b{display:block;color:var(--green);font-size:17px;margin:4px 0 2px}.cr-kpi span{display:block;color:#778071;font-size:7.5px}.cr-charts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cr-chart-card{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;break-inside:avoid}.cr-chart-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:3px}.cr-chart-top b{font-size:10px;color:#4b5647}.cr-chart-top small{display:block;font-size:7.5px;color:#899184;margin-top:2px}.cr-chart-top strong{font-size:12px;color:var(--green);white-space:nowrap}.cr-line-chart{display:block;width:100%;height:128px;object-fit:contain}.cr-chart-empty{height:128px;display:grid;place-items:center;font-size:9px;color:#90988b;background:#fafbf9;border-radius:6px}.cr-legend{display:flex;gap:12px;justify-content:flex-end;font-size:7px;color:#7b8376}.cr-legend span{display:flex;align-items:center;gap:4px}.cr-legend i{width:12px;height:2px;background:#5E8C2A;display:inline-block}.cr-legend .l2{background:#355E3B}.cr-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cr-box{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff}.cr-box h4{font-size:10px;color:var(--green);margin:0 0 7px}.cr-table{width:100%;border-collapse:collapse}.cr-table th{font-size:7.5px;text-transform:uppercase;color:#737d6d;background:#f4f7f1}.cr-table th,.cr-table td{padding:6px 7px;border-bottom:1px solid #e8ede4;text-align:left}.cr-table td{font-size:8.5px;vertical-align:middle}.cr-table tbody tr:nth-child(even){background:#fbfcfa}.cr-comparison{border:1px solid var(--line);border-radius:9px;overflow:hidden}.cr-comparison th:nth-child(1){width:20%}.cr-comparison th:nth-child(2),.cr-comparison th:nth-child(3){width:17%}.cr-comparison th:nth-child(4){width:17%}.cr-comparison th:nth-child(5){width:29%}.cr-spark{display:block;width:118px;height:34px;object-fit:contain;margin:auto}.trendcell{text-align:center!important}.cr-delta{font-weight:700;white-space:nowrap}.cr-delta.up{color:#5c8a31}.cr-delta.down{color:#3f7d59}.cr-delta.same{color:#7c8478}.cr-muted{color:#999f96;font-size:7.5px}.cr-note{border-left:3px solid var(--olive);background:#f4f8ee;padding:10px 12px;border-radius:5px;font-size:9px;line-height:1.55;white-space:pre-wrap}.cr-reco{background:linear-gradient(135deg,#edf5df,#f8fbf4);border:1px solid #dbe8ce;border-radius:9px;padding:11px;font-size:9px;line-height:1.6}.cr-access{margin-top:14px}.cr-access-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cr-access-item{border:1px solid var(--line);border-radius:7px;padding:9px;background:#fbfcfa}.cr-access-item small{display:block;font-size:7px;color:#7b8576;text-transform:uppercase}.cr-access-item b{display:block;font-size:10px;color:#394634;margin-top:3px;word-break:break-word}.cr-footer{text-align:center;border-top:1px solid #e1e7dc;padding-top:7px;color:#858d80;font-size:7px;margin-top:14px}.cr-screen-note{font-size:8px;color:#778071;margin-top:6px}
+    @media(max-width:760px){.cr-page{padding:18px}.cr-kpis{grid-template-columns:repeat(2,1fr)}.cr-charts,.cr-two{grid-template-columns:1fr}.cr-patient{grid-template-columns:1fr 1fr}.cr-cell{border-bottom:1px solid #e6ece1}.cr-logo{height:50px}.cr-title b{font-size:16px}}
+    @media print{.report-actions{display:none!important}.clinical-report{border:0!important;border-radius:0!important;max-width:none!important;width:100%!important}.cr-page{padding:0!important}.cr-page+.cr-page{border-top:0!important;break-before:page;page-break-before:always}.cr-chart-card,.cr-box,.cr-kpi,.cr-comparison,tr{break-inside:avoid;page-break-inside:avoid}.cr-line-chart{height:32mm!important}.cr-spark{width:30mm!important;height:9mm!important}}
+    .pdf-export-mode{width:196mm!important;max-width:196mm!important;border:0!important;border-radius:0!important}.pdf-export-mode .cr-page{padding:7mm 6mm!important;break-after:page;page-break-after:always}.pdf-export-mode .cr-page:last-child{break-after:auto;page-break-after:auto}.pdf-export-mode .cr-kpis{grid-template-columns:repeat(6,1fr)!important}.pdf-export-mode .cr-line-chart{height:31mm!important}.pdf-export-mode .cr-spark{width:29mm!important;height:9mm!important}.pdf-export-mode .cr-chart-card,.pdf-export-mode .cr-box,.pdf-export-mode .cr-kpi,.pdf-export-mode .cr-comparison,.pdf-export-mode tr{break-inside:avoid!important;page-break-inside:avoid!important}
+  </style>
+  <div class="report-actions report-screen-only" style="display:flex;justify-content:flex-end;gap:10px;margin:0 0 14px;padding:0 2px"><button type="button" class="btn btn-outline" onclick="closeModal('modal-report')">Cerrar</button><button type="button" class="btn btn-outline" onclick="printReportPDF()">🖨️ Imprimir / Guardar PDF</button><button type="button" class="btn btn-olive" onclick="downloadReportPDF()">📥 Descarga directa</button></div>
+  <div class="clinical-report" data-patient="${esc(p.nombre)}">
+    <section class="cr-page">
+      <div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}" alt="NutriMachata"><div class="cr-title"><b>Reporte Clínico Nutricional</b><span>Última evaluación: ${esc(dateLabel(last.fecha))}</span></div></div>
+      <div class="cr-patient"><div class="cr-cell"><small>Paciente</small><strong>${esc(p.nombre)}</strong></div><div class="cr-cell"><small>Edad</small><strong>${show(p.edad)} años</strong></div><div class="cr-cell"><small>Sexo</small><strong>${p.sexo==='F'?'Femenino':p.sexo==='M'?'Masculino':'—'}</strong></div><div class="cr-cell"><small>Estado</small><strong>${p.activo===false?'Inactivo':'Activo'}</strong></div></div>
+      <div class="cr-section"><h3>Evaluación nutricional</h3><div class="cr-kpis">
+        ${metric('Peso',peso!=null?peso.toFixed(1)+' kg':'—',prev&&current('peso',prev)!=null?`Anterior ${current('peso',prev).toFixed(1)} kg`:'Evaluación inicial')}
+        ${metric('IMC',imc!=null?imc.toFixed(1):'—',imcLabel)}
+        ${metric('% Grasa',grasa!=null?grasa.toFixed(1)+'%':'—','Grasa corporal')}
+        ${metric('Masa muscular',muscleNow!=null?muscleNow.toFixed(1)+' kg':'—','Composición corporal')}
+        ${metric('Presión',pressureNow?`${pressureNow[0]}/${pressureNow[1]}`:'—','mmHg')}
+        ${metric('TMB',tmbNow!=null?Math.round(tmbNow)+' kcal':'—','Metabolismo basal')}
+      </div></div>
+      <div class="cr-section"><h3>Gráficas de evolución</h3><div class="cr-charts">${chartCards}</div></div>
+      <div class="cr-two">
+        <div class="cr-box"><h4>Composición corporal</h4><table class="cr-table"><tbody><tr><td>Masa muscular / magra</td><td><b>${muscleNow!=null?muscleNow.toFixed(1)+' kg':'—'}</b></td></tr><tr><td>Grasa corporal</td><td><b>${grasa!=null?grasa.toFixed(1)+'%':'—'}</b></td></tr><tr><td>Agua corporal</td><td><b>${waterNow!=null?waterNow.toFixed(1)+(current('agua')!=null?'%':' kg'):'—'}</b></td></tr><tr><td>Grasa visceral</td><td><b>${visceralNow!=null?visceralNow.toFixed(1):'—'}</b></td></tr><tr><td>Masa ósea</td><td><b>${num(comp.masaOsea)!=null?num(comp.masaOsea).toFixed(1)+' kg':'—'}</b></td></tr></tbody></table></div>
+        <div class="cr-box"><h4>Medidas antropométricas</h4><table class="cr-table"><thead><tr><th>Medida</th><th>Actual</th><th>Cambio</th></tr></thead><tbody>${measures.map(([label,key])=>{const a=current(key),b=prev?current(key,prev):null;return `<tr><td>${label}</td><td>${a!=null?a.toFixed(1)+' cm':'—'}</td><td>${changeText(a,b,'cm')}</td></tr>`}).join('')}</tbody></table></div>
+      </div>
+      <div class="cr-section" style="margin-top:14px"><h3>Comparativo de Medidas</h3><div class="cr-comparison"><table class="cr-table"><thead><tr><th>Medida</th><th>Actual</th><th>Anterior</th><th>Cambio</th><th>Tendencia</th></tr></thead><tbody>${comparisonRows}</tbody></table></div></div>
+      <div class="cr-section"><h3>Interpretación clínica / observaciones</h3><div class="cr-note">${obs}</div></div>
+      <div class="cr-footer">${clinic} · NutriMachata · Nutrición Conectada · ${doctor}</div>
+    </section>
+    <section class="cr-page">
+      <div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}" alt="NutriMachata"><div class="cr-title"><b>Seguimiento Nutricional</b><span>${esc(p.nombre)}</span></div></div>
+      <div class="cr-section"><h3>Recomendaciones e indicaciones registradas</h3><div class="cr-reco">${rec}</div></div>
+      <div class="cr-section"><h3>Historial de evaluaciones</h3><table class="cr-table"><thead><tr><th>Fecha</th><th>Peso</th><th>IMC</th><th>% Grasa</th><th>Cintura</th></tr></thead><tbody>${history || '<tr><td colspan="5">Sin evaluaciones registradas</td></tr>'}</tbody></table></div>
+      <div class="cr-section cr-access"><h3>Datos de acceso del paciente</h3><div class="cr-access-grid"><div class="cr-access-item"><small>Correo / usuario</small><b>${accessEmail}</b></div><div class="cr-access-item"><small>Contraseña</small><b>${accessPass}</b></div></div><div class="cr-screen-note">Datos registrados para el acceso del paciente a NutriMachata.</div></div>
+      <div class="cr-footer">Documento clínico confidencial · ${clinic} · ${doctor}</div>
+    </section>
   </div>`;
 }
 
