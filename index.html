@@ -5718,88 +5718,69 @@ function switchHCTab(tab, btn) {
 
 // ── SVG Chart Generator (synchronous, no DOM/animation needed) ─────────────
 function _svgChart(labels, values, opts) {
-  const { color='#5E8C2A', width=540, height=150, unit='', refMin=null, refMax=null } = opts || {};
+  const { color='#5E8C2A', width=540, height=150, unit='', refMin=null, refMax=null, compact=false, smooth=true } = opts || {};
   if (!values || !values.length) return '';
-  const PAD = { top:20, right:16, bottom:28, left:48 };
+  const cleanValues = values.map(Number).filter(Number.isFinite);
+  if (!cleanValues.length) return '';
+  const PAD = compact ? { top:5, right:5, bottom:5, left:5 } : { top:20, right:16, bottom:28, left:48 };
   const W = width - PAD.left - PAD.right;
   const H = height - PAD.top - PAD.bottom;
-  const vMin = Math.min(...values); const vMax = Math.max(...values);
-  const range = vMax - vMin || 1;
-  const yMin = vMin - range * 0.18; const yMax = vMax + range * 0.18;
-  const toX = (i) => PAD.left + (values.length < 2 ? W/2 : i / (values.length-1) * W);
-  const toY = (v) => PAD.top + H - ((v - yMin) / (yMax - yMin)) * H;
-  const useBar = false; // Reportes clinicos: tendencia siempre lineal; con 1 dato se muestra un punto
-  let inner = '';
-  
-  // Crear gradiente para el área bajo la línea
-  const gradientId = 'grad_' + Math.random().toString(36).substr(2, 9);
-  let defs = `<defs><linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%" style="stop-color:${color};stop-opacity:0.3" />
-    <stop offset="100%" style="stop-color:${color};stop-opacity:0.05" />
-  </linearGradient></defs>`;
-  
-  // Reference band
-  if (refMin !== null && refMax !== null) {
-    const ry1 = toY(Math.min(refMax, yMax)); const ry2 = toY(Math.max(refMin, yMin));
-    if (ry2 > ry1) inner += `<rect x="${PAD.left}" y="${ry1.toFixed(1)}" width="${W}" height="${(ry2-ry1).toFixed(1)}" fill="#5E8C2A" opacity="0.08"/>`;
+  const vMin = Math.min(...cleanValues), vMax = Math.max(...cleanValues);
+  const baseRange = vMax - vMin;
+  const range = baseRange || Math.max(Math.abs(vMax)*0.08, 1);
+  const yMin = vMin - range * (compact ? 0.25 : 0.18);
+  const yMax = vMax + range * (compact ? 0.25 : 0.18);
+  const toX = i => PAD.left + (cleanValues.length < 2 ? W/2 : i/(cleanValues.length-1)*W);
+  const toY = v => PAD.top + H - ((v-yMin)/(yMax-yMin))*H;
+  const points = cleanValues.map((v,i)=>({x:toX(i),y:toY(v),v}));
+  const esc = x => String(x ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const gradientId = 'grad_' + Math.random().toString(36).slice(2,11);
+  const defs = `<defs><linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="${color}" stop-opacity="0.20"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>`;
+
+  // Curva Catmull-Rom convertida a Bezier: pasa exactamente por cada medición real.
+  const smoothPath = pts => {
+    if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    if (!smooth || pts.length === 2) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} ` + pts.slice(1).map(p=>`L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+    let d=`M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+      const c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6;
+      const c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
+      d+=` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    return d;
+  };
+  const linePath=smoothPath(points);
+  const bottom=(PAD.top+H).toFixed(1);
+  const areaPath = points.length > 1 ? `${linePath} L ${points[points.length-1].x.toFixed(1)} ${bottom} L ${points[0].x.toFixed(1)} ${bottom} Z` : '';
+  let inner='';
+
+  if (!compact) {
+    if (refMin !== null && refMax !== null) {
+      const ry1=toY(Math.min(refMax,yMax)), ry2=toY(Math.max(refMin,yMin));
+      if(ry2>ry1) inner+=`<rect x="${PAD.left}" y="${ry1.toFixed(1)}" width="${W}" height="${(ry2-ry1).toFixed(1)}" fill="${color}" opacity="0.06"/>`;
+    }
+    for(let s=0;s<=4;s++){
+      const v=yMin+(yMax-yMin)*(s/4), y=toY(v).toFixed(1);
+      inner+=`<line x1="${PAD.left}" y1="${y}" x2="${PAD.left+W}" y2="${y}" stroke="#e6e9e3" stroke-width="0.8"/>`;
+      inner+=`<text x="${PAD.left-6}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="8.5" fill="#7f877b" font-family="Arial,sans-serif">${v.toFixed(1).replace('.',',')}</text>`;
+    }
   }
-  
-  // Grid mejorado
-  for (let s = 0; s <= 4; s++) {
-    const v = yMin + (yMax-yMin)*(s/4); const y = toY(v).toFixed(1);
-    inner += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left+W}" y2="${y}" stroke="#e8e6e0" stroke-width="0.8" opacity="0.6"/>`;
-    inner += `<text x="${PAD.left-6}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="8.5" fill="#999" font-family="'DM Mono', monospace" font-weight="500">${v.toFixed(1)}</text>`;
-  }
-  
-  // Axes mejorados
-  inner += `<line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1.2" opacity="0.8"/>`;
-  inner += `<line x1="${PAD.left}" y1="${PAD.top+H}" x2="${PAD.left+W}" y2="${PAD.top+H}" stroke="#ccc" stroke-width="1.2" opacity="0.8"/>`;
-  
-  if (useBar) {
-    // Barras mejoradas
-    const step = W / values.length; const bw = Math.min(50, step*0.6);
-    values.forEach((v,i) => {
-      const x = PAD.left + step*i + step/2 - bw/2; const y = toY(v); const bh = PAD.top+H-y;
-      const isLast = i === values.length-1;
-      const opacity = isLast ? 1 : 0.6;
-      inner += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" fill="${color}" opacity="${opacity}" rx="4" ry="4"/>`;
-      if (isLast) {
-        inner += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" fill="none" stroke="${color}" stroke-width="2" opacity="0.4" rx="4" ry="4"/>`;
-      }
-      inner += `<text x="${(x+bw/2).toFixed(1)}" y="${(y-8).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${color}" font-family="'DM Mono', monospace">${v}${unit}</text>`;
-    });
-  } else {
-    // Línea con gradiente mejorada
-    const pts = values.map((v,i)=>`${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-    const area = `M${toX(0).toFixed(1)},${(PAD.top+H).toFixed(1)} ${values.map((v,i)=>`L${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')} L${toX(values.length-1).toFixed(1)},${(PAD.top+H).toFixed(1)} Z`;
-    inner += `<path d="${area}" fill="url(#${gradientId})"/>`;
-    inner += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
-    values.forEach((v,i) => {
-      const isLast = i === values.length-1;
-      const r = isLast ? 5.5 : 4;
-      const strokeW = isLast ? 2 : 1.5;
-      inner += `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="${r}" fill="${color}" stroke="white" stroke-width="${strokeW}"/>`;
-      if (isLast) {
-        inner += `<circle cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="${r}" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
-      }
-    });
-    // Etiquetas de inicio y fin mejoradas
-    inner += `<text x="${toX(0).toFixed(1)}" y="${(toY(values[0])-10).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${color}" font-family="'DM Mono', monospace">${values[0]}${unit}</text>`;
-    inner += `<text x="${toX(values.length-1).toFixed(1)}" y="${(toY(values[values.length-1])-10).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${color}" font-family="'DM Mono', monospace">${values[values.length-1]}${unit}</text>`;
-  }
-  
-  // Etiquetas X mejoradas
-  const idxs = values.length<=5 ? values.map((_,i)=>i) : [0, Math.floor(values.length/2), values.length-1];
-  idxs.forEach(i => {
-    const lbl = (labels[i]||'').replace(/^20/,'').replace(/-/g,'/');
-    inner += `<text x="${toX(i).toFixed(1)}" y="${(PAD.top+H+16).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="#888" font-family="'DM Sans', sans-serif" font-weight="500">${lbl}</text>`;
+
+  if(areaPath) inner+=`<path d="${areaPath}" fill="url(#${gradientId})"/>`;
+  inner+=`<path d="${linePath}" fill="none" stroke="${color}" stroke-width="${compact?2.2:2.5}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  points.forEach((p,i)=>{
+    inner+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${compact?2.8:4}" fill="${color}"/>`;
   });
-  
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.08))">
-    ${defs}
-    <rect width="${width}" height="${height}" fill="white" rx="8" ry="8" opacity="0"/>
-    ${inner}
-  </svg>`;
+
+  if(!compact){
+    const idxs=cleanValues.length<=5?cleanValues.map((_,i)=>i):[0,Math.floor(cleanValues.length/2),cleanValues.length-1];
+    idxs.forEach(i=>{
+      const lbl=esc((labels[i]||'').replace(/^20/,'').replace(/-/g,'/'));
+      inner+=`<text x="${toX(i).toFixed(1)}" y="${(PAD.top+H+16).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="#7f877b" font-family="Arial,sans-serif">${lbl}</text>`;
+    });
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${defs}<rect width="${width}" height="${height}" fill="#fff"/>${inner}</svg>`;
 }
 function _svgToDataURL(svg) {
   return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
@@ -8474,7 +8455,7 @@ function generateReportHTML(p) {
   const measureRows=measures.map(([l,k])=>`<tr><td>${l}</td><td>${fmt(last[k])}${last[k]!=null?' cm':''}</td><td>${prev?fmt(prev[k])+(prev[k]!=null?' cm':''):'—'}</td><td>${change(k,' cm')}</td></tr>`).join('');
   const valueOf=(e,key)=>{if(!e)return null;if(key==='grasa')return n(e.grasa??e.porcentaje_grasa);if(key==='masaMuscular')return n(e.masaMuscular??e.masa_muscular);if(key==='tmb')return n(e.tmb);return n(e[key]);};
   const pressureParts=e=>{const raw=String((e&&(e.presion??e.presionActual))||'');const m=raw.match(/(\d{2,3})\s*\/\s*(\d{2,3})/);return m?[Number(m[1]),Number(m[2])]:null;};
-  const spark=(key,color='#5E8C2A')=>{let vals=[];if(key==='presion'){vals=evals.map(e=>{const p=pressureParts(e);return p?p[0]:null;});}else vals=evals.map(e=>valueOf(e,key));const clean=vals.filter(v=>v!=null);if(clean.length<2)return '<span class="cr-no-trend">Sin historial</span>';const pts=vals.map((v,i)=>v==null?null:{label:String(evals[i].fecha||'').slice(5),value:v}).filter(Boolean);return `<img class="cr-spark" src="${_svgToDataURL(_svgChart(pts.map(x=>x.label),pts.map(x=>x.value),{color,unit:'',width:150,height:45}))}">`;};
+  const spark=(key,color='#5E8C2A')=>{let vals=[];if(key==='presion'){vals=evals.map(e=>{const p=pressureParts(e);return p?p[0]:null;});}else vals=evals.map(e=>valueOf(e,key));const clean=vals.filter(v=>v!=null);if(clean.length<2)return '<span class="cr-no-trend">Sin historial</span>';const pts=vals.map((v,i)=>v==null?null:{label:String(evals[i].fecha||'').slice(5),value:v}).filter(Boolean);return `<img class="cr-spark" src="${_svgToDataURL(_svgChart(pts.map(x=>x.label),pts.map(x=>x.value),{color,unit:'',width:150,height:45,compact:true,smooth:true}))}">`;};
   const compFor=e=>{const w=valueOf(e,'peso');const g=valueOf(e,'grasa');return w!=null&&g!=null?calcComposicionCorporal(w,g):{};};
   const comparisonDefs=[
     ['Peso','peso','kg',e=>valueOf(e,'peso')],
