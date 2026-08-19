@@ -8429,8 +8429,21 @@ function downloadReportPDF() {
     .finally(() => staging.remove());
 }
 
-function openReportModal(patientId, type) {
+async function openReportModal(patientId, type) {
   const p = patientId ? DB.patients.find(x => x.id == patientId) : null;
+  if (p && (p.email || p.usuario)) {
+    const email = p.email || p.usuario;
+    try {
+      if (typeof SB !== 'undefined' && SB.getUsuario) {
+        const u = await SB.getUsuario(email);
+        if (u && u.password_hash) {
+          USERS[email] = { ...(USERS[email] || {}), pass: u.password_hash, role: 'patient', name: p.nombre, initials: p.initials || '', patientId: p.id };
+        }
+      }
+    } catch (err) {
+      console.warn('No se pudo recuperar la contraseña del portal para el reporte:', err);
+    }
+  }
   document.getElementById('report-modal-body').innerHTML = p ? generateReportHTML(p) : `
     <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Reporte en preparación</div><div class="empty-text">Seleccione un paciente para generar el reporte completo</div></div>
   `;
@@ -8642,7 +8655,7 @@ function generateReportHTML(p) {
       <div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}" alt="NutriMachata"><div class="cr-title"><b>Seguimiento Nutricional</b><span>${esc(p.nombre)}</span></div></div>
       <div class="cr-section"><h3>Recomendaciones e indicaciones registradas</h3><div class="cr-reco">${rec}</div></div>
       <div class="cr-section"><h3>Historial de evaluaciones</h3><table class="cr-table"><thead><tr><th>Fecha</th><th>Peso</th><th>IMC</th><th>% Grasa</th><th>Cintura</th></tr></thead><tbody>${history || '<tr><td colspan="5">Sin evaluaciones registradas</td></tr>'}</tbody></table></div>
-      <div class="cr-section cr-access"><h3>Datos de acceso del paciente</h3><div class="cr-access-grid"><div class="cr-access-item"><small>Correo / usuario</small><b>${accessEmail}</b></div><div class="cr-access-item"><small>Contraseña</small><b>${accessPass}</b></div></div><div class="cr-screen-note">Datos registrados para el acceso del paciente a NutriMachata.</div></div>
+      <div class="cr-section cr-access"><h3>Datos de acceso del paciente</h3><div class="cr-access-grid"><div class="cr-access-item"><small>Correo / usuario</small><b>${accessEmail}</b></div><div class="cr-access-item"><small>Contraseña de acceso</small><b>${accessPass}</b></div></div><div class="cr-screen-note">Datos registrados para el acceso del paciente a NutriMachata.</div></div>
       <div class="cr-footer">Documento clínico confidencial · ${clinic} · ${doctor}</div>
     </section>
   </div>`;
@@ -10797,6 +10810,38 @@ function _evalChronoUpTo(p, evalId) {
   return idx >= 0 ? all.slice(0, idx + 1) : all;
 }
 
+function _svgBarChart(labels, values, opts) {
+  const { color='#5E8C2A', width=540, height=150, unit='' } = opts || {};
+  if (!values || !values.length) return '';
+  const clean = values.map(Number).filter(Number.isFinite);
+  if (!clean.length) return '';
+  const PAD={top:16,right:14,bottom:28,left:46};
+  const W=width-PAD.left-PAD.right, H=height-PAD.top-PAD.bottom;
+  const minV=Math.min(...clean), maxV=Math.max(...clean);
+  const baseMin=Math.min(0,minV);
+  const range=(maxV-baseMin)||Math.max(Math.abs(maxV)*0.1,1);
+  const yMin=baseMin;
+  const yMax=maxV+range*0.12;
+  const toY=v=>PAD.top+H-((v-yMin)/(yMax-yMin))*H;
+  const slot=W/clean.length;
+  const barW=Math.min(34,Math.max(12,slot*0.48));
+  const esc=x=>String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let inner='';
+  for(let i=0;i<=4;i++){
+    const v=yMin+(yMax-yMin)*(i/4), y=toY(v);
+    inner+=`<line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${PAD.left+W}" y2="${y.toFixed(1)}" stroke="#e7ebe3" stroke-width="0.8"/>`;
+    inner+=`<text x="${PAD.left-6}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="8" fill="#7f877b" font-family="Arial,sans-serif">${v.toFixed(1).replace('.',',')}</text>`;
+  }
+  clean.forEach((v,i)=>{
+    const x=PAD.left+slot*i+(slot-barW)/2, y=toY(v), h=PAD.top+H-y;
+    inner+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,h).toFixed(1)}" rx="4" fill="${color}" opacity="0.88"/>`;
+    inner+=`<text x="${(x+barW/2).toFixed(1)}" y="${Math.max(10,y-5).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="#475441" font-family="Arial,sans-serif">${Number.isInteger(v)?v:v.toFixed(1)}</text>`;
+    const raw=(labels[i]||'').replace(/^20/,'').replace(/-/g,'/');
+    inner+=`<text x="${(x+barW/2).toFixed(1)}" y="${height-8}" text-anchor="middle" font-size="7.5" fill="#7f877b" font-family="Arial,sans-serif">${esc(raw)}</text>`;
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#fff"/>${inner}</svg>`;
+}
+
 function _evalMeasureChartsHTML(p, evalId, compact=false) {
   const evals = _evalChronoUpTo(p, evalId);
   const fields = [
@@ -10816,7 +10861,7 @@ function _evalMeasureChartsHTML(p, evalId, compact=false) {
     const pairs = evals.map((e,i)=>({v:parseFloat(e[f.key]),l:labels[i]})).filter(x=>Number.isFinite(x.v));
     if (!pairs.length) return '';
     const values=pairs.map(x=>x.v), labs=pairs.map(x=>x.l);
-    const svg=_svgChart(labs, values, {color:getFieldChartColor(f, evals),width:compact?440:520,height:compact?128:145,unit:f.unit});
+    const svg=_svgBarChart(labs, values, {color:getFieldChartColor(f, evals),width:compact?440:520,height:compact?128:145,unit:f.unit});
     const current=values[values.length-1];
     const previous=values.length>1?values[values.length-2]:null;
     const delta=previous===null?null:current-previous;
@@ -10890,7 +10935,7 @@ function openEvaluationDetail(patientId, evalId) {
     </div>
     
     <div style="margin-bottom:20px">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px">Evolución de Medidas</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">Evolución de Medidas <span style="font-size:10px;color:var(--gray-400);font-weight:500">· Gráficas de barras</span></div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${_evalMeasureChartsHTML(p, eval_.id)}</div>
     </div>
 
