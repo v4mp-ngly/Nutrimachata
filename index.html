@@ -10812,64 +10812,94 @@ function renderBodyFigure(eval_) {
     cuello: v(eval_.cuello), pecho: v(eval_.pecho), muneca: v(eval_.muneca),
     cintura: v(eval_.cintura), abdomen: v(eval_.abdomen), cadera: v(eval_.cadera), muslo: v(eval_.muslo)
   };
-  const txt = (x) => x == null ? '—' : `${Number(x).toFixed(Number(x)%1?1:0)} cm`;
-  const label = (x,y,title,val,color,anchor='start') => val==null ? '' : `
-    <line x1="${x}" y1="${y}" x2="${anchor==='start'?x+19:x-19}" y2="${y}" stroke="${color}" stroke-width="1.2" stroke-dasharray="2.5 2.5"/>
-    <text x="${anchor==='start'?x+22:x-22}" y="${y-2}" text-anchor="${anchor}" font-size="5.6" font-weight="600" fill="#4b5548">${title}</text>
-    <text x="${anchor==='start'?x+22:x-22}" y="${y+5}" text-anchor="${anchor}" font-size="6" font-weight="700" fill="${color}">${txt(val)}</text>`;
-  return `<div style="width:100%;max-width:380px;margin:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:0 4px 8px"><div><div style="font-size:12px;font-weight:700;color:#274d24">Mapa antropométrico</div><div style="font-size:9px;color:#8b9389">Referencia visual de las medidas registradas</div></div><span style="font-size:9px;padding:4px 7px;background:#eef5e9;border-radius:999px;color:#4d7b2c">cm</span></div>
-    <svg width="100%" height="330" viewBox="0 0 320 330" style="display:block;max-width:100%" role="img" aria-label="Mapa visual de medidas antropométricas">
-      <defs>
-        <linearGradient id="bodyFillNM" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7e8d8"/><stop offset="1" stop-color="#efd5bd"/></linearGradient>
-        <linearGradient id="clothNM" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#78a84c"/><stop offset="1" stop-color="#527f31"/></linearGradient>
-        <filter id="shadowNM" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#18330f" flood-opacity=".08"/></filter>
-      </defs>
-      <rect x="1" y="1" width="318" height="328" rx="16" fill="#fbfcf9" stroke="#e3e9df"/>
-      <text x="84" y="22" text-anchor="middle" font-size="8" font-weight="700" fill="#4f7d2f">VISTA FRONTAL</text>
-      <text x="236" y="22" text-anchor="middle" font-size="8" font-weight="700" fill="#4f7d2f">VISTA POSTERIOR</text>
+  const fmt = (x) => x == null ? '—' : `${Number(x).toFixed(Number(x)%1?1:0)} cm`;
+  const c = {
+    cuello:'#4f8b36', pecho:'#ef8b42', muneca:'#4689cf', cintura:'#2f7d42',
+    abdomen:'#5f9cc9', cadera:'#c87818', muslo:'#7b5ac8'
+  };
+  const callout = (x1,y1,x2,y2,label,val,color,align='start') => val==null ? '' : `
+    <path d="M${x1} ${y1} L${x2} ${y2}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <circle cx="${x1}" cy="${y1}" r="2.6" fill="${color}"/>
+    <text x="${x2 + (align==='start'?6:-6)}" y="${y2-3}" text-anchor="${align}" font-size="9" font-weight="700" fill="#495448">${label}</text>
+    <text x="${x2 + (align==='start'?6:-6)}" y="${y2+9}" text-anchor="${align}" font-size="10" font-weight="800" fill="${color}">${fmt(val)}</text>`;
+  const chip = (label,val,color) => `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e4e9e0;border-radius:10px;background:#fff;min-width:0"><span style="width:7px;height:7px;border-radius:50%;background:${color};flex:0 0 auto"></span><span style="font-size:10px;color:#778075;flex:1;white-space:nowrap">${label}</span><b style="font-size:11px;color:#294f24;white-space:nowrap">${fmt(val)}</b></div>`;
 
-      <!-- Front figure -->
-      <g transform="translate(15,25)" filter="url(#shadowNM)">
-        <circle cx="70" cy="33" r="17" fill="url(#bodyFillNM)" stroke="#d7b99d" stroke-width="1"/>
-        <path d="M54 51 Q58 44 70 44 Q82 44 86 51 L90 71 Q88 86 86 99 L92 122 Q88 135 82 143 L80 178 L86 239 L79 286 L70 286 L64 239 L64 177 L60 177 L60 239 L54 286 L45 286 L38 239 L44 178 L42 143 Q35 134 34 122 L40 99 Q37 84 40 71 Z" fill="url(#bodyFillNM)" stroke="#d7b99d" stroke-width="1"/>
-        <path d="M43 67 Q52 57 70 58 Q87 57 96 67 L90 97 Q70 106 40 97 Z" fill="url(#clothNM)" opacity=".92"/>
-        <path d="M35 123 Q52 115 70 116 Q87 115 93 123 L88 151 Q68 158 41 151 Z" fill="#6e9d43" opacity=".9"/>
-        <path d="M40 73 Q31 99 27 134 L22 176" fill="none" stroke="#d7b99d" stroke-width="7" stroke-linecap="round"/>
-        <path d="M92 73 Q101 99 105 134 L110 176" fill="none" stroke="#d7b99d" stroke-width="7" stroke-linecap="round"/>
-        <circle cx="21" cy="179" r="4" fill="#efd5bd" stroke="#d7b99d"/><circle cx="111" cy="179" r="4" fill="#efd5bd" stroke="#d7b99d"/>
-        ${m.cuello!=null?`<ellipse cx="70" cy="54" rx="13" ry="3.6" fill="none" stroke="#2f7d42" stroke-width="2"/>`:''}
-        ${m.pecho!=null?`<path d="M42 83 Q70 91 94 83" fill="none" stroke="#f28c43" stroke-width="2.5"/>`:''}
-        ${m.cintura!=null?`<path d="M40 116 Q69 123 94 116" fill="none" stroke="#2f7d42" stroke-width="2.5"/>`:''}
-        ${m.abdomen!=null?`<path d="M39 128 Q68 135 94 128" fill="none" stroke="#4d92c8" stroke-width="2"/>`:''}
-        ${m.cadera!=null?`<path d="M38 145 Q68 155 91 145" fill="none" stroke="#c77719" stroke-width="2.5"/>`:''}
-        ${m.muslo!=null?`<path d="M48 188 Q56 191 64 188" fill="none" stroke="#7456c8" stroke-width="2.5"/>`:''}
-        ${m.muneca!=null?`<line x1="18" y1="170" x2="25" y2="170" stroke="#3e83c5" stroke-width="2.5"/>`:''}
-      </g>
+  return `<div style="width:100%;max-width:440px;margin:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 2px 10px">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#244c20;letter-spacing:-.1px">Mapa antropométrico</div>
+        <div style="font-size:10px;color:#8b9389;margin-top:2px">Ubicación visual de las medidas registradas</div>
+      </div>
+      <span style="font-size:9px;padding:5px 8px;background:#edf5e9;border:1px solid #dbe8d3;border-radius:999px;color:#4d7b2c;font-weight:700">cm</span>
+    </div>
 
-      <!-- Back figure -->
-      <g transform="translate(167,25)" opacity=".96">
-        <circle cx="70" cy="33" r="17" fill="url(#bodyFillNM)" stroke="#d7b99d" stroke-width="1"/>
-        <path d="M54 51 Q58 44 70 44 Q82 44 86 51 L90 71 Q88 86 86 99 L92 122 Q88 135 82 143 L80 178 L86 239 L79 286 L70 286 L64 239 L64 177 L60 177 L60 239 L54 286 L45 286 L38 239 L44 178 L42 143 Q35 134 34 122 L40 99 Q37 84 40 71 Z" fill="url(#bodyFillNM)" stroke="#d7b99d" stroke-width="1"/>
-        <path d="M43 67 Q52 57 70 58 Q87 57 96 67 L90 98 Q70 106 40 98 Z" fill="url(#clothNM)" opacity=".92"/>
-        <path d="M35 123 Q52 115 70 116 Q87 115 93 123 L88 151 Q68 158 41 151 Z" fill="#6e9d43" opacity=".9"/>
-        <path d="M40 73 Q31 99 27 134 L22 176" fill="none" stroke="#d7b99d" stroke-width="7" stroke-linecap="round"/>
-        <path d="M92 73 Q101 99 105 134 L110 176" fill="none" stroke="#d7b99d" stroke-width="7" stroke-linecap="round"/>
-        <path d="M70 57 L70 143" stroke="#dfc6ad" stroke-width="1" opacity=".7"/>
-        ${m.cintura!=null?`<path d="M40 116 Q69 122 94 116" fill="none" stroke="#2f7d42" stroke-width="2"/>`:''}
-        ${m.cadera!=null?`<path d="M38 145 Q68 154 91 145" fill="none" stroke="#c77719" stroke-width="2"/>`:''}
-      </g>
+    <div style="background:linear-gradient(180deg,#fcfdfb 0%,#f7faf5 100%);border:1px solid #e1e8dd;border-radius:16px;padding:8px 6px 4px;overflow:hidden">
+      <svg width="100%" viewBox="0 0 420 430" style="display:block" role="img" aria-label="Mapa antropométrico frontal y posterior">
+        <defs>
+          <linearGradient id="nmSkin2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f9e9da"/><stop offset="1" stop-color="#efd2b7"/></linearGradient>
+          <linearGradient id="nmTop2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7eae51"/><stop offset="1" stop-color="#5d8d37"/></linearGradient>
+          <linearGradient id="nmShort2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79aa4b"/><stop offset="1" stop-color="#4f7d31"/></linearGradient>
+          <filter id="nmShadow2" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#27451d" flood-opacity=".08"/></filter>
+        </defs>
 
-      ${label(100,78,'Cuello',m.cuello,'#2f7d42','start')}
-      ${label(103,108,'Pecho',m.pecho,'#f28c43','start')}
-      ${label(104,141,'Cintura',m.cintura,'#2f7d42','start')}
-      ${label(104,158,'Abdomen',m.abdomen,'#4d92c8','start')}
-      ${label(105,178,'Cadera',m.cadera,'#c77719','start')}
-      ${label(63,218,'Muslo',m.muslo,'#7456c8','end')}
-      ${label(38,198,'Muñeca',m.muneca,'#3e83c5','end')}
-    </svg>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px">
-      ${[['Cuello',m.cuello],['Pecho',m.pecho],['Cintura',m.cintura],['Abdomen',m.abdomen],['Cadera',m.cadera],['Muslo',m.muslo]].map(([k,val])=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border:1px solid #e7ebe4;border-radius:8px;background:#fff;font-size:10px"><span style="color:#737c70">${k}</span><b style="color:#2e5427">${txt(val)}</b></div>`).join('')}
+        <text x="145" y="21" text-anchor="middle" font-size="10" font-weight="800" fill="#4f7d2f">VISTA FRONTAL</text>
+        <text x="315" y="21" text-anchor="middle" font-size="10" font-weight="800" fill="#4f7d2f">VISTA POSTERIOR</text>
+
+        <!-- FRONT BODY -->
+        <g transform="translate(70,28)" filter="url(#nmShadow2)">
+          <ellipse cx="75" cy="36" rx="22" ry="24" fill="url(#nmSkin2)" stroke="#d8b797" stroke-width="1.2"/>
+          <rect x="67" y="57" width="16" height="18" rx="7" fill="url(#nmSkin2)" stroke="#d8b797" stroke-width="1"/>
+          <path d="M50 73 Q75 62 100 73 Q107 92 104 114 Q100 132 103 153 Q111 175 103 201 Q94 218 88 224 L86 268 L94 342 Q92 370 85 392 L72 392 L67 344 L66 258 L61 258 L60 344 L55 392 L42 392 Q35 370 34 342 L42 268 L40 224 Q31 215 26 201 Q18 175 27 153 Q30 132 26 114 Q23 92 31 73 Z" fill="url(#nmSkin2)" stroke="#d8b797" stroke-width="1.2"/>
+          <path d="M29 82 Q15 116 15 157 L7 230" fill="none" stroke="#e5c4a8" stroke-width="10" stroke-linecap="round"/>
+          <path d="M101 82 Q115 116 115 157 L123 230" fill="none" stroke="#e5c4a8" stroke-width="10" stroke-linecap="round"/>
+          <circle cx="6" cy="234" r="6" fill="#efd2b7" stroke="#d8b797"/>
+          <circle cx="124" cy="234" r="6" fill="#efd2b7" stroke="#d8b797"/>
+          <path d="M30 79 Q48 67 75 68 Q101 67 103 79 L100 121 Q75 132 27 121 Z" fill="url(#nmTop2)" opacity=".97"/>
+          <path d="M25 176 Q50 165 75 166 Q100 165 107 176 L101 216 Q75 226 31 216 Z" fill="url(#nmShort2)"/>
+          <path d="M75 75 L75 204" stroke="#e3c3a7" stroke-width="1" opacity=".35"/>
+          <!-- measurement bands -->
+          ${m.cuello!=null?`<ellipse cx="75" cy="70" rx="14" ry="4" fill="none" stroke="${c.cuello}" stroke-width="3"/>`:''}
+          ${m.pecho!=null?`<path d="M29 106 Q75 116 102 106" fill="none" stroke="${c.pecho}" stroke-width="3"/>`:''}
+          ${m.cintura!=null?`<path d="M28 153 Q75 163 103 153" fill="none" stroke="${c.cintura}" stroke-width="3"/>`:''}
+          ${m.abdomen!=null?`<path d="M27 170 Q75 180 104 170" fill="none" stroke="${c.abdomen}" stroke-width="2.5"/>`:''}
+          ${m.cadera!=null?`<path d="M27 202 Q75 215 103 202" fill="none" stroke="${c.cadera}" stroke-width="3"/>`:''}
+          ${m.muslo!=null?`<path d="M39 268 Q53 273 66 268" fill="none" stroke="${c.muslo}" stroke-width="3"/>`:''}
+          ${m.muneca!=null?`<line x1="2" y1="224" x2="12" y2="224" stroke="${c.muneca}" stroke-width="3"/>`:''}
+        </g>
+
+        <!-- BACK BODY -->
+        <g transform="translate(250,28)">
+          <ellipse cx="65" cy="36" rx="22" ry="24" fill="url(#nmSkin2)" stroke="#d8b797" stroke-width="1.2"/>
+          <rect x="57" y="57" width="16" height="18" rx="7" fill="url(#nmSkin2)" stroke="#d8b797" stroke-width="1"/>
+          <path d="M40 73 Q65 62 90 73 Q97 92 94 114 Q90 132 93 153 Q101 175 93 201 Q84 218 78 224 L76 268 L84 342 Q82 370 75 392 L62 392 L57 344 L56 258 L51 258 L50 344 L45 392 L32 392 Q25 370 24 342 L32 268 L30 224 Q21 215 16 201 Q8 175 17 153 Q20 132 16 114 Q13 92 21 73 Z" fill="url(#nmSkin2)" stroke="#d8b797" stroke-width="1.2"/>
+          <path d="M19 82 Q5 116 5 157 L-3 230" fill="none" stroke="#e5c4a8" stroke-width="10" stroke-linecap="round"/>
+          <path d="M91 82 Q105 116 105 157 L113 230" fill="none" stroke="#e5c4a8" stroke-width="10" stroke-linecap="round"/>
+          <path d="M20 80 Q38 68 65 68 Q92 68 94 80 L91 122 Q66 132 17 122 Z" fill="url(#nmTop2)" opacity=".97"/>
+          <path d="M15 176 Q40 165 65 166 Q90 165 97 176 L91 216 Q65 226 21 216 Z" fill="url(#nmShort2)"/>
+          <path d="M65 75 L65 207" stroke="#d9b89a" stroke-width="1" opacity=".65"/>
+          ${m.cintura!=null?`<path d="M18 153 Q65 162 93 153" fill="none" stroke="${c.cintura}" stroke-width="2.5"/>`:''}
+          ${m.cadera!=null?`<path d="M17 202 Q65 214 93 202" fill="none" stroke="${c.cadera}" stroke-width="2.5"/>`:''}
+        </g>
+
+        <!-- callouts, positioned outside the bodies -->
+        ${callout(145,97,206,82,'Cuello',m.cuello,c.cuello,'start')}
+        ${callout(163,135,206,125,'Pecho',m.pecho,c.pecho,'start')}
+        ${callout(163,182,206,176,'Cintura',m.cintura,c.cintura,'start')}
+        ${callout(163,199,206,202,'Abdomen',m.abdomen,c.abdomen,'start')}
+        ${callout(164,231,206,238,'Cadera',m.cadera,c.cadera,'start')}
+        ${callout(109,296,45,300,'Muslo',m.muslo,c.muslo,'end')}
+        ${callout(77,252,45,256,'Muñeca',m.muneca,c.muneca,'end')}
+      </svg>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px">
+      ${chip('Cuello',m.cuello,c.cuello)}
+      ${chip('Pecho',m.pecho,c.pecho)}
+      ${chip('Muñeca',m.muneca,c.muneca)}
+      ${chip('Cintura',m.cintura,c.cintura)}
+      ${chip('Abdomen',m.abdomen,c.abdomen)}
+      ${chip('Cadera',m.cadera,c.cadera)}
+      ${chip('Muslo',m.muslo,c.muslo)}
     </div>
   </div>`;
 }
@@ -10995,14 +11025,14 @@ function openEvaluationDetail(patientId, evalId) {
       </div>
     </div>
     
-    <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;margin-bottom:20px">
       <div>
         <div style="font-size:14px;font-weight:600;margin-bottom:12px">Medidas Antropométricas</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
           ${[['Cuello',eval_.cuello,'cm'],['Pecho',eval_.pecho,'cm'],['Muñeca',eval_.muneca,'cm'],['Cintura',eval_.cintura,'cm'],['Abdomen',eval_.abdomen,'cm'],['Cadera',eval_.cadera,'cm'],['Muslo',eval_.muslo,'cm'],['% Grasa',eval_.grasa,'%']].map(([l,v,u])=>`<div style="background:var(--beige);border-radius:var(--radius);padding:12px;text-align:center;border:1px solid var(--gray-200)"><div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;font-weight:600;margin-bottom:4px">${l}</div><div style="font-size:20px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark);margin-bottom:2px">${v||'—'}</div><div style="font-size:10px;color:var(--gray-400)">${v?u:'—'}</div></div>`).join('')}
         </div>
       </div>
-      <div style="background:var(--beige);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)">${renderBodyFigure(eval_)}</div>
+      <div style="background:white;border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200);box-shadow:0 1px 3px rgba(26,62,20,.04)">${renderBodyFigure(eval_)}</div>
     </div>
     
     <div style="margin-bottom:20px">
