@@ -1461,6 +1461,94 @@ tbody td{padding:12px 13px;font-size:12px}tbody tr:hover{background:#f7faF3!impo
 @media(max-width:850px){.nm-clinical-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.nm-clinical-follow,.nm-clinical-admission{grid-template-columns:1fr}.nm-hc-timeline-shell{padding:16px}.nm-hc-timeline-head{flex-direction:column}.nm-clinical-event{grid-template-columns:34px minmax(0,1fr)}}
 </style>
 
+
+<style id="nm-ui-consistency-2026">
+:root{
+  --nm-green-900:#174807;
+  --nm-green-800:#214f0b;
+  --nm-green-700:#3f6e11;
+  --nm-green-600:#5e8c2a;
+  --nm-green-500:#79ad46;
+  --nm-green-100:#edf6e5;
+  --nm-surface:#ffffff;
+  --nm-bg:#f7f8f5;
+  --nm-border:#e4e9df;
+  --nm-text:#20241f;
+  --nm-muted:#7a8276;
+  --nm-success:#2d7a4a;
+  --nm-warning:#b97816;
+  --nm-danger:#b9472c;
+  --nm-info:#2f6f96;
+  --nm-radius-sm:8px;
+  --nm-radius:10px;
+  --nm-radius-lg:14px;
+  --nm-shadow:0 8px 24px rgba(31,61,18,.06);
+}
+body{background:var(--nm-bg)!important;color:var(--nm-text)}
+.page-content{max-width:1600px;margin:0 auto}
+.card,.dash-card,.kpi-card,.chart-card,.portal-card,.portal-card-w,.soft-section,.patient-directory,.patient-toolbar{
+  border:1px solid var(--nm-border)!important;
+  border-radius:var(--nm-radius-lg)!important;
+  box-shadow:var(--nm-shadow)!important;
+  background:var(--nm-surface)!important;
+}
+.card-header,.dash-card-header,.modal-header{
+  background:linear-gradient(180deg,#fff,#fbfcfa)!important;
+  border-bottom:1px solid var(--nm-border)!important;
+}
+.btn,.topbar-btn,.cal-nav-btn,.modal-close,.role-btn,.tab-btn,.ai-send-btn{
+  min-height:40px;
+  border-radius:var(--nm-radius)!important;
+  font-weight:600!important;
+  transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s!important;
+}
+.btn-sm{min-height:34px;padding:7px 12px!important;font-size:12px!important}
+.btn-lg{min-height:46px;padding:12px 20px!important}
+.btn-olive,.btn-primary{
+  background:linear-gradient(135deg,var(--nm-green-600),var(--nm-green-700))!important;
+  color:#fff!important;
+  box-shadow:0 6px 16px rgba(94,140,42,.18)!important;
+}
+.btn-olive:hover,.btn-primary:hover{background:var(--nm-green-800)!important;transform:translateY(-1px)}
+.btn-outline{background:#fff!important;border:1px solid var(--nm-border)!important;color:#42483f!important}
+.btn-outline:hover{border-color:var(--nm-green-600)!important;color:var(--nm-green-800)!important;background:#f8fbf5!important}
+.btn-danger{background:var(--nm-danger)!important;color:#fff!important}
+.btn-ghost{background:transparent!important;color:#5f665b!important}
+.btn-icon,.topbar-btn,.cal-nav-btn,.modal-close{width:40px;height:40px;padding:0!important;justify-content:center!important}
+.form-control,.form-select,.form-textarea,input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
+  border-radius:var(--nm-radius)!important;
+  border:1px solid #dfe5da!important;
+  background:#fff!important;
+}
+.form-control:focus,.form-select:focus,.form-textarea:focus,input:focus,select:focus,textarea:focus{
+  border-color:var(--nm-green-600)!important;
+  box-shadow:0 0 0 3px rgba(94,140,42,.11)!important;
+  outline:none!important;
+}
+.modal-overlay{backdrop-filter:blur(6px);background:rgba(22,34,17,.42)!important}
+.modal{border-radius:18px!important;border:1px solid var(--nm-border)!important;box-shadow:0 24px 70px rgba(20,45,10,.18)!important}
+.modal-header{padding:20px 24px!important;align-items:center!important}
+.modal-body{padding:24px!important}.modal-footer{padding:16px 24px!important;border-top:1px solid var(--nm-border)!important}
+.modal-title{font-family:'DM Sans',sans-serif!important;font-size:20px!important;color:var(--nm-green-800)!important}
+.badge{border-radius:999px!important;padding:4px 9px!important;font-weight:700!important}
+.badge-success{background:#eaf6ee!important;color:var(--nm-success)!important}
+.badge-warning{background:#fff4de!important;color:var(--nm-warning)!important}
+.badge-danger{background:#fdece7!important;color:var(--nm-danger)!important}
+.badge-info{background:#eaf3f9!important;color:var(--nm-info)!important}
+.badge-neutral{background:#f0f2ef!important;color:#60675d!important}
+.badge-olive{background:var(--nm-green-100)!important;color:var(--nm-green-800)!important}
+thead th{background:#f8faf7!important;color:#697165!important;border-bottom:1px solid var(--nm-border)!important}
+tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8fbf5!important}
+.section-title,.card-title,.dash-card-title,.wizard-section-title{color:var(--nm-green-800)!important}
+.tab-bar{background:#eef1ec!important;border:1px solid #e5e9e2!important}.tab-btn.active{background:#fff!important;color:var(--nm-green-800)!important;box-shadow:0 2px 8px rgba(31,61,18,.06)!important}
+.nav-item{border-radius:10px!important}.nav-item.active{background:linear-gradient(90deg,rgba(121,174,45,.72),rgba(94,140,42,.45))!important}
+.status-paid,.estado-pagada,.invoice-status-paid{background:#eaf6ee!important;color:var(--nm-success)!important}
+.status-pending,.estado-pendiente,.invoice-status-pending{background:#fff4de!important;color:var(--nm-warning)!important}
+.status-overdue,.estado-vencida,.invoice-status-overdue{background:#fdece7!important;color:var(--nm-danger)!important}
+.status-partial,.estado-parcial,.invoice-status-partial{background:#eaf3f9!important;color:var(--nm-info)!important}
+@media(max-width:768px){.btn{min-height:42px}.modal{border-radius:18px 18px 0 0!important}.modal-body{padding:18px 16px!important}.modal-header,.modal-footer{padding-left:16px!important;padding-right:16px!important}}
+</style>
+
 </head>
 <body>
 
@@ -11343,87 +11431,6 @@ function fixFormLabelAssociations(root=document){
 }
 setTimeout(()=>fixFormLabelAssociations(),0);
 new MutationObserver(m=>{m.forEach(x=>x.addedNodes.forEach(n=>{if(n.nodeType===1)fixFormLabelAssociations(n)}))}).observe(document.documentElement,{childList:true,subtree:true});
-</script>
-
-<style id="nm-final-quality-upgrades">
-/* Paciente: ficha lateral clínica 360 */
-.nm-patient360{background:#fff;border:1px solid #e1e8dc;border-radius:16px;overflow:hidden;box-shadow:0 10px 28px rgba(38,73,24,.08)}
-.nm-p360-head{padding:18px;background:linear-gradient(135deg,#174807,#5e8c2a);color:#fff}.nm-p360-person{display:flex;gap:12px;align-items:center}.nm-p360-avatar{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.28);font-weight:800;font-size:20px}.nm-p360-head h3{font-size:17px;margin:0}.nm-p360-head p{font-size:11px;opacity:.8;margin:4px 0 0}.nm-p360-body{padding:14px}.nm-p360-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.nm-p360-card{border:1px solid #e8ede4;border-radius:10px;padding:10px;background:#fbfcfa;min-width:0}.nm-p360-card small{display:block;font-size:8px;text-transform:uppercase;color:#7d8777;font-weight:700;letter-spacing:.4px}.nm-p360-card b{display:block;font-size:12px;margin-top:3px;color:#293525;overflow:hidden;text-overflow:ellipsis}.nm-p360-progress{height:7px;border-radius:6px;background:#edf1e9;overflow:hidden;margin-top:7px}.nm-p360-progress i{display:block;height:100%;background:linear-gradient(90deg,#79ad3f,#4f8419);border-radius:6px}.nm-p360-alert{font-size:10px;padding:8px 9px;border-radius:8px;margin-top:7px;background:#fff7e6;border:1px solid #f1ddaa;color:#805b13}.nm-p360-alert.ok{background:#f0f7e8;border-color:#d7e9c5;color:#466c24}.nm-p360-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:12px}.nm-p360-actions button{border:1px solid #dfe7d9;background:#fff;border-radius:8px;padding:8px 7px;font-size:10px;color:#40503a;cursor:pointer}.nm-p360-actions button:hover{border-color:#7da84e;background:#f6faf2}.nm-p360-actions .primary{background:#5e8c2a;color:#fff;border-color:#5e8c2a}.nm-p360-wide{grid-column:1/-1}
-/* Facturación: estados/acciones más claros */
-.billing-page .bill-icon-btn{min-width:31px;min-height:31px;display:inline-grid;place-items:center}.billing-page .bill-actions{display:flex;gap:5px;flex-wrap:wrap}.billing-page .bill-line-row{border:1px solid #e8ede4;border-radius:10px;padding:10px;margin-bottom:8px;background:#fcfdfb}.billing-page .bill-totals{position:sticky;bottom:0;background:#fff;border-top:1px solid #e5eadf;padding-top:10px}.billing-page .bill-tab{min-height:38px}.billing-page input:invalid,.billing-page select:invalid{border-color:#c44a2a}
-/* Reporte clínico A4 */
-@page{size:A4 portrait;margin:10mm}
-@media print{
-  html,body{background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  .clinical-report{width:190mm!important;max-width:190mm!important;margin:0 auto!important;box-shadow:none!important;overflow:visible!important}
-  .clinical-report .cr-page{width:190mm!important;max-width:190mm!important;min-height:auto!important;padding:0!important;box-sizing:border-box!important;overflow:visible!important}
-  .clinical-report .cr-head{break-inside:avoid;page-break-inside:avoid}
-  .clinical-report .cr-footer{break-inside:avoid;page-break-inside:avoid;margin-top:7mm!important}
-  .clinical-report .cr-chart-card,.clinical-report .cr-comparison,.clinical-report .cr-box,.clinical-report .cr-note,.clinical-report .cr-reco{overflow:visible!important}
-}
-</style>
-<script id="nm-final-quality-upgrades-js">
-(function(){
-  const safeNum=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
-  const fmtDate=v=>{if(!v)return '—';try{return new Date(String(v).length<=10?v+'T12:00:00':v).toLocaleDateString('es-DO',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return String(v)}};
-  const byDate=(a,b)=>new Date(a.fecha||a.date||a.created||0)-new Date(b.fecha||b.date||b.created||0);
-  function patientSnapshot(p){
-    const evals=(p.evaluaciones||[]).slice().sort(byDate), last=evals.at(-1)||null, prev=evals.at(-2)||null;
-    const diets=(p.dietas||[]).slice().sort(byDate), plan=diets.at(-1)||null;
-    const now=new Date();
-    const appts=(DB.appointments||[]).filter(a=>String(a.patientId)==String(p.id) && new Date((a.fecha||a.date||'')+'T'+(a.hora||'12:00'))>=now).sort((a,b)=>new Date((a.fecha||a.date||'')+'T'+(a.hora||'12:00'))-new Date((b.fecha||b.date||'')+'T'+(b.hora||'12:00')));
-    const next=appts[0]||null;
-    const w=safeNum(last?.peso ?? p.peso), wp=safeNum(prev?.peso), delta=(w!=null&&wp!=null)?w-wp:null;
-    const progress=evals.length>1?Math.min(100,Math.max(10,35+evals.length*10)):evals.length?25:5;
-    const alerts=[];
-    if(!last) alerts.push('Sin evaluación registrada');
-    else {const d=(Date.now()-new Date(last.fecha||0).getTime())/86400000;if(d>45)alerts.push('Evaluación con más de 45 días');}
-    if(!plan) alerts.push('Sin plan nutricional activo');
-    const pending=(typeof getBillingData==='function'?getBillingData().invoices:[]).filter(x=>String(x.patientId)==String(p.id)&&typeof billingInvoiceBalance==='function'&&billingInvoiceBalance(x)>0);
-    if(pending.length) alerts.push(`${pending.length} factura${pending.length>1?'s':''} con saldo pendiente`);
-    return {evals,last,prev,plan,next,w,delta,progress,alerts,pending};
-  }
-  window.showPatientPortalAccess=function(pid){
-    const p=(DB.patients||[]).find(x=>String(x.id)==String(pid)); if(!p)return;
-    const users=(typeof USERS!=='undefined'?USERS:{}), u=users[p.email]||{}; const pass=p.portalPassword||u.pass||'No registrada';
-    document.getElementById('nm-portal-access')?.remove();
-    document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm-portal-access" style="z-index:10010"><div class="modal modal-sm"><div class="modal-header"><div><div class="modal-title">Acceso del paciente</div><div class="modal-subtitle">${billingEscape?.(p.nombre)||p.nombre}</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><div class="form-group"><label>Correo / usuario</label><input class="form-control" readonly value="${String(p.email||'').replace(/"/g,'&quot;')}"></div><div class="form-group"><label>Contraseña registrada</label><input class="form-control" readonly value="${String(pass).replace(/"/g,'&quot;')}"></div></div><div class="modal-footer"><button class="btn btn-olive" onclick="this.closest('.modal-overlay').remove()">Cerrar</button></div></div></div>`);
-  };
-  window.openInvoiceForPatient=function(pid){navigate('billing');setTimeout(()=>{openInvoiceModal();const sel=document.getElementById('inv-patient');if(sel){sel.value=String(pid);billingFillPatient(sel);}},80)};
-  window.patient360HTML=function(p){const s=patientSnapshot(p); const last=s.last||{}; const delta=s.delta; const dtext=delta==null?'Sin comparativo':`${delta>0?'+':''}${delta.toFixed(1)} kg vs anterior`; const next=s.next?`${fmtDate(s.next.fecha||s.next.date)} · ${s.next.hora||''}`:'Sin cita programada'; const plan=s.plan?(s.plan.nombre||s.plan.tipo||'Plan nutricional'):'Sin plan actual';
-    return `<div class="nm-patient360"><div class="nm-p360-head"><div class="nm-p360-person"><div class="nm-p360-avatar">${p.initials||'P'}</div><div><h3>${p.nombre||'Paciente'}</h3><p>${p.email||'Sin correo'} · ${p.telefono||'Sin teléfono'}</p></div></div></div><div class="nm-p360-body"><div class="nm-p360-grid"><div class="nm-p360-card"><small>Última evaluación</small><b>${s.last?fmtDate(s.last.fecha):'Sin evaluación'}</b></div><div class="nm-p360-card"><small>Próxima cita</small><b>${next}</b></div><div class="nm-p360-card"><small>Plan actual</small><b>${plan}</b></div><div class="nm-p360-card"><small>Progreso</small><b>${dtext}</b><div class="nm-p360-progress"><i style="width:${s.progress}%"></i></div></div></div><div style="margin-top:12px;font-size:9px;font-weight:800;color:#778172;text-transform:uppercase;letter-spacing:.6px">Alertas</div>${s.alerts.length?s.alerts.map(a=>`<div class="nm-p360-alert">⚠ ${a}</div>`).join(''):'<div class="nm-p360-alert ok">✓ Sin alertas administrativas pendientes</div>'}<div class="nm-p360-actions"><button class="primary" onclick="openEvalModal('${p.id}')">＋ Evaluación</button><button onclick="openHistoriaClinica('${p.id}')">Historia</button><button onclick="openDietModal('${p.id}')">Plan / dieta</button><button onclick="openInvoiceForPatient('${p.id}')">Factura</button><button onclick="openReportModal('${p.id}')">Reporte</button><button onclick="showPatientPortalAccess('${p.id}')">Portal</button></div></div></div>`;
-  };
-  // Enriquecer la ficha lateral sin reemplazar la lógica existente de pacientes.
-  const baseRenderPatients=window.renderPatients;
-  if(typeof baseRenderPatients==='function') window.renderPatients=function(){baseRenderPatients.apply(this,arguments);try{const aside=document.querySelector('.patient-preview-pane');const p=(DB.patients||[]).slice(-1)[0]||(DB.patients||[])[0];if(aside&&p)aside.innerHTML=patient360HTML(p);}catch(e){console.warn('Ficha paciente 360',e)}};
-
-  // Validaciones adicionales de factura sin romper el flujo existente.
-  const baseSaveInvoice=window.saveInvoice;
-  if(typeof baseSaveInvoice==='function') window.saveInvoice=function(){
-    const date=document.getElementById('inv-date')?.value||'', due=document.getElementById('inv-due')?.value||'';
-    if(date&&due&&due<date){notify('La fecha de vencimiento no puede ser anterior a la fecha de factura','warning');return false;}
-    const ncf=(document.getElementById('inv-ncf')?.value||'').trim();
-    if(ncf && ncf.length<8){notify('Revisa el NCF: parece incompleto','warning');return false;}
-    try{return baseSaveInvoice.apply(this,arguments)}catch(e){console.error(e);notify('No se pudo guardar la factura. Revisa los datos e inténtalo de nuevo.','danger');return false;}
-  };
-  const baseOpenInvoice=window.openInvoiceModal;
-  if(typeof baseOpenInvoice==='function') window.openInvoiceModal=function(){const r=baseOpenInvoice.apply(this,arguments);setTimeout(()=>{const m=document.getElementById('invoice-modal');if(m&&!m.classList.contains('open'))m.classList.add('open');const first=m?.querySelector('input,select,textarea');first?.focus?.();},0);return r};
-  const baseOpenProduct=window.openBillingProductModal;
-  if(typeof baseOpenProduct==='function') window.openBillingProductModal=function(){const r=baseOpenProduct.apply(this,arguments);setTimeout(()=>{const m=document.getElementById('billing-product-modal');if(m&&!m.classList.contains('open'))m.classList.add('open');document.getElementById('prd-name')?.focus();},0);return r};
-  const basePay=window.registerInvoicePayment;
-  if(typeof basePay==='function') window.registerInvoicePayment=function(){const r=basePay.apply(this,arguments);setTimeout(()=>document.getElementById('pay-amount')?.focus(),0);return r};
-
-  // Fallback de impresión para factura si la librería PDF externa no carga.
-  const directInvoicePDF=window.downloadInvoicePDF;
-  window.downloadInvoicePDF=function(id){if(typeof html2pdf==='function')return directInvoicePDF(id);const b=getBillingData(),x=b.invoices.find(i=>i.id===id);if(!x)return;notify('Abriendo impresión del navegador para guardar la factura como PDF','warning');viewInvoice(id);setTimeout(()=>window.print(),250)};
-
-  // Auditoría rápida de acciones de facturación disponible desde consola: billingSelfTest()
-  window.billingSelfTest=function(){const names=['renderBilling','renderBillingTab','openInvoiceModal','saveInvoice','editInvoice','viewInvoice','deleteInvoice','archiveInvoice','registerInvoicePayment','saveInvoicePayment','downloadInvoicePDF','addInvoiceLine','recalcInvoiceEditor','billingSelectProduct','openBillingProductModal','saveBillingProduct','deleteBillingProduct'];const missing=names.filter(n=>typeof window[n]!=='function');const data=getBillingData();return {ok:missing.length===0,missing,invoices:Array.isArray(data.invoices),products:Array.isArray(data.products),patients:billingPatients().length};};
-
-  // Estilo final del reporte: misma identidad, A4 y pie coherente en cada página.
-  const baseGenerate=window.generateReportHTML;
-  if(typeof baseGenerate==='function') window.generateReportHTML=function(p){let html=baseGenerate(p);html=html.replace(/<style>/,'<style>@page{size:A4 portrait;margin:10mm}.clinical-report{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cr-head,.cr-footer{break-inside:avoid;page-break-inside:avoid}');return html};
-})();
 </script>
 </body>
 </html>
