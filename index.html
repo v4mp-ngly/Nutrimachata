@@ -1549,6 +1549,44 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
 @media(max-width:768px){.btn{min-height:42px}.modal{border-radius:18px 18px 0 0!important}.modal-body{padding:18px 16px!important}.modal-header,.modal-footer{padding-left:16px!important;padding-right:16px!important}}
 </style>
 
+
+<style id="nm-print-paging-upgrade">
+  .nm-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid var(--gray-100);background:#fff;flex-wrap:wrap}
+  .nm-pager-info{font-size:11px;color:var(--gray-500)}
+  .nm-pager-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .nm-page-btn{min-width:34px;height:34px;padding:0 10px;border:1px solid var(--gray-200);background:#fff;border-radius:8px;color:var(--gray-600);cursor:pointer;font:600 12px 'DM Sans',sans-serif}
+  .nm-page-btn:hover:not(:disabled){border-color:var(--olive);color:var(--olive-dark);background:var(--olive-pale)}
+  .nm-page-btn.active{background:var(--olive);border-color:var(--olive);color:#fff}
+  .nm-page-btn:disabled{opacity:.4;cursor:not-allowed}
+  .nm-page-size{height:34px;border:1px solid var(--gray-200);border-radius:8px;background:#fff;padding:0 30px 0 9px;font-size:11px;color:var(--gray-600)}
+
+  .nm-print-preview-overlay{position:fixed;inset:0;background:rgba(16,30,12,.62);z-index:12000;display:flex;flex-direction:column;align-items:center;overflow:auto;padding:22px;-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+  .nm-print-preview-toolbar{position:sticky;top:0;z-index:2;width:min(100%,980px);display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:14px;box-shadow:0 12px 30px rgba(0,0,0,.16)}
+  .nm-print-preview-title{font-size:13px;font-weight:700;color:var(--olive-dark)}
+  .nm-print-preview-meta{font-size:10px;color:var(--gray-500);margin-top:2px}
+  .nm-print-preview-actions{display:flex;gap:7px;flex-wrap:wrap}
+  .nm-print-preview-pages{width:100%;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .nm-a4-preview{width:210mm;min-height:297mm;background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.22);padding:9mm 8mm 12mm;position:relative;overflow:hidden;transform-origin:top center}
+  .nm-a4-preview .clinical-report{border:0!important;border-radius:0!important;max-width:none!important;width:100%!important;box-shadow:none!important;overflow:visible!important}
+  .nm-a4-preview .cr-page{padding:0!important;border-top:0!important;min-height:auto!important}
+  .nm-a4-preview .cr-page+.cr-page{display:none!important}
+  .nm-a4-preview .report-actions,.nm-a4-preview .report-screen-only{display:none!important}
+  .nm-browser-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:20px;background:#f2f6ee;color:#4e6c35;font-size:9px;font-weight:700}
+  @media(max-width:900px){.nm-a4-preview{transform:scale(.72);margin-bottom:-83mm}.nm-print-preview-toolbar{width:100%}}
+  @media(max-width:620px){.nm-a4-preview{transform:scale(.48);margin-bottom:-154mm}.nm-print-preview-toolbar{align-items:flex-start;flex-direction:column}}
+
+  /* Print rules shared by Chromium/Edge and WebKit/Safari. */
+  @media print{
+    @page{size:A4 portrait;margin:10mm 8mm 13mm}
+    html,body{background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    thead{display:table-header-group!important}
+    tfoot{display:table-footer-group!important}
+    tr,.cr-kpi,.cr-chart-card,.cr-box,.cr-comparison,.cr-access-item,.invoice-print-summary,.invoice-print-note{break-inside:avoid!important;page-break-inside:avoid!important;-webkit-column-break-inside:avoid!important}
+    .cr-section h3,.invoice-print-section-title{break-after:avoid!important;page-break-after:avoid!important}
+    img,svg,canvas{max-width:100%!important;break-inside:avoid!important;page-break-inside:avoid!important}
+  }
+</style>
+
 </head>
 <body>
 
@@ -1653,7 +1691,7 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
         </div>
         <div class="topbar-right">
           <button class="topbar-btn" onclick="toggleSidebar()" title="Menú" id="menu-toggle" style="display:none;font-size:18px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-          <button class="topbar-btn" id="notif-btn" title="Notificaciones"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+          <button class="topbar-btn" id="notif-btn" title="Alertas clínicas" onclick="toggleClinicAlerts(event)" style="position:relative"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span id="clinic-alert-badge" class="clinic-alert-badge" style="display:none">0</span></button>
           <button class="topbar-btn" onclick="refreshData()" title="Actualizar datos"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
           <button class="btn btn-olive btn-sm" id="topbar-action" onclick="handleTopAction()">Nueva Cita</button>
         </div>
@@ -6339,7 +6377,7 @@ function downloadEvalReport(patientId, evalId) {
   const charts=_evalMeasureChartsHTML(p,e.id,true);
   const clinicalText=e.obs ? String(e.obs) : 'Sin observaciones clínicas registradas en esta evaluación.';
   const pdfHTML=`<!doctype html><html><head><meta charset="utf-8"><style>
-    @page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#1e281b;background:#fff;font-size:10px;line-height:1.45}.doc{width:100%}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #5e8c2a;padding-bottom:9px;margin-bottom:12px}.logo{height:50px;width:auto;object-fit:contain}.doctype{text-align:right}.doctype b{display:block;color:#315f0b;font-size:15px;letter-spacing:.4px}.doctype span{font-size:8px;color:#72796e}.patient{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;border:1px solid #dfe5d8;border-radius:8px;overflow:hidden;margin-bottom:12px}.pcell{padding:9px 10px;border-left:1px solid #e7ebe2}.pcell:first-child{border-left:0}.pcell small{display:block;color:#7b8276;font-size:7px;text-transform:uppercase;font-weight:bold;margin-bottom:3px}.pcell strong{font-size:11px}.section{margin:0 0 12px;break-inside:auto}.section-title{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#315f0b;font-weight:800;border-bottom:1px solid #dfe6d8;padding-bottom:5px;margin-bottom:8px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.metric{border:1px solid #e2e7dd;border-radius:7px;padding:9px;background:#fbfcf9}.metric small{display:block;color:#7c8378;font-size:7px;text-transform:uppercase}.metric b{display:block;font-size:17px;color:#284e09;margin:3px 0}.metric em{font-style:normal;font-size:8px;color:#687164}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{border:1px solid #e1e6dc;border-radius:8px;padding:10px;break-inside:avoid}.box h3{margin:0 0 7px;font-size:10px;color:#315f0b}table{width:100%;border-collapse:collapse}th{font-size:7px;text-transform:uppercase;color:#727a6e;background:#f5f7f2}th,td{padding:6px 7px;border-bottom:1px solid #e8ece5;text-align:left}td{font-size:8.5px}.note{border-left:3px solid #5e8c2a;background:#f5f8ef;padding:9px 11px;border-radius:4px;white-space:pre-wrap}.pagebreak{break-before:page;page-break-before:always}.charts{display:grid;grid-template-columns:1fr 1fr;gap:9px}.eval-trend-card{border:1px solid #e2e7dd!important;border-radius:7px!important;padding:8px!important;break-inside:avoid!important}.eval-trend-card img{max-height:105px!important;width:100%!important;object-fit:contain!important}.follow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.follow div{border:1px solid #e3e7df;border-radius:7px;padding:8px}.follow b{display:block;font-size:8px;color:#315f0b;margin-bottom:3px}.footer{margin-top:15px;padding-top:7px;border-top:1px solid #e2e6de;text-align:center;color:#858b81;font-size:7px}
+    @page{size:A4 portrait;margin:12mm 11mm 14mm}html,body{width:100%;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1e281b;background:#fff;font-size:10px;line-height:1.45}.doc{width:100%;max-width:188mm;margin:0 auto;overflow:visible!important}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #5e8c2a;padding-bottom:9px;margin-bottom:12px}.logo{height:50px;width:auto;object-fit:contain}.doctype{text-align:right}.doctype b{display:block;color:#315f0b;font-size:15px;letter-spacing:.4px}.doctype span{font-size:8px;color:#72796e}.patient{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));border:1px solid #dfe5d8;border-radius:8px;overflow:hidden;margin-bottom:12px}.pcell{padding:9px 10px;border-left:1px solid #e7ebe2}.pcell:first-child{border-left:0}.pcell small{display:block;color:#7b8276;font-size:7px;text-transform:uppercase;font-weight:bold;margin-bottom:3px}.pcell strong{font-size:11px}.section{margin:0 0 12px;break-inside:auto}.section-title{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#315f0b;font-weight:800;border-bottom:1px solid #dfe6d8;padding-bottom:5px;margin-bottom:8px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid}.metric{border:1px solid #e2e7dd;border-radius:7px;padding:9px;background:#fbfcf9}.metric small{display:block;color:#7c8378;font-size:7px;text-transform:uppercase}.metric b{display:block;font-size:17px;color:#284e09;margin:3px 0}.metric em{font-style:normal;font-size:8px;color:#687164}.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;break-inside:avoid;page-break-inside:avoid}.box{border:1px solid #e1e6dc;border-radius:8px;padding:10px;break-inside:avoid}.box h3{margin:0 0 7px;font-size:10px;color:#315f0b}table{width:100%;border-collapse:collapse}th{font-size:7px;text-transform:uppercase;color:#727a6e;background:#f5f7f2}th,td{padding:6px 7px;border-bottom:1px solid #e8ece5;text-align:left}td{font-size:8.5px}.note{border-left:3px solid #5e8c2a;background:#f5f8ef;padding:9px 11px;border-radius:4px;white-space:pre-wrap}.pagebreak{display:block;height:0;clear:both;break-before:page!important;page-break-before:always!important}.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:start}.eval-trend-card{border:1px solid #e2e7dd!important;border-radius:7px!important;padding:8px!important;break-inside:avoid!important;page-break-inside:avoid!important;overflow:hidden!important}.eval-trend-card img{max-height:105px!important;width:100%!important;object-fit:contain!important}.follow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;break-inside:avoid;page-break-inside:avoid}.follow div{border:1px solid #e3e7df;border-radius:7px;padding:8px}.follow b{display:block;font-size:8px;color:#315f0b;margin-bottom:3px}.footer{margin-top:15px;padding-top:7px;border-top:1px solid #e2e6de;text-align:center;color:#858b81;font-size:7px;break-inside:avoid;page-break-inside:avoid}@media print{body{zoom:1!important}.head,.patient,.metrics,.two,.box,.metric,.section-title,.eval-trend-card,.follow>div,table,tr{break-inside:avoid!important;page-break-inside:avoid!important}.charts{grid-template-columns:repeat(2,minmax(0,1fr))!important}.eval-trend-card img{max-width:100%!important;height:auto!important}.section{overflow:visible!important}thead{display:table-header-group}tfoot{display:table-footer-group}}
   </style></head><body><div class="doc">
     <div class="head"><img class="logo" src="${NUTRIMACHATA_REPORT_LOGO}"><div class="doctype"><b>Evaluación Nutricional</b><span>Documento clínico · ${fmt(e.fecha)}</span></div></div>
     <div class="patient"><div class="pcell"><small>Paciente</small><strong>${p.nombre}</strong></div><div class="pcell"><small>Edad</small><strong>${fmt(p.edad)} años</strong></div><div class="pcell"><small>Sexo</small><strong>${p.sexo==='F'?'Femenino':p.sexo==='M'?'Masculino':'—'}</strong></div><div class="pcell"><small>Fecha</small><strong>${fmt(e.fecha)}</strong></div></div>
@@ -6356,7 +6394,7 @@ function downloadEvalReport(patientId, evalId) {
     ${followItems.length?`<div class="section"><div class="section-title">Seguimiento del paciente</div><div class="follow">${followItems.map(([q,a])=>`<div><b>${q}</b>${a}</div>`).join('')}</div></div>`:''}
     <div class="footer">NutriMachata · Nutrición Conectada · Documento clínico confidencial</div>
   </div></body></html>`;
-  downloadPDF(pdfHTML, `Evaluacion_${p.nombre.replace(/\s+/g,'_')}_${e.fecha}.pdf`);
+  downloadEvaluationPDFMacSafe(pdfHTML, `Evaluacion_${p.nombre.replace(/\s+/g,'_')}_${e.fecha}.pdf`);
 }
 
 // ═══════════════════════════════════════════════
@@ -8029,6 +8067,7 @@ function openAppointmentModal(defaultDate, existingApt) {
           <div id="apt-patient-list" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--gray-200);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:200px;overflow-y:auto;display:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
         </div>
       </div>
+      <div id="apt-patient-context" class="apt-patient-context" style="display:none"></div>
     </div>
 
     <!-- Tab: Manual -->
@@ -8078,6 +8117,7 @@ function openAppointmentModal(defaultDate, existingApt) {
     </div>
   `;
   openModal('modal-appointment');
+  if (existingApt && existingApt.patientId) refreshAppointmentPatientContext(existingApt.patientId);
 }
 
 /**
@@ -8142,6 +8182,7 @@ function selectPacienteApt(id, nombre) {
   document.getElementById('apt-patient-search').value = nombre;
   document.getElementById('apt-patient').value = id;
   document.getElementById('apt-patient-list').style.display = 'none';
+  refreshAppointmentPatientContext(id);
 }
 
 async function saveAppointment() {
@@ -8462,7 +8503,7 @@ function saveInvoice(){
   const inv=normalizeBillingInvoice({...(old||{}),id:id||('inv-'+Date.now()),number:document.getElementById('inv-number').value,date:document.getElementById('inv-date').value||billingToday(),dueDate:document.getElementById('inv-due').value||'',patientId:p.id,patient:p.nombre,email:p.email||'',rnc:document.getElementById('inv-rnc').value.trim(),ncf:document.getElementById('inv-ncf').value.trim(),notes:document.getElementById('inv-notes').value.trim(),items,discount:totals.disc,tax:totals.tax,paid:old?.paid||0,paymentHistory:old?.paymentHistory||[],status:old?.status||'Pendiente'});billingStockDelta(inv,-1,b);inv.status=billingInvoiceStatus(inv);if(old)Object.assign(old,inv);else b.invoices.push(inv);if(!saveBillingData(b))return false;document.getElementById('invoice-modal')?.remove();renderBilling();notify(old?'Factura actualizada':'Factura creada correctamente','success');return true;
 }
 
-function viewInvoice(id){const x=getBillingData().invoices.find(i=>i.id===id);if(!x)return;document.getElementById('invoice-view-modal')?.remove();const rows=x.items.map(i=>`<tr><td>${billingEscape(i.description)}</td><td>${i.qty}</td><td>${moneyRD(i.price)}</td><td>${i.discount||0}%</td><td><b>${moneyRD(billingLineTotal(i))}</b></td></tr>`).join('');const ph=(x.paymentHistory||[]).map(p=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid #eee"><span>${billingEscape(p.date)} · ${billingEscape(p.method)}</span><b>${moneyRD(p.amount)}</b></div>`).join('');document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="invoice-view-modal" style="z-index:9999"><div class="modal" style="max-width:800px"><div class="modal-header"><div class="modal-title">Factura ${billingEscape(x.number)}</div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><div class="form-row"><div><small>PACIENTE</small><b style="display:block">${billingEscape(x.patient)}</b></div><div><small>FECHA</small><b style="display:block">${x.date}</b></div><div><small>ESTADO</small><b style="display:block">${billingInvoiceStatus(x)}</b></div></div><table class="table mt-4"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div class="bill-totals"><div><span>Total</span><b>${moneyRD(x.total)}</b></div><div><span>Pagado</span><b>${moneyRD(x.paid)}</b></div><div class="grand"><span>Saldo</span><b>${moneyRD(billingInvoiceBalance(x))}</b></div></div>${ph?`<div style="margin-top:16px"><b>Historial de pagos</b>${ph}</div>`:''}</div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cerrar</button><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove();editInvoice('${x.id}')">Editar</button>${billingInvoiceBalance(x)>0?`<button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove();registerInvoicePayment('${x.id}')">Registrar pago</button>`:''}<button class="btn btn-olive" onclick="downloadInvoicePDF('${x.id}')">PDF</button></div></div></div>`);}
+function viewInvoice(id){const x=getBillingData().invoices.find(i=>i.id===id);if(!x)return;document.getElementById('invoice-view-modal')?.remove();const rows=x.items.map(i=>`<tr><td>${billingEscape(i.description)}</td><td>${i.qty}</td><td>${moneyRD(i.price)}</td><td>${i.discount||0}%</td><td><b>${moneyRD(billingLineTotal(i))}</b></td></tr>`).join('');const ph=(x.paymentHistory||[]).map(p=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid #eee"><span>${billingEscape(p.date)} · ${billingEscape(p.method)}</span><b>${moneyRD(p.amount)}</b></div>`).join('');document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="invoice-view-modal" style="z-index:9999"><div class="modal" style="max-width:800px"><div class="modal-header"><div class="modal-title">Factura ${billingEscape(x.number)}</div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><div class="form-row"><div><small>PACIENTE</small><b style="display:block">${billingEscape(x.patient)}</b></div><div><small>FECHA</small><b style="display:block">${x.date}</b></div><div><small>ESTADO</small><b style="display:block">${billingInvoiceStatus(x)}</b></div></div><table class="table mt-4"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div class="bill-totals"><div><span>Total</span><b>${moneyRD(x.total)}</b></div><div><span>Pagado</span><b>${moneyRD(x.paid)}</b></div><div class="grand"><span>Saldo</span><b>${moneyRD(billingInvoiceBalance(x))}</b></div></div>${ph?`<div style="margin-top:16px"><b>Historial de pagos</b>${ph}</div>`:''}</div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cerrar</button><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove();editInvoice('${x.id}')">Editar</button>${billingInvoiceBalance(x)>0?`<button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove();registerInvoicePayment('${x.id}')">Registrar pago</button>`:''}<button class="btn btn-outline" onclick="previewInvoicePDF('${x.id}')">Vista previa</button><button class="btn btn-olive" onclick="downloadInvoicePDF('${x.id}')">PDF</button></div></div></div>`);}
 function deleteInvoice(id){const b=getBillingData(),x=b.invoices.find(i=>i.id===id);if(!x)return;if(!confirm(`¿Eliminar definitivamente la factura ${x.number}?`))return;billingStockDelta(x,+1,b);b.invoices=b.invoices.filter(i=>i.id!==id);saveBillingData(b);document.getElementById('invoice-view-modal')?.remove();renderBilling();notify('Factura eliminada','success')}
 function archiveInvoice(id){const b=getBillingData(),x=b.invoices.find(i=>i.id===id);if(!x)return;x.status=x.status==='Archivada'?'Pendiente':'Archivada';saveBillingData(b);renderBilling();notify(x.status==='Archivada'?'Factura archivada':'Factura reactivada','success')}
 function registerInvoicePayment(id){const x=getBillingData().invoices.find(i=>i.id===id);if(!x)return;const rem=billingInvoiceBalance(x);if(rem<=0){notify('Esta factura ya está pagada','info');return}document.getElementById('invoice-payment-modal')?.remove();document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="invoice-payment-modal" style="z-index:10000"><div class="modal" style="max-width:520px"><div class="modal-header"><div class="modal-title">Registrar pago · ${billingEscape(x.number)}</div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><div style="background:#f5f8f2;padding:13px;border-radius:10px;margin-bottom:14px">Saldo pendiente: <b>${moneyRD(rem)}</b></div><div class="form-group"><label for="pay-amount">Monto</label><input id="pay-amount" class="form-control" type="number" min="0.01" max="${rem}" step="0.01" value="${rem.toFixed(2)}"></div><div class="form-group"><label for="pay-method">Método</label><select id="pay-method" class="form-select"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Cheque</option><option>Otro</option></select></div><div class="form-group"><label for="pay-reference">Referencia</label><input id="pay-reference" class="form-control" placeholder="Opcional"></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" onclick="saveInvoicePayment('${id}')">Guardar pago</button></div></div></div>`);}
@@ -8873,7 +8914,7 @@ function generateReportHTML(p) {
     @media print{.report-actions{display:none!important}.clinical-report{border:0!important;border-radius:0!important;max-width:none!important;width:100%!important}.cr-page{padding:0!important}.cr-page+.cr-page{border-top:0!important;break-before:page;page-break-before:always}.cr-chart-card,.cr-box,.cr-kpi,.cr-comparison,tr{break-inside:avoid;page-break-inside:avoid}.cr-line-chart{height:32mm!important}.cr-spark{width:30mm!important;height:9mm!important}}
     .pdf-export-mode{width:196mm!important;max-width:196mm!important;border:0!important;border-radius:0!important}.pdf-export-mode .cr-page{padding:7mm 6mm!important;break-after:page;page-break-after:always}.pdf-export-mode .cr-page:last-child{break-after:auto;page-break-after:auto}.pdf-export-mode .cr-kpis{grid-template-columns:repeat(6,1fr)!important}.pdf-export-mode .cr-line-chart{height:31mm!important}.pdf-export-mode .cr-spark{width:29mm!important;height:9mm!important}.pdf-export-mode .cr-chart-card,.pdf-export-mode .cr-box,.pdf-export-mode .cr-kpi,.pdf-export-mode .cr-comparison,.pdf-export-mode tr{break-inside:avoid!important;page-break-inside:avoid!important}
   </style>
-  <div class="report-actions report-screen-only" style="display:flex;justify-content:flex-end;gap:10px;margin:0 0 14px;padding:0 2px"><button type="button" class="btn btn-outline" onclick="closeModal('modal-report')">Cerrar</button><button type="button" class="btn btn-outline" onclick="printReportPDF()">🖨️ Imprimir / Guardar PDF</button><button type="button" class="btn btn-olive" onclick="downloadReportPDF()">📥 Descarga directa</button></div>
+  <div class="report-actions report-screen-only" style="display:flex;justify-content:flex-end;gap:10px;margin:0 0 14px;padding:0 2px"><button type="button" class="btn btn-outline" onclick="closeModal('modal-report')">Cerrar</button><button type="button" class="btn btn-outline" onclick="previewReportPDF()">👁 Vista previa</button><button type="button" class="btn btn-outline" onclick="printReportPDF()">🖨️ Imprimir / Guardar PDF</button><button type="button" class="btn btn-olive" onclick="downloadReportPDF()">📥 Descarga directa</button></div>
   <div class="clinical-report" data-patient="${esc(p.nombre)}">
     <section class="cr-page">
       <div class="cr-head"><img class="cr-logo" src="${NUTRIMACHATA_REPORT_LOGO}" alt="NutriMachata"><div class="cr-title"><b>Reporte Clínico Nutricional</b><span>Última evaluación: ${esc(dateLabel(last.fecha))}</span></div></div>
@@ -10841,24 +10882,65 @@ function _printHTML(htmlContent, filename) {
   doc.write(htmlContent);
   doc.close();
 
-  // Wait for fonts/images to load then print
+  // Esperar a que Safari/Chrome en macOS terminen de maquetar fuentes e imagenes
+  // antes de abrir el dialogo de impresion. En Safari quitar el iframe demasiado pronto
+  // puede producir paginas cortadas o incompletas.
   frame.onload = function() {
-    setTimeout(function() {
+    const win = frame.contentWindow;
+    const fdoc = frame.contentDocument || win.document;
+    const waitForImages = () => Promise.all(Array.from(fdoc.images || []).map(img => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise(resolve => {
+        const done = () => resolve();
+        img.addEventListener('load', done, {once:true});
+        img.addEventListener('error', done, {once:true});
+        setTimeout(done, 5000);
+      });
+    }));
+    const waitForFonts = fdoc.fonts && fdoc.fonts.ready ? fdoc.fonts.ready.catch(()=>{}) : Promise.resolve();
+    const cleanup = () => {
+      const ov = document.getElementById('_pdf-overlay');
+      const fr = document.getElementById('_pdf-frame');
+      if (ov) ov.remove();
+      if (fr) fr.remove();
+    };
+    Promise.all([waitForImages(), waitForFonts]).then(() => new Promise(r => setTimeout(r, 450))).then(() => {
       try {
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
+        win.focus();
+        let cleaned = false;
+        const finish = () => {
+          if (cleaned) return;
+          cleaned = true;
+          setTimeout(cleanup, 700);
+        };
+        win.addEventListener('afterprint', finish, {once:true});
+        win.print();
+        // Fallback largo: no destruir el documento mientras Safari aun esta generando el PDF.
+        setTimeout(finish, 30000);
       } catch(e) {
         console.error('Print error:', e);
+        notify('No se pudo abrir la impresion. Intenta nuevamente.', 'danger');
+        cleanup();
       }
-      // Remove overlay after dialog appears
-      setTimeout(function() {
-        const ov = document.getElementById('_pdf-overlay');
-        const fr = document.getElementById('_pdf-frame');
-        if (ov) ov.remove();
-        if (fr) fr.remove();
-      }, 1500);
-    }, 800);
+    });
   };
+}
+
+function isMacOSBrowser() {
+  const ua = String(navigator.userAgent || '');
+  const platform = String(navigator.platform || '');
+  return /Macintosh|Mac OS X/i.test(ua) || /Mac/i.test(platform);
+}
+
+// En macOS usamos el motor nativo de impresion. Safari/WebKit puede recortar
+// contenido cuando html2canvas rasteriza documentos clinicos de varias paginas.
+function downloadEvaluationPDFMacSafe(htmlContent, filename) {
+  if (isMacOSBrowser()) {
+    notify('Abriendo vista de impresion optimizada para Mac. Elige Guardar como PDF.', 'success');
+    _printHTML(htmlContent, filename);
+    return;
+  }
+  downloadPDF(htmlContent, filename);
 }
 
 // Nueva función para descargar PDF directamente
@@ -11432,5 +11514,332 @@ function fixFormLabelAssociations(root=document){
 setTimeout(()=>fixFormLabelAssociations(),0);
 new MutationObserver(m=>{m.forEach(x=>x.addedNodes.forEach(n=>{if(n.nodeType===1)fixFormLabelAssociations(n)}))}).observe(document.documentElement,{childList:true,subtree:true});
 </script>
+<style id="nm-agenda-alerts-upgrade">
+.apt-patient-context{margin-top:12px;border:1px solid #e2e9dd;border-radius:12px;background:linear-gradient(180deg,#fbfdf9,#f5f9f1);padding:14px}
+.apt-context-head{display:flex;align-items:center;gap:10px;margin-bottom:11px}.apt-context-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex:0 0 38px}.apt-context-name{font-size:14px;font-weight:700;color:#22321f}.apt-context-goal{font-size:11px;color:#778273;margin-top:2px}.apt-context-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.apt-context-metric{background:#fff;border:1px solid #e7ece2;border-radius:9px;padding:9px}.apt-context-metric span{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.45px;color:#899184}.apt-context-metric b{display:block;margin-top:3px;font-size:12px;color:#2b3828}.apt-context-actions{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+.clinic-alert-badge{position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#c44a2a;color:#fff;border:2px solid #fff;font-size:9px;font-weight:800;line-height:14px;text-align:center}
+.clinic-alert-panel{position:fixed;right:26px;top:68px;width:min(410px,calc(100vw - 28px));max-height:min(650px,calc(100vh - 90px));overflow:hidden;background:#fff;border:1px solid #e1e7dc;border-radius:15px;box-shadow:0 22px 60px rgba(24,56,13,.18);z-index:2500;display:none}.clinic-alert-panel.open{display:block;animation:fadeScale .16s ease-out}.clinic-alert-head{padding:15px 17px 12px;border-bottom:1px solid #edf0e9;display:flex;justify-content:space-between;align-items:center}.clinic-alert-head h3{font-size:14px;margin:0;color:#263223}.clinic-alert-head small{font-size:10px;color:#899184}.clinic-alert-list{max-height:520px;overflow:auto;padding:8px}.clinic-alert-item{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:10px;border-radius:10px;border:1px solid transparent;cursor:pointer}.clinic-alert-item:hover{background:#f8faf6;border-color:#e8ede4}.clinic-alert-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px}.clinic-alert-item.danger .clinic-alert-icon{background:#fdeceb;color:#b42318}.clinic-alert-item.warning .clinic-alert-icon{background:#fff4da;color:#b56c08}.clinic-alert-item.info .clinic-alert-icon{background:#eaf3fb;color:#2a6a8c}.clinic-alert-item.success .clinic-alert-icon{background:#eaf6ee;color:#2d7a4a}.clinic-alert-title{font-size:11px;font-weight:700;color:#2a3427}.clinic-alert-text{font-size:10px;color:#7b8477;line-height:1.4;margin-top:2px}.clinic-alert-date{font-size:9px;color:#9ba396;white-space:nowrap}.clinic-alert-empty{padding:34px 18px;text-align:center;color:#879181;font-size:12px}.clinic-alert-footer{padding:10px 12px;border-top:1px solid #edf0e9;display:flex;justify-content:space-between;align-items:center;background:#fbfcfa}.clinic-alert-footer span{font-size:10px;color:#7f887a}
+@media(max-width:700px){.apt-context-grid{grid-template-columns:repeat(2,1fr)}.clinic-alert-panel{right:10px;top:60px}.clinic-alert-item{grid-template-columns:32px 1fr}.clinic-alert-date{display:none}}
+</style>
+<div id="clinic-alert-panel" class="clinic-alert-panel" aria-live="polite"></div>
+<script>
+(function(){
+  const DAY=86400000;
+  const isoToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+  const validNumber=v=>v!==null&&v!==''&&v!==undefined&&Number.isFinite(Number(v));
+  const parseDate=v=>{if(!v)return null;const d=new Date(String(v).slice(0,10)+'T00:00:00');return isNaN(d)?null:d};
+  const daysFromToday=v=>{const d=parseDate(v);if(!d)return null;return Math.round((d-isoToday())/DAY)};
+  const safeText=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  window.refreshAppointmentPatientContext=function(patientId){
+    const box=document.getElementById('apt-patient-context'); if(!box)return;
+    const p=(DB.patients||[]).find(x=>String(x.id)===String(patientId));
+    if(!p){box.style.display='none';box.innerHTML='';return}
+    const evs=(p.evaluaciones||[]).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+    const last=evs[evs.length-1]||null;
+    const lastDate=last?.fecha?new Date(last.fecha+'T00:00:00').toLocaleDateString('es-DO'):'Sin evaluación';
+    const weight=validNumber(last?.peso)?`${Number(last.peso).toFixed(1)} kg`:validNumber(p.peso)?`${Number(p.peso).toFixed(1)} kg`:'—';
+    const imc=validNumber(last?.imc)?Number(last.imc).toFixed(1):validNumber(p.imc)?Number(p.imc).toFixed(1):'—';
+    const pressure=last?.presion||p.presion||'—';
+    box.innerHTML=`<div class="apt-context-head"><div class="apt-context-avatar" style="background:${p.color||'#5E8C2A'}">${safeText(p.initials||p.nombre?.split(/\s+/).map(x=>x[0]).slice(0,2).join('')||'P')}</div><div><div class="apt-context-name">${safeText(p.nombre)}</div><div class="apt-context-goal">Objetivo: ${safeText(p.objetivo||last?.proximoObjetivo||'No registrado')}</div></div></div><div class="apt-context-grid"><div class="apt-context-metric"><span>Última evaluación</span><b>${safeText(lastDate)}</b></div><div class="apt-context-metric"><span>Peso</span><b>${safeText(weight)}</b></div><div class="apt-context-metric"><span>IMC</span><b>${safeText(imc)}</b></div><div class="apt-context-metric"><span>Presión</span><b>${safeText(pressure)}</b></div></div><div class="apt-context-actions"><button type="button" class="btn btn-olive btn-sm" onclick="startEvaluationFromAppointment('${p.id}')">＋ Iniciar evaluación</button><button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modal-appointment');navigateTo('patients');setTimeout(()=>openPatientDetail?.('${p.id}'),120)">Ver paciente</button></div>`;
+    box.style.display='block';
+  };
+  window.startEvaluationFromAppointment=function(patientId){closeModal('modal-appointment');setTimeout(()=>openEvalModal(patientId),120)};
+
+  function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d+)/);return !!m&&(Number(m[1])>=140||Number(m[2])>=90)}
+  window.computeClinicAlerts=function(){
+    const alerts=[]; const now=isoToday();
+    (DB.patients||[]).filter(p=>p.activo!==false).forEach(p=>{
+      const evs=(p.evaluaciones||[]).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+      const last=evs[evs.length-1];
+      if(!last){alerts.push({type:'warning',icon:'◷',title:'Paciente sin evaluación',text:`${p.nombre} no tiene evaluaciones registradas.`,date:'Seguimiento',action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),100)}})}
+      else{
+        const days=daysFromToday(last.fecha); if(days!==null&&days<-45) alerts.push({type:'warning',icon:'◷',title:'Evaluación atrasada',text:`${p.nombre}: última evaluación hace ${Math.abs(days)} días.`,date:'Evaluación',action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),100)}});
+        const imc=validNumber(last.imc)?Number(last.imc):(validNumber(p.imc)?Number(p.imc):null); if(imc!==null&&(imc<18.5||imc>=30)) alerts.push({type:'info',icon:'⚕',title:'IMC fuera de rango',text:`${p.nombre}: IMC ${imc.toFixed(1)}.`,date:'Clínico',action:()=>navigateTo('evaluations')});
+        const press=last.presion||p.presion;if(pressureHigh(press)) alerts.push({type:'danger',icon:'♥',title:'Presión arterial elevada',text:`${p.nombre}: ${press}.`,date:'Clínico',action:()=>navigateTo('evaluations')});
+        if(evs.length>1&&validNumber(last.peso)&&validNumber(evs[evs.length-2].peso)){const prev=Number(evs[evs.length-2].peso),cur=Number(last.peso),pct=prev?Math.abs(cur-prev)/prev*100:0;if(pct>=5) alerts.push({type:'warning',icon:'↕',title:'Cambio de peso significativo',text:`${p.nombre}: ${cur>prev?'+':''}${(cur-prev).toFixed(1)} kg (${pct.toFixed(1)}%).`,date:'Evolución',action:()=>navigateTo('evaluations')})}
+      }
+      (p.dietas||[]).forEach(d=>{const end=d.fechaFin||d.fecha_fin||d.fin||d.endDate;const days=daysFromToday(end);if(days!==null&&days>=0&&days<=7)alerts.push({type:'info',icon:'◫',title:'Plan por finalizar',text:`${p.nombre}: ${d.nombre||'Plan nutricional'} finaliza en ${days===0?'hoy':days+' días'}.`,date:'Plan',action:()=>navigateTo('diets')})})
+    });
+    (DB.appointments||[]).forEach(a=>{if(['completada','cancelada'].includes(String(a.estado||'').toLowerCase()))return;const dt=new Date(`${a.fecha}T${(a.hora||'00:00').slice(0,5)}:00`);const hours=(dt-new Date())/3600000;if(hours>=0&&hours<=24){const p=(DB.patients||[]).find(x=>x.id==a.patientId);alerts.push({type:'info',icon:'◷',title:'Cita cercana',text:`${p?.nombre||a.nombreManual||'Paciente'} · ${a.fecha} ${a.hora||''}.`,date:hours<=2?'Muy pronto':'Próxima',action:()=>{navigateTo('agenda');setTimeout(()=>editAppointment(a.id),100)}})}});
+    try{const b=typeof getBillingData==='function'?getBillingData():null;(b?.invoices||[]).forEach(x=>{const st=typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):x.status;if(st==='Vencida')alerts.push({type:'danger',icon:'$',title:'Factura vencida',text:`${x.patient||'Paciente'} · ${x.number||'Factura'} · saldo ${typeof moneyRD==='function'?moneyRD((x.total||0)-(x.paid||0)):''}`,date:x.dueDate||'Vencida',action:()=>navigateTo('billing')})});(b?.products||[]).filter(p=>p.type!=='Servicio'&&p.active!==false&&validNumber(p.stock)&&validNumber(p.min)&&Number(p.stock)<=Number(p.min)).forEach(p=>alerts.push({type:'warning',icon:'▣',title:'Stock bajo',text:`${p.name}: ${p.stock} disponibles (mín. ${p.min}).`,date:'Inventario',action:()=>navigateTo('billing')}))}catch(e){console.warn('Alertas de facturación:',e)}
+    const priority={danger:0,warning:1,info:2,success:3};alerts.sort((a,b)=>(priority[a.type]??9)-(priority[b.type]??9));return alerts;
+  };
+  window.refreshClinicAlertBadge=function(){const n=computeClinicAlerts().length;const b=document.getElementById('clinic-alert-badge');if(!b)return;b.textContent=n>99?'99+':n;b.style.display=n?'block':'none'};
+  window.renderClinicAlerts=function(){const panel=document.getElementById('clinic-alert-panel');if(!panel)return;const alerts=computeClinicAlerts();panel.innerHTML=`<div class="clinic-alert-head"><div><h3>Centro de alertas</h3><small>Seguimiento clínico y operativo</small></div><button class="modal-close" onclick="toggleClinicAlerts()">×</button></div><div class="clinic-alert-list">${alerts.length?alerts.map((a,i)=>`<div class="clinic-alert-item ${a.type}" onclick="runClinicAlert(${i})"><div class="clinic-alert-icon">${a.icon}</div><div><div class="clinic-alert-title">${safeText(a.title)}</div><div class="clinic-alert-text">${safeText(a.text)}</div></div><div class="clinic-alert-date">${safeText(a.date||'')}</div></div>`).join(''):'<div class="clinic-alert-empty">✓ No hay alertas pendientes en este momento.</div>'}</div><div class="clinic-alert-footer"><span>${alerts.length} alerta${alerts.length===1?'':'s'} activa${alerts.length===1?'':'s'}</span><button class="btn btn-outline btn-sm" onclick="refreshClinicAlertBadge();renderClinicAlerts()">Actualizar</button></div>`;window.__clinicAlerts=alerts};
+  window.runClinicAlert=function(i){const a=(window.__clinicAlerts||[])[i];document.getElementById('clinic-alert-panel')?.classList.remove('open');if(a?.action)a.action()};
+  window.toggleClinicAlerts=function(ev){ev?.stopPropagation?.();const p=document.getElementById('clinic-alert-panel');if(!p)return;const opening=!p.classList.contains('open');if(opening)renderClinicAlerts();p.classList.toggle('open',opening)};
+  document.addEventListener('click',e=>{const p=document.getElementById('clinic-alert-panel');if(p?.classList.contains('open')&&!p.contains(e.target)&&!e.target.closest('#notif-btn'))p.classList.remove('open')});
+  setTimeout(refreshClinicAlertBadge,1000);setInterval(refreshClinicAlertBadge,60000);
+  const _notify=window.notify;if(typeof _notify==='function'){window.notify=function(){const r=_notify.apply(this,arguments);setTimeout(refreshClinicAlertBadge,200);return r}}
+})();
+</script>
+
+<style id="nm-reliability-layer-style">
+#nm-connection-banner{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:12000;display:none;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;font:600 12px 'DM Sans',sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.14);max-width:min(92vw,620px)}
+#nm-connection-banner.offline{display:flex;background:#fff3df;color:#8a4c00;border:1px solid #f0c98c}
+#nm-connection-banner.error{display:flex;background:#fdeceb;color:#9b271d;border:1px solid #efb3ad}
+#nm-connection-banner.ok{display:flex;background:#eaf6ee;color:#25683f;border:1px solid #b9dfc6}
+.nm-action-busy{pointer-events:none!important;opacity:.68!important;cursor:wait!important}
+[data-nm-dead-action="1"]{display:none!important}
+</style>
+<div id="nm-connection-banner" role="status" aria-live="polite"></div>
+<script id="nm-reliability-layer">
+(function(){
+  'use strict';
+  const SNAP_KEY='nutrimachata_critical_snapshot_v3';
+  const ERROR_LOG_KEY='nutrimachata_error_log_v2';
+  const MAX_ERRORS=40;
+  const banner=document.getElementById('nm-connection-banner');
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function showBanner(message,kind='error',ms=5200){
+    if(!banner)return;
+    banner.className=kind;
+    banner.innerHTML=`<span>${kind==='ok'?'✓':kind==='offline'?'⚠':'✕'}</span><span>${esc(message)}</span>`;
+    banner.style.display='flex';
+    clearTimeout(showBanner._t);
+    if(ms)showBanner._t=setTimeout(()=>{banner.style.display='none';banner.className=''},ms);
+  }
+  window.nmShowSystemMessage=showBanner;
+
+  function logError(scope,error,extra){
+    const item={time:new Date().toISOString(),scope,message:String(error?.message||error||'Error desconocido'),extra:extra||null};
+    try{const arr=JSON.parse(localStorage.getItem(ERROR_LOG_KEY)||'[]');arr.unshift(item);localStorage.setItem(ERROR_LOG_KEY,JSON.stringify(arr.slice(0,MAX_ERRORS)))}catch(_e){}
+    console.error('[NutriMachata]',scope,error,extra||'');
+    return item;
+  }
+
+  window.addEventListener('error',ev=>{
+    logError('JavaScript',ev.error||ev.message,{file:ev.filename,line:ev.lineno});
+    showBanner('Ocurrió un error inesperado. La acción no se completó.','error');
+    try{notify('Ocurrió un error inesperado. Revisa los datos e inténtalo otra vez.','danger')}catch(_e){}
+  });
+  window.addEventListener('unhandledrejection',ev=>{
+    logError('Promesa',ev.reason);
+    showBanner('No se pudo completar una operación. Revisa la conexión e inténtalo otra vez.','error');
+    try{notify('No se pudo completar la operación. Inténtalo nuevamente.','danger')}catch(_e){}
+  });
+
+  window.addEventListener('offline',()=>showBanner('Sin conexión a internet. No cierres la página hasta recuperar la conexión.','offline',0));
+  window.addEventListener('online',()=>{showBanner('Conexión recuperada.','ok',2800);try{refreshData?.()}catch(_e){}});
+  if(!navigator.onLine)showBanner('Sin conexión a internet. Los cambios del servidor no podrán guardarse.','offline',0);
+
+  // Evita que Supabase falle en silencio en operaciones de escritura.
+  if(typeof supa==='function'&&!window.__nmSupaGuarded){
+    window.__nmSupaGuarded=true;
+    const rawSupa=supa;
+    supa=async function(path,method='GET',body=null){
+      const beforeOnline=typeof SUPA_ONLINE!=='undefined'?SUPA_ONLINE:true;
+      const result=await rawSupa(path,method,body);
+      const write=String(method||'GET').toUpperCase()!=='GET';
+      if(write&&!IS_LOCAL&&(result===null||SUPA_ONLINE===false)){
+        const err=new Error(!navigator.onLine?'No hay conexión a internet.':'La base de datos no confirmó el guardado.');
+        logError('Persistencia Supabase',err,{path,method,beforeOnline});
+        throw err;
+      }
+      return result;
+    };
+  }
+
+  function criticalSnapshot(){
+    return {
+      version:3,
+      savedAt:new Date().toISOString(),
+      patients:Array.isArray(DB?.patients)?DB.patients:[],
+      appointments:Array.isArray(DB?.appointments)?DB.appointments:[],
+      settings:DB?.settings||{}
+    };
+  }
+  function saveSnapshot(reason='auto'){
+    try{
+      const snap=criticalSnapshot();
+      localStorage.setItem(SNAP_KEY,JSON.stringify(snap));
+      window.__nmLastSnapshot={time:snap.savedAt,reason};
+      return true;
+    }catch(e){logError('Copia local',e,{reason});showBanner('No se pudo crear la copia local de seguridad.','error');return false}
+  }
+  function restoreSnapshot(){
+    try{
+      const raw=localStorage.getItem(SNAP_KEY);if(!raw)return false;
+      const snap=JSON.parse(raw);if(!snap||!Array.isArray(snap.patients))return false;
+      DB.patients=snap.patients;
+      DB.appointments=Array.isArray(snap.appointments)?snap.appointments:[];
+      if(snap.settings&&typeof snap.settings==='object')DB.settings={...(DB.settings||{}),...snap.settings};
+      DB.loaded=true;
+      window.__nmRestoredSnapshot=snap.savedAt||true;
+      return true;
+    }catch(e){logError('Restaurar copia local',e);return false}
+  }
+  window.nmSaveCriticalSnapshot=saveSnapshot;
+  window.nmRestoreCriticalSnapshot=restoreSnapshot;
+
+  // Si la BD no puede cargar, usa la última copia local en vez de dejar el sistema vacío.
+  if(typeof loadFromSupabase==='function'&&!window.__nmLoadWrapped){
+    window.__nmLoadWrapped=true;
+    const rawLoad=loadFromSupabase;
+    loadFromSupabase=async function(){
+      try{
+        const result=await rawLoad.apply(this,arguments);
+        if(DB?.loaded){saveSnapshot('servidor-cargado');return result}
+        if(restoreSnapshot()){
+          showBanner('Base de datos no disponible. Se abrió la última copia local guardada.','offline',6500);
+          try{notify('Mostrando la última copia local disponible','warning')}catch(_e){}
+        }
+        return result;
+      }catch(e){
+        logError('Carga de datos',e);
+        if(restoreSnapshot())showBanner('No se pudo conectar. Se recuperó la última copia local.','offline',6500);
+        else showBanner('No se pudo cargar la información y no hay copia local disponible.','error',0);
+        throw e;
+      }
+    };
+  }
+
+  // Verifica que Facturación realmente se escriba y pueda leerse desde localStorage.
+  if(typeof saveBillingData==='function'&&!window.__nmBillingStorageGuarded){
+    window.__nmBillingStorageGuarded=true;
+    const rawSaveBilling=saveBillingData;
+    saveBillingData=function(data){
+      const ok=rawSaveBilling(data);
+      if(!ok)throw new Error('No se pudo guardar la información de facturación.');
+      try{
+        const probe=localStorage.getItem(typeof BILLING_KEY!=='undefined'?BILLING_KEY:'nutrimachata_billing_v2');
+        if(!probe)throw new Error('El navegador no confirmó el almacenamiento de facturación.');
+        JSON.parse(probe);
+      }catch(e){logError('Persistencia Facturación',e);throw e}
+      saveSnapshot('facturacion');
+      return true;
+    };
+  }
+
+  function setBusyForActiveButton(active,label){
+    const el=document.activeElement;
+    if(!(el instanceof HTMLButtonElement))return ()=>{};
+    if(!active)return ()=>{};
+    const old=el.innerHTML;el.classList.add('nm-action-busy');el.disabled=true;
+    el.dataset.nmOldHtml=old;if(label)el.textContent=label;
+    return ()=>{el.classList.remove('nm-action-busy');el.disabled=false;if(el.dataset.nmOldHtml){el.innerHTML=el.dataset.nmOldHtml;delete el.dataset.nmOldHtml}}
+  }
+
+  function wrapMutation(name,label){
+    const original=window[name];if(typeof original!=='function'||original.__nmReliable)return;
+    const wrapped=function(){
+      const restore=setBusyForActiveButton(true,'Guardando…');
+      try{
+        const result=original.apply(this,arguments);
+        if(result&&typeof result.then==='function'){
+          return result.then(v=>{saveSnapshot(name);restore();return v}).catch(e=>{restore();logError(label||name,e);showBanner(`${label||'La operación'} no pudo guardarse: ${e.message||'error desconocido'}`,'error',7000);try{notify(`${label||'La operación'} no pudo guardarse. ${e.message||''}`,'danger')}catch(_e){};throw e});
+        }
+        saveSnapshot(name);restore();return result;
+      }catch(e){restore();logError(label||name,e);showBanner(`${label||'La operación'} no pudo guardarse: ${e.message||'error desconocido'}`,'error',7000);try{notify(`${label||'La operación'} no pudo guardarse. ${e.message||''}`,'danger')}catch(_e){};return false}
+    };
+    wrapped.__nmReliable=true;wrapped.__nmOriginal=original;window[name]=wrapped;
+  }
+
+  [
+    ['saveEvaluation','La evaluación'],['saveAppointment','La cita'],['saveInvoice','La factura'],
+    ['saveInvoicePayment','El pago'],['saveBillingProduct','El producto o servicio'],
+    ['deleteInvoice','La eliminación de la factura'],['deleteBillingProduct','La eliminación del producto'],
+    ['savePatient','El paciente'],['saveEditPatient','Los datos del paciente'],['saveLabNote','La nota clínica'],
+    ['saveDietChanges','El plan nutricional']
+  ].forEach(x=>wrapMutation(x[0],x[1]));
+
+  // Copia local periódica y al abandonar la pestaña.
+  setInterval(()=>saveSnapshot('periodica'),60000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveSnapshot('ocultar-pagina')});
+  window.addEventListener('beforeunload',()=>saveSnapshot('cerrar-pagina'));
+  if(IS_LOCAL)restoreSnapshot();
+
+  // Auditoría automática: oculta botones con acciones inexistentes y duplicados exactos en el mismo bloque.
+  const ignored=new Set(['if','this','event','document','window','confirm','return','location','history','setTimeout']);
+  function directAction(code){
+    const s=String(code||'').trim();const m=s.match(/^([A-Za-z_$][\w$]*)\s*\(/);if(!m)return null;
+    return ignored.has(m[1])?null:m[1];
+  }
+  function auditButtons(root=document){
+    let dead=0,dupes=0;
+    const nodes=[];
+    if(root instanceof Element&&root.matches('button,[role="button"],a[onclick]'))nodes.push(root);
+    if(root.querySelectorAll)nodes.push(...root.querySelectorAll('button,[role="button"],a[onclick]'));
+    nodes.forEach(btn=>{
+      const code=btn.getAttribute('onclick');const fn=directAction(code);
+      if(fn&&typeof window[fn]!=='function'){
+        btn.dataset.nmDeadAction='1';btn.setAttribute('aria-hidden','true');btn.title=`Acción no disponible: ${fn}`;dead++;return;
+      }
+      if(btn.parentElement&&code){
+        const signature=(btn.textContent||'').trim().replace(/\s+/g,' ')+'||'+code.trim();
+        const siblings=[...btn.parentElement.querySelectorAll(':scope > button,:scope > a[onclick]')];
+        const first=siblings.find(x=>((x.textContent||'').trim().replace(/\s+/g,' ')+'||'+String(x.getAttribute('onclick')||'').trim())===signature);
+        if(first&&first!==btn){btn.dataset.nmDeadAction='1';btn.setAttribute('aria-hidden','true');dupes++}
+      }
+    });
+    window.__nmButtonAudit={time:new Date().toISOString(),dead,duplicates:dupes};
+    if(dead)console.warn(`[NutriMachata] ${dead} botón(es) con acción inexistente fueron ocultados.`);
+    return window.__nmButtonAudit;
+  }
+  window.auditNutriMachataButtons=auditButtons;
+  let auditTimer;
+  const obs=new MutationObserver(muts=>{clearTimeout(auditTimer);auditTimer=setTimeout(()=>muts.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1)auditButtons(n)})),40)});
+  obs.observe(document.documentElement,{childList:true,subtree:true});
+  window.addEventListener('load',()=>setTimeout(()=>{auditButtons(document);saveSnapshot('inicio')},350));
+})();
+</script>
+
+<script id="nm-pagination-print-runtime">
+// ===== Escalabilidad de listas + vista previa/impresion A4 =====
+const NM_PAGINATION={patients:{page:1,size:20,last:[]},evaluations:{page:1,size:20},invoices:{page:1,size:20,last:[]}};
+function nmClampPage(state,total){const pages=Math.max(1,Math.ceil(total/state.size));state.page=Math.max(1,Math.min(state.page,pages));return pages}
+function nmPagerHTML(kind,total){const st=NM_PAGINATION[kind],pages=nmClampPage(st,total),start=total?((st.page-1)*st.size+1):0,end=Math.min(total,st.page*st.size);let nums=[];for(let i=Math.max(1,st.page-2);i<=Math.min(pages,st.page+2);i++)nums.push(i);return `<div class="nm-pager"><div class="nm-pager-info">Mostrando <b>${start}-${end}</b> de <b>${total}</b></div><div class="nm-pager-controls"><select class="nm-page-size" aria-label="Filas por página" onchange="nmSetPageSize('${kind}',this.value)"><option ${st.size===10?'selected':''}>10</option><option ${st.size===20?'selected':''}>20</option><option ${st.size===50?'selected':''}>50</option></select><button class="nm-page-btn" ${st.page<=1?'disabled':''} onclick="nmSetPage('${kind}',${st.page-1})">‹</button>${nums.map(n=>`<button class="nm-page-btn ${n===st.page?'active':''}" onclick="nmSetPage('${kind}',${n})">${n}</button>`).join('')}<button class="nm-page-btn" ${st.page>=pages?'disabled':''} onclick="nmSetPage('${kind}',${st.page+1})">›</button></div></div>`}
+function nmSetPage(kind,page){const st=NM_PAGINATION[kind];if(!st)return;st.page=Number(page)||1;if(kind==='patients')renderPatientsTable(st.last||[]);if(kind==='evaluations')nmApplyEvalPagination();if(kind==='invoices'){const el=document.getElementById('invoice-list');if(el)el.innerHTML=invoiceTable(st.last||filteredInvoices())}}
+function nmSetPageSize(kind,size){const st=NM_PAGINATION[kind];if(!st)return;st.size=Math.max(10,Number(size)||20);st.page=1;nmSetPage(kind,1)}
+
+// Pacientes: render progresivo sin cambiar la logica de busqueda.
+const nmOriginalRenderPatientsTable=renderPatientsTable;
+renderPatientsTable=function(list){const st=NM_PAGINATION.patients;st.last=Array.isArray(list)?list:[];const pages=nmClampPage(st,st.last.length),start=(st.page-1)*st.size,slice=st.last.slice(start,start+st.size);nmOriginalRenderPatientsTable(slice);const count=document.getElementById('patient-count');if(count)count.textContent=`${st.last.length} pacientes registrados`;const dir=document.querySelector('.patient-directory');if(dir){dir.querySelector('.nm-pager')?.remove();dir.insertAdjacentHTML('beforeend',nmPagerHTML('patients',st.last.length))}}
+const nmOriginalFilterPatients=filterPatients;
+filterPatients=function(){NM_PAGINATION.patients.page=1;return nmOriginalFilterPatients.apply(this,arguments)};
+
+// Evaluaciones: mantiene todas en memoria, pero solo pinta/expone una pagina a la vez.
+function nmEvalMatches(row,term){const name=row.querySelector('.eval-name')?.textContent.toLowerCase()||'',fecha=row.querySelector('.eval-fecha')?.textContent||'',peso=row.querySelector('.eval-peso')?.textContent||'',imc=row.querySelector('.eval-imc')?.textContent||'',obs=row.querySelector('.eval-obs')?.textContent.toLowerCase()||'';return !term||name.includes(term)||fecha.includes(term)||peso.includes(term)||imc.includes(term)||obs.includes(term)}
+function nmApplyEvalPagination(reset=false){const input=document.getElementById('eval-search-input'),term=(input?.value||'').toLowerCase(),rows=[...document.querySelectorAll('.eval-row')],matched=rows.filter(r=>nmEvalMatches(r,term)),st=NM_PAGINATION.evaluations;if(reset)st.page=1;nmClampPage(st,matched.length);rows.forEach(r=>r.style.display='none');const start=(st.page-1)*st.size;matched.slice(start,start+st.size).forEach(r=>r.style.display='');const subtitle=document.getElementById('eval-subtitle');if(subtitle)subtitle.textContent=`${matched.length} de ${rows.length} evaluaciones`;const card=document.querySelector('#page-content .card:last-child');if(card){card.querySelector('.nm-pager')?.remove();card.insertAdjacentHTML('beforeend',nmPagerHTML('evaluations',matched.length))}}
+const nmOriginalRenderEvaluations=renderEvaluations;
+renderEvaluations=function(){const out=nmOriginalRenderEvaluations.apply(this,arguments);setTimeout(()=>nmApplyEvalPagination(true),0);return out};
+filterEvaluationsTable=function(){nmApplyEvalPagination(true)};
+
+// Facturas: pagina los resultados filtrados; filtros reinician en pagina 1.
+const nmOriginalInvoiceTable=invoiceTable;
+invoiceTable=function(rows){const st=NM_PAGINATION.invoices;st.last=Array.isArray(rows)?rows:[];nmClampPage(st,st.last.length);const ordered=st.last.slice().reverse(),start=(st.page-1)*st.size,pageRows=ordered.slice(start,start+st.size).reverse();const html=nmOriginalInvoiceTable(pageRows);return `<div class="nm-invoice-paged">${html}${nmPagerHTML('invoices',st.last.length)}</div>`};
+const nmOriginalFilterInvoices=filterInvoices;
+filterInvoices=function(v){NM_PAGINATION.invoices.page=1;return nmOriginalFilterInvoices(v)};
+const nmOriginalFilterInvoiceMonth=filterInvoiceMonth;
+filterInvoiceMonth=function(v){NM_PAGINATION.invoices.page=1;return nmOriginalFilterInvoiceMonth(v)};
+const nmOriginalFilterInvoiceStatus=filterInvoiceStatus;
+filterInvoiceStatus=function(v){NM_PAGINATION.invoices.page=1;return nmOriginalFilterInvoiceStatus(v)};
+
+function nmBrowserFamily(){const ua=navigator.userAgent;if(/Edg\//.test(ua))return 'Microsoft Edge';if(/Chrome\//.test(ua)&&!/Edg\//.test(ua))return 'Google Chrome / Chromium';if(/Safari\//.test(ua)&&!/Chrome\//.test(ua))return 'Safari';return 'Navegador actual'}
+function nmGenerationStamp(){return new Intl.DateTimeFormat('es-DO',{dateStyle:'medium',timeStyle:'short'}).format(new Date())}
+function nmDocumentIdentity(){const st=(typeof DB!=='undefined'&&DB.settings)||{};return {clinic:st.clinicName||'NutriMachata',doctor:st.doctorName||'Profesional de nutrición',phone:st.phone||'',email:st.email||''}}
+function nmClosePrintPreview(){document.getElementById('nm-print-preview')?.remove()}
+function nmPreviewShell(title,subtitle,pages,printAction,downloadAction){nmClosePrintPreview();const el=document.createElement('div');el.id='nm-print-preview';el.className='nm-print-preview-overlay';el.innerHTML=`<div class="nm-print-preview-toolbar"><div><div class="nm-print-preview-title">${title}</div><div class="nm-print-preview-meta">${subtitle} · <span class="nm-browser-badge">${nmBrowserFamily()}</span></div></div><div class="nm-print-preview-actions"><button class="btn btn-outline btn-sm" onclick="nmClosePrintPreview()">Cerrar</button>${printAction?`<button class="btn btn-outline btn-sm" onclick="${printAction}">Imprimir / PDF</button>`:''}${downloadAction?`<button class="btn btn-olive btn-sm" onclick="${downloadAction}">Descargar PDF</button>`:''}</div></div><div class="nm-print-preview-pages">${pages}</div>`;document.body.appendChild(el)}
+
+function nmReportPreviewPages(source){const styles=Array.from(document.querySelectorAll('#report-modal-body style')).map(x=>x.outerHTML).join('');const sections=[...source.querySelectorAll(':scope > .cr-page')];return sections.map((section,i)=>`<div class="nm-a4-preview" aria-label="Página ${i+1}">${styles}<div class="clinical-report">${section.outerHTML}</div><div style="position:absolute;bottom:4mm;left:8mm;right:8mm;display:flex;justify-content:space-between;font:9px Arial;color:#7b8576;border-top:1px solid #e3e9df;padding-top:2mm"><span>${nmDocumentIdentity().clinic} · ${nmDocumentIdentity().doctor} · ${nmGenerationStamp()}</span><span>Página ${i+1} de ${sections.length}</span></div></div>`).join('')}
+function previewReportPDF(){const source=document.querySelector('#report-modal-body .clinical-report');if(!source){notify('Genera el reporte primero','warning');return}nmPreviewShell('Vista previa del Reporte Clínico','A4 - la descarga directa usa esta misma estructura',nmReportPreviewPages(source),'nmClosePrintPreview();printReportPDF()','nmClosePrintPreview();downloadReportPDF()')}
+
+function nmInvoiceDocumentHTML(x,b){const logo=(typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'');const items=(x.items||[]).map(i=>`<tr><td>${billingEscape(i.description)}</td><td>${i.qty}</td><td>${moneyRD(i.price)}</td><td>${i.discount||0}%</td><td><b>${moneyRD(billingLineTotal(i))}</b></td></tr>`).join('');return `<div class="invoice-print-doc" data-invoice="${billingEscape(x.number)}"><div class="invoice-print-head">${logo?`<img src="${logo}" alt="NutriMachata">`:'<b class="invoice-brand">NutriMachata</b>'}<div><strong>FACTURA</strong><b>${billingEscape(x.number)}</b><span>${billingEscape(x.date||'')}</span></div></div><div class="invoice-party"><div><small>PACIENTE</small><b>${billingEscape(x.patient)}</b><span>${x.rnc?billingEscape(x.rnc):'Sin RNC / cédula'}</span></div><div><small>NCF</small><b>${billingEscape(x.ncf||'No especificado')}</b><span>Vencimiento: ${billingEscape(x.dueDate||'—')}</span></div></div><table class="invoice-items"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${items||'<tr><td colspan="5">Sin conceptos</td></tr>'}</tbody></table><div class="invoice-print-summary"><div><span>Subtotal</span><b>${moneyRD(x.subtotal)}</b></div><div><span>Descuento general</span><b>${x.discount||0}%</b></div><div><span>ITBIS</span><b>${x.tax||0}%</b></div><div class="grand"><span>Total</span><b>${moneyRD(x.total)}</b></div><div><span>Pagado</span><b>${moneyRD(x.paid)}</b></div><div><span>Saldo</span><b>${moneyRD(billingInvoiceBalance(x))}</b></div></div><div class="invoice-print-note">${billingEscape(x.notes||b.templateNote||'')}</div></div>`}
+function nmInvoicePrintStyles(){return `<style>.invoice-print-doc{font-family:Arial,sans-serif;color:#263126;background:#fff;width:100%;box-sizing:border-box}.invoice-print-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #5E8C2A;padding:0 0 16px}.invoice-print-head img{height:58px;max-width:240px;object-fit:contain}.invoice-brand{font-size:25px;color:#355e20}.invoice-print-head>div{text-align:right;display:flex;flex-direction:column;gap:3px}.invoice-print-head strong{font-size:24px}.invoice-party{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0}.invoice-party small,.invoice-party b,.invoice-party span{display:block}.invoice-items{width:100%;border-collapse:collapse}.invoice-items thead{display:table-header-group}.invoice-items th{background:#355E3B;color:#fff;padding:10px;text-align:left;font-size:11px}.invoice-items th:nth-child(n+2),.invoice-items td:nth-child(n+2){text-align:right}.invoice-items td{padding:9px;border-bottom:1px solid #e5e9e2;font-size:11px}.invoice-print-summary{margin-left:auto;width:320px;margin-top:18px;break-inside:avoid;page-break-inside:avoid}.invoice-print-summary>div{display:flex;justify-content:space-between;padding:5px}.invoice-print-summary .grand{padding:10px 5px;border-top:2px solid #5E8C2A;font-size:19px;color:#355E3B}.invoice-print-note{margin-top:30px;padding:13px;background:#f3f7ef;border-radius:9px;font-size:11px;break-inside:avoid;page-break-inside:avoid}.invoice-items tr{break-inside:avoid;page-break-inside:avoid}@media print{@page{size:A4 portrait;margin:10mm 8mm 13mm}.invoice-print-doc{width:auto!important}.invoice-items thead{display:table-header-group!important}}</style>`}
+function previewInvoicePDF(id){const b=getBillingData(),x=b.invoices.find(i=>i.id===id);if(!x){notify('La factura ya no existe','danger');return}const page=`<div class="nm-a4-preview">${nmInvoicePrintStyles()}${nmInvoiceDocumentHTML(x,b)}<div style="position:absolute;bottom:4mm;left:8mm;right:8mm;display:flex;justify-content:space-between;font:9px Arial;color:#7b8576;border-top:1px solid #e3e9df;padding-top:2mm"><span>${nmDocumentIdentity().clinic} · ${nmDocumentIdentity().doctor} · ${nmGenerationStamp()}</span><span>Vista A4</span></div></div>`;nmPreviewShell(`Vista previa - ${billingEscape(x.number)}`,'A4 - confirme el contenido antes de descargar',page,'','nmClosePrintPreview();downloadInvoicePDF(\''+x.id+'\')')}
+
+// Descarga de factura con encabezado/pie y numeracion real por pagina.
+downloadInvoicePDF=function(id){const b=getBillingData(),x=b.invoices.find(i=>i.id===id);if(!x){notify('La factura ya no existe','danger');return}if(typeof html2pdf!=='function'){notify('El generador de PDF no está disponible','danger');return}const wrap=document.createElement('div');Object.assign(wrap.style,{position:'fixed',left:'-10000px',top:'0',width:'194mm',background:'#fff'});wrap.innerHTML=nmInvoicePrintStyles()+nmInvoiceDocumentHTML(x,b);document.body.appendChild(wrap);const node=wrap.querySelector('.invoice-print-doc'),filename=`${x.number}_${String(x.patient).replace(/\s+/g,'_')}.pdf`,stamp=nmGenerationStamp();html2pdf().set({margin:[10,8,14,8],filename,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true},pagebreak:{mode:['css','legacy'],avoid:['tr','.invoice-print-summary','.invoice-print-note']}}).from(node).toPdf().get('pdf').then(pdf=>{const total=pdf.internal.getNumberOfPages();for(let i=1;i<=total;i++){pdf.setPage(i);pdf.setFontSize(7);pdf.setTextColor(110);const ident=nmDocumentIdentity();pdf.text(`${ident.clinic} · ${ident.doctor} · ${x.number} · ${stamp}`,8,291);pdf.text(`Página ${i} de ${total}`,202,291,{align:'right'});}}).save().then(()=>notify('Factura PDF descargada','success')).catch(e=>{console.error(e);notify('No se pudo generar el PDF de la factura','danger')}).finally(()=>wrap.remove())};
+
+// Reporte directo: usa los saltos CSS y estampa pie/numeracion en cada pagina real del PDF.
+downloadReportPDF=function(){if(typeof html2pdf==='undefined'){notify('El generador de PDF no terminó de cargar. Recarga la página.','danger');return}const source=document.querySelector('#report-modal-body .clinical-report');if(!source){notify('Genera el reporte primero','warning');return}const clone=source.cloneNode(true);clone.querySelectorAll('.report-screen-only,button,.report-actions').forEach(el=>el.remove());clone.classList.add('pdf-export-mode');Object.assign(clone.style,{width:'194mm',maxWidth:'194mm',margin:'0',background:'#fff',boxShadow:'none',overflow:'visible'});const staging=document.createElement('div');Object.assign(staging.style,{position:'fixed',left:'-10000px',top:'0',width:'194mm',background:'#fff'});document.querySelectorAll('#report-modal-body style').forEach(x=>staging.appendChild(x.cloneNode(true)));const extra=document.createElement('style');extra.textContent=`.pdf-export-mode,.pdf-export-mode *{box-sizing:border-box!important}.pdf-export-mode .cr-page{padding:7mm 5mm 8mm!important;break-after:page;page-break-after:always;overflow:visible!important}.pdf-export-mode .cr-page:last-child{break-after:auto;page-break-after:auto}.pdf-export-mode thead{display:table-header-group!important}.pdf-export-mode tr,.pdf-export-mode .cr-kpi,.pdf-export-mode .cr-chart-card,.pdf-export-mode .cr-box,.pdf-export-mode .cr-comparison,.pdf-export-mode .cr-access-item{break-inside:avoid!important;page-break-inside:avoid!important}.pdf-export-mode .cr-section h3{break-after:avoid!important;page-break-after:avoid!important}.pdf-export-mode .cr-line-chart{height:31mm!important}.pdf-export-mode .cr-spark{width:29mm!important;height:9mm!important}`;staging.appendChild(extra);staging.appendChild(clone);document.body.appendChild(staging);const patientName=source.dataset.patient||'Paciente',safeName=patientName.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_'),filename=`Reporte_Clinico_${safeName}_${new Date().toISOString().slice(0,10)}.pdf`,stamp=nmGenerationStamp();const waits=Promise.all([...clone.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true});setTimeout(r,2200)})));Promise.all([waits,document.fonts?.ready||Promise.resolve()]).then(()=>html2pdf().set({margin:[8,7,13,7],filename,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',logging:false,scrollX:0,scrollY:0,windowWidth:760},jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true},pagebreak:{mode:['css','legacy'],avoid:['.cr-head','.cr-patient','.cr-kpi','.cr-chart-card','.cr-box','.cr-comparison','.cr-access-item','tr']}}).from(clone).toPdf().get('pdf')).then(pdf=>{const total=pdf.internal.getNumberOfPages();for(let i=1;i<=total;i++){pdf.setPage(i);pdf.setFontSize(7);pdf.setTextColor(110);const ident=nmDocumentIdentity();pdf.text(`${ident.clinic} · ${ident.doctor} · ${patientName} · ${stamp}`,7,291);pdf.text(`Página ${i} de ${total}`,203,291,{align:'right'});}pdf.save(filename);notify('PDF completo descargado correctamente','success')}).catch(e=>{console.error(e);notify('No se pudo descargar el PDF','danger')}).finally(()=>staging.remove())};
+
+// Aviso preventivo para diferencias conocidas entre motores de impresión.
+window.addEventListener('beforeprint',()=>{document.documentElement.classList.add('nm-printing')});
+window.addEventListener('afterprint',()=>{document.documentElement.classList.remove('nm-printing')});
+</script>
+
 </body>
 </html>
