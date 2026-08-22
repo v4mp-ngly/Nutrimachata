@@ -1587,6 +1587,12 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
   }
 </style>
 
+
+<style id="hc-required-style">
+.hc-required-missing{border-color:#c84444!important;box-shadow:0 0 0 3px rgba(200,68,68,.10)!important;background:#fffafa!important}
+.hc-required-group{outline:2px solid rgba(200,68,68,.35);outline-offset:4px;border-radius:10px}
+.hc-required-note{font-size:12px;color:#8d2d2d;background:#fff2f2;border:1px solid #f2caca;border-radius:10px;padding:10px 12px;margin:0 0 16px}
+</style>
 </head>
 <body>
 
@@ -2769,7 +2775,7 @@ function savePubWizStep() {
 
 function pubWizNext() {
   savePubWizStep();
-  if (pubWizStep === 0 && !pubWizData.nombre) { notify('El nombre es requerido','danger'); return; }
+  if (!hcStepValidation(pubWizStep,pubWizData,true)) return;
   // Step 6 (index 5) is the last public step — step 7 (Evaluación) is doctor-only
   const PUB_WIZ_LAST = WIZ_STEPS.length - 2;
   if (pubWizStep >= PUB_WIZ_LAST) {
@@ -4165,9 +4171,97 @@ function saveWizStep() {
   }
 }
 
+// ─────────────────────────────────────────────
+// HISTORIA CLÍNICA: validación obligatoria por paso
+// No permite avanzar si falta una respuesta principal.
+// Campos condicionales "Otros" siguen siendo opcionales.
+// ─────────────────────────────────────────────
+function clearHCRequiredMarks(root=document){
+  root.querySelectorAll('.hc-required-missing').forEach(el=>el.classList.remove('hc-required-missing'));
+  root.querySelectorAll('.hc-required-group').forEach(el=>el.classList.remove('hc-required-group'));
+  root.querySelectorAll('.hc-required-note').forEach(el=>el.remove());
+}
+function markHCField(id, isPublic=false){
+  const el=document.getElementById((isPublic?'pub-':'')+id);
+  if(el){ el.classList.add('hc-required-missing'); return el; }
+  return null;
+}
+function markHCGroup(name,isPublic=false){
+  const nm=(isPublic?'pub-':'')+name;
+  const el=document.querySelector(`input[name="${nm}"]`)?.closest('.radio-group,.checkbox-group') || document.querySelector(`input[name="${nm}"]`)?.parentElement;
+  if(el) el.classList.add('hc-required-group');
+  return el;
+}
+function hcStepValidation(step,data,isPublic=false){
+  const root=document.getElementById(isPublic?'pub-wizard-body':'wizard-body')||document;
+  clearHCRequiredMarks(root);
+  const missing=[];
+  const need=(ok,label,fieldId=null,groupName=null)=>{ if(ok) return; missing.push(label); if(fieldId) markHCField(fieldId,isPublic); if(groupName) markHCGroup(groupName,isPublic); };
+  const txt=v=>String(v??'').trim().length>0;
+  const arr=v=>Array.isArray(v)&&v.length>0;
+  switch(step){
+    case 0:
+      need(txt(data.nombre),'Nombre completo','wf-nombre');
+      need(txt(data.cedula),'Cédula','wf-cedula');
+      need(txt(data.dob),'Fecha de nacimiento','wf-dob');
+      need(txt(data.telefono),'Teléfono','wf-tel');
+      need(txt(data.direccion),'Dirección','wf-dir');
+      need(txt(data.sexo),'Género',null,'wf-sexo');
+      need(txt(data.motivo),'Motivo de consulta','wf-motivo');
+      need(txt(data.objetivo),'Objetivo del tratamiento','wf-objetivo');
+      need(txt(data.plazo),'Tiempo esperado para lograrlo','wf-plazo');
+      break;
+    case 1:
+      need(arr(data.antecedentes),'Antecedentes personales',null,'wf-antec');
+      need(arr(data.antecFam),'Antecedentes familiares',null,'wf-fam');
+      break;
+    case 2:
+      need(txt(data.medicamentos),'Medicamentos o escribir “Ninguno”','wf-medicamentos');
+      need(txt(data.tieneAlergias),'Indicar si tiene alergias',null,'wf-alerg');
+      if(data.tieneAlergias==='si') need(txt(data.alergias),'Especificar alergias','wf-alergias');
+      need(txt(data.noConsume),'Alimentos que no consume o escribir “Ninguno”','wf-no-consume');
+      break;
+    case 3:
+      need(txt(data.actividad),'Nivel de actividad',null,'wf-act');
+      need(txt(data.ejercicio),'Tipo de ejercicio','wf-ejercicio');
+      need(txt(data.frecuencia),'Frecuencia semanal','wf-frecuencia');
+      need(txt(data.sueno),'Horas de sueño','wf-sueno');
+      need(txt(data.estres),'Nivel de estrés',null,'wf-estres');
+      need(arr(data.habitos),'Hábitos tóxicos o “Ninguno”',null,'wf-habitos');
+      break;
+    case 4:
+      need(arr(data.sintomas),'Síntomas recientes o “Ninguno”',null,'wf-sintomas');
+      need(txt(data.metabolicas),'Alteraciones metabólicas o escribir “Ninguna”','wf-metabolicas');
+      break;
+    case 5:
+      ['comeEstres','comeAburrido','hambreEmocional','comeRapido','comeLleno','culpaComer','dietasRepetidas','horariosRegulares'].forEach(k=>{
+        need(data[k]==='si'||data[k]==='no','Responder todas las preguntas de conducta alimentaria');
+      });
+      need(txt(data.comidasFuera),'Frecuencia de comidas fuera de casa',null,'wf-fuera');
+      break;
+    case 6:
+      // Paso clínico del profesional: peso y talla son obligatorios; las medidas marcadas como opcionales se mantienen opcionales.
+      need(Number(data.peso)>0,'Peso','wf-peso');
+      need(Number(data.talla)>0,'Talla','wf-talla-cm');
+      break;
+  }
+  if(missing.length){
+    const unique=[...new Set(missing)];
+    const note=document.createElement('div'); note.className='hc-required-note';
+    note.innerHTML='<strong>Complete este paso para continuar.</strong><br>'+unique.join(' · ');
+    root.prepend(note);
+    const first=root.querySelector('.hc-required-missing,.hc-required-group');
+    first?.scrollIntoView({behavior:'smooth',block:'center'});
+    first?.focus?.();
+    notify('Faltan campos obligatorios en la Historia Clínica','danger');
+    return false;
+  }
+  return true;
+}
+
 async function wizNext() {
   saveWizStep();
-  if (wizStep===0 && !wizData.nombre) { notify('El nombre es requerido','danger'); return; }
+  if (!hcStepValidation(wizStep,wizData,false)) return;
   if (wizStep===WIZ_STEPS.length-1) { await finishWizard(); return; }
   wizStep++;
   renderWizard();
