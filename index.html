@@ -1911,6 +1911,10 @@ async function supaAuthLogin(email,password){
   SUPA_AUTH_SESSION=data; sessionStorage.setItem('nutri_supa_session',JSON.stringify(data)); return data;
 }
 function restoreSupaSession(){try{const x=JSON.parse(sessionStorage.getItem('nutri_supa_session')||'null');if(x?.access_token)SUPA_AUTH_SESSION=x;}catch(_){}}
+function currentAuthUserId(){
+  const id = SUPA_AUTH_SESSION?.user?.id;
+  return (typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) ? id : null;
+}
 async function supaAuthLogout(){try{if(SUPA_AUTH_SESSION?.access_token)await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/logout',{method:'POST',headers:{apikey:SUPA_ANON,Authorization:'Bearer '+SUPA_AUTH_SESSION.access_token}});}catch(_){} SUPA_AUTH_SESSION=null;sessionStorage.removeItem('nutri_supa_session');}
 restoreSupaSession();
 
@@ -1961,6 +1965,49 @@ async function supa(path, method='GET', body=null) {
   }
 }
 
+
+// Carga progresiva de todas las filas de una tabla Supabase.
+// Evita que el límite de PostgREST deje pacientes fuera del directorio.
+async function supaFetchAll(path, pageSize=500) {
+  if (IS_LOCAL) return [];
+  const rows = [];
+  let offset = 0;
+  while (true) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const sep = path.includes('?') ? '&' : '?';
+      const url = (SUPA_URL.endsWith('/') ? SUPA_URL : SUPA_URL + '/') + 'rest/v1/' + path + sep + `limit=${pageSize}&offset=${offset}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          apikey: SUPA_ANON,
+          Authorization: 'Bearer ' + supaAccessToken(),
+          Accept: 'application/json',
+          'X-Client-Info': 'nutrimachata/1.0'
+        },
+        mode: 'cors', credentials: 'omit', signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`HTTP ${res.status}: ${detail || 'No se pudieron cargar los registros'}`);
+      }
+      const batch = await res.json();
+      if (!Array.isArray(batch)) throw new Error('Respuesta inválida de Supabase');
+      rows.push(...batch);
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+      if (offset > 50000) throw new Error('Se alcanzó el límite de seguridad de carga');
+    } catch (e) {
+      console.error('[supaFetchAll]', path, e);
+      notify?.('No se pudieron cargar todos los pacientes. Revisa la conexión o los permisos.', 'danger');
+      throw e;
+    }
+  }
+  return rows;
+}
+
 // ── CRUD helpers ──────────────────────────────
 const SB = {
   // USUARIOS
@@ -1974,7 +2021,7 @@ const SB = {
 
   // PACIENTES
   async getPacientes() {
-    return await supa('pacientes?order=created_at.desc&select=*') || [];
+    return await supaFetchAll('pacientes?order=created_at.desc&select=*');
   },
   async getPaciente(id) {
     const r = await supa(`pacientes?id=eq.${id}&limit=1&select=*`);
@@ -2004,6 +2051,35 @@ const SB = {
   },
   async deleteEvaluacion(id) {
     return await supa(`evaluaciones?id=eq.${id}`, 'DELETE');
+  },
+
+  // SEGUIMIENTO DEL PACIENTE
+  async getSeguimientos(pacienteId) {
+    return await supa(`seguimiento_paciente?paciente_id=eq.${pacienteId}&order=fecha.asc&select=*`) || [];
+  },
+  async getSeguimientoEvaluacion(evaluacionId) {
+    if (!evaluacionId) return null;
+    const r = await supa(`seguimiento_paciente?evaluacion_id=eq.${evaluacionId}&limit=1&select=*`);
+    return r && r[0] ? r[0] : null;
+  },
+  async createSeguimiento(data) {
+    const r = await supa('seguimiento_paciente', 'POST', data);
+    return r && r[0] ? r[0] : null;
+  },
+  async updateSeguimiento(id, data) {
+    return await supa(`seguimiento_paciente?id=eq.${id}`, 'PATCH', data);
+  },
+  async upsertSeguimientoByEvaluacion(evaluacionId, data) {
+    const existing = await SB.getSeguimientoEvaluacion(evaluacionId);
+    if (existing?.id) {
+      await SB.updateSeguimiento(existing.id, data);
+      return { ...existing, ...data };
+    }
+    return await SB.createSeguimiento({ ...data, evaluacion_id: evaluacionId });
+  },
+  async deleteSeguimientoByEvaluacion(evaluacionId) {
+    if (!evaluacionId) return null;
+    return await supa(`seguimiento_paciente?evaluacion_id=eq.${evaluacionId}`, 'DELETE');
   },
 
   // HISTORIAS
@@ -2110,13 +2186,14 @@ async function loadFromSupabase() {
   showLoadingOverlay(true);
   try {
     // Load everything in parallel with bulk queries
-    const [pacientesRaw, citasRaw, evalsRaw, dietasRaw, hcsRaw, usuariosRaw] = await Promise.all([
-      supa('pacientes?order=created_at.desc&select=*'),
-      supa('citas?order=fecha.asc,hora.asc&select=*'),
-      supa('evaluaciones?order=fecha.asc&select=*'),
-      supa('dietas?order=created_at.desc&select=*'),
-      supa('historias_clinicas?select=*'),
-      supa('usuarios?select=id,email,password_hash,rol,nombre'),
+    const [pacientesRaw, citasRaw, evalsRaw, dietasRaw, hcsRaw, usuariosRaw, seguimientosRaw] = await Promise.all([
+      supaFetchAll('pacientes?order=created_at.desc&select=*'),
+      supaFetchAll('citas?order=fecha.asc,hora.asc&select=*'),
+      supaFetchAll('evaluaciones?order=fecha.asc&select=*'),
+      supaFetchAll('dietas?order=created_at.desc&select=*'),
+      supaFetchAll('historias_clinicas?select=*'),
+      supaFetchAll('usuarios?select=id,email,password_hash,rol,nombre'),
+      supaFetchAll('seguimiento_paciente?order=fecha.asc,created_at.asc&select=*'),
     ]);
 
     const pacs    = pacientesRaw || [];
@@ -2125,6 +2202,21 @@ async function loadFromSupabase() {
     const hcs     = hcsRaw      || [];
     const citas   = citasRaw    || [];
     const usuarios = usuariosRaw || [];
+    const seguimientos = seguimientosRaw || [];
+
+    // Combinar seguimiento estructurado con cada evaluación. La tabla
+    // seguimiento_paciente es la fuente principal; el JSON antiguo en obs
+    // queda solo como compatibilidad con evaluaciones históricas.
+    const seguimientoPorEvaluacion = new Map();
+    seguimientos.forEach(r => {
+      if (r?.evaluacion_id) seguimientoPorEvaluacion.set(String(r.evaluacion_id), r);
+    });
+    evals.forEach(e => {
+      const seg = seguimientoPorEvaluacion.get(String(e.id));
+      if (seg) {
+        e._seguimiento = seg;
+      }
+    });
 
     // Map pacientes with their related data
     DB.patients = pacs.map(p => {
@@ -2158,7 +2250,7 @@ async function loadFromSupabase() {
     });
 
     DB.loaded = true;
-    console.log(`✓ Supabase cargado: ${DB.patients.length} pacientes, ${DB.appointments.length} citas`);
+    console.log(`✓ Supabase cargado: ${DB.patients.length} pacientes, ${DB.appointments.length} citas, ${seguimientos.length} seguimientos`);
     // Show connection status in sidebar
     const connBadge = document.getElementById('supa-status');
     if (connBadge) { connBadge.textContent = '● Conectado'; connBadge.style.color = 'var(--success)'; }
@@ -2265,7 +2357,9 @@ function mapPaciente(p, evals, dietas, hc) {
     if (imcActual < 18.5) estadoActual = 'Bajo Peso';
     else if (imcActual < 25) estadoActual = 'Normal';
     else if (imcActual < 30) estadoActual = 'Sobrepeso';
-    else estadoActual = 'Obesidad';
+    else if (imcActual < 35) estadoActual = 'Obesidad I';
+    else if (imcActual < 40) estadoActual = 'Obesidad II';
+    else estadoActual = 'Obesidad mórbida';
     
     // Obtener peso anterior (segunda evaluación más reciente)
     if (evalsOrdenadas.length > 1) {
@@ -2277,9 +2371,12 @@ function mapPaciente(p, evals, dietas, hc) {
   const progresoPeso = pesoActual - pesoAnterior; // Negativo = adelgazó, Positivo = engordó
   const direccionProgreso = progresoPeso < 0 ? 'mejoría' : progresoPeso > 0 ? 'empeoramiento' : 'mantenimiento';
   
+  const safeName = String(p.nombre || '').trim() || 'Paciente sin nombre';
+  const evalsOrdenadasVista = [...(evals || [])].sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
+  const ultimaEvaluacion = evalsOrdenadasVista[0]?.fecha || '';
   return {
     id: p.id,
-    nombre: p.nombre,
+    nombre: safeName,
     cedula: p.cedula || '',
     edad: p.edad || calcAgeFromDobStr(p.fecha_nacimiento) || 0,
     dob: p.fecha_nacimiento || '',
@@ -2300,9 +2397,11 @@ function mapPaciente(p, evals, dietas, hc) {
     noConsume: p.no_consume || '',
     enfermedades: p.enfermedades || '',
     activo: p.activo !== false,
-    color: p.color || getPatientColor(p.nombre),
-    initials: p.initials || p.nombre.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),
+    color: p.color || getPatientColor(safeName),
+    initials: p.initials || safeName.split(/\s+/).filter(Boolean).map(n=>n[0]).join('').toUpperCase().slice(0,2) || 'P',
     created: p.created_at ? p.created_at.substring(0,10) : '',
+    fechaIngreso: p.created_at ? p.created_at.substring(0,10) : '',
+    ultimaEvaluacion,
     evaluaciones: evals.map(e => ({
       id: e.id,
       fecha: e.fecha,
@@ -2313,6 +2412,15 @@ function mapPaciente(p, evals, dietas, hc) {
       estado: e.estado || '',
       obs: cleanEvalObs(e.obs || ''),
       ...decodeEvalFollowup(e.obs || ''),
+      ...(e._seguimiento ? {
+        seguimientoId: e._seguimiento.id,
+        dificil: e._seguimiento.dificil || '',
+        facil: e._seguimiento.facil || '',
+        habito: e._seguimiento.habito_mantenido || '',
+        proximoObjetivo: e._seguimiento.proximo_objetivo || '',
+        seguimientoObservaciones: e._seguimiento.observaciones || '',
+        seguimientoFecha: e._seguimiento.fecha || e.fecha
+      } : {}),
       cuello: e.cuello || null,
       pecho: e.pecho || null,
       muneca: e.muneca || null,
@@ -3258,9 +3366,17 @@ function renderPatients() {
   const patients = DB.patients || [];
   const active = patients.filter(p => p.activo !== false).length;
   const evaluated = patients.filter(p => p.evaluaciones && p.evaluaciones.length).length;
-  const newThisMonth = patients.filter(p=>{const f=p.fechaIngreso||'';return f && new Date(f).getMonth()===new Date().getMonth()}).length;
-  const recent = patients.slice(-1)[0] || patients[0] || null;
-  const avgImc = patients.length ? (patients.reduce((s,p)=>s+(Number(p.imc)||0),0)/patients.length).toFixed(1) : '0.0';
+  const now = new Date();
+  const newThisMonth = patients.filter(p => {
+    const f = p.fechaIngreso || p.created || '';
+    if (!f) return false;
+    const d = new Date(f + (String(f).length === 10 ? 'T12:00:00' : ''));
+    return !Number.isNaN(d.getTime()) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  // Supabase carga por created_at DESC: el primer registro es el más reciente.
+  const recent = patients[0] || null;
+  const validImcs = patients.map(p=>Number(p.imc)).filter(v=>Number.isFinite(v) && v > 0);
+  const avgImc = validImcs.length ? (validImcs.reduce((a,b)=>a+b,0)/validImcs.length).toFixed(1) : '—';
   const status = recent ? getImcBadge(recent.imc) : 'badge-neutral';
   
   document.getElementById('page-title').textContent = 'Pacientes';
@@ -3279,22 +3395,22 @@ function renderPatients() {
       <div class="kpi-card" style="text-align:center">
         <div class="kpi-label">Pacientes Totales</div>
         <div class="kpi-value">${patients.length}</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">↑ 5% vs mes anterior</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">Registros disponibles</div>
       </div>
       <div class="kpi-card" style="text-align:center">
         <div class="kpi-label">Pacientes Activos</div>
         <div class="kpi-value">${active}</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">${((active/patients.length)*100).toFixed(0)}% del total</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">${patients.length ? ((active/patients.length)*100).toFixed(0) : 0}% del total</div>
       </div>
       <div class="kpi-card" style="text-align:center">
         <div class="kpi-label">Nuevos Este Mes</div>
         <div class="kpi-value">${newThisMonth}</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">20% de incremento</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">Registrados en el mes actual</div>
       </div>
       <div class="kpi-card" style="text-align:center">
         <div class="kpi-label">Evaluaciones Totales</div>
         <div class="kpi-value">${evaluated}</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">↑ 8% vs anterior</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">Pacientes con al menos una evaluación</div>
       </div>
     </div>
 
@@ -3348,7 +3464,7 @@ function renderPatients() {
             <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700">${recent.initials}</div>
             <div style="flex:1">
               <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:700;line-height:1.1">${recent.nombre}</div>
-              <div style="font-size:12px;opacity:0.85;margin-top:4px">${recent.edad} años · ${recent.sexo==='F'?'Femenino':'Masculino'}</div>
+              <div style="font-size:12px;opacity:0.85;margin-top:4px">${recent.edad || '—'} años · ${formatPatientSex(recent.sexo)}</div>
               <span class="badge" style="background:rgba(255,255,255,0.2);color:white;margin-top:8px;border:1px solid rgba(255,255,255,0.3)">Activo</span>
             </div>
           </div>
@@ -3364,7 +3480,7 @@ function renderPatients() {
           </div>
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:16px 20px;border-top:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.1)">
             <div style="text-align:center;padding:12px;border-radius:var(--radius);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15)">
-              <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;margin-bottom:4px">${(recent.imc||0).toFixed(1)}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;margin-bottom:4px">${Number(recent.imc)>0 ? Number(recent.imc).toFixed(1) : '—'}</div>
               <div style="font-size:10px;opacity:0.75;text-transform:uppercase;font-weight:600">IMC</div>
             </div>
             <div style="text-align:center;padding:12px;border-radius:var(--radius);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15)">
@@ -3447,7 +3563,7 @@ function renderPatientsTable(list) {
           <div style="width:40px;height:40px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:white;flex-shrink:0">${p.initials}</div>
           <div style="min-width:0;flex:1">
             <div style="font-size:14px;font-weight:600;color:var(--black);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre}</div>
-            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'}</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${p.edad || '—'} años · ${formatPatientSex(p.sexo)}</div>
           </div>
         </div>
       </td>
@@ -3456,15 +3572,15 @@ function renderPatientsTable(list) {
         <div style="font-size:11px;color:var(--gray-400);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.telefono}</div>
       </td>
       <td style="padding:14px 16px;text-align:center">
-        <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${getImcColor(p.imc)}">${(p.imc||0).toFixed(1)}</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${p.peso}kg / ${p.talla}m</div>
+        <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${getImcColor(p.imc)}">${Number(p.imc)>0 ? Number(p.imc).toFixed(1) : '—'}</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${Number(p.peso)>0 ? Number(p.peso).toFixed(1)+' kg' : '—'} / ${Number(p.talla)>0 ? Number(p.talla).toFixed(2)+' m' : '—'}</div>
       </td>
       <td style="padding:14px 16px">
         <span class="badge ${getImcBadge(p.imc)}">${p.estado}</span>
         <div style="font-size:11px;color:${colorProgreso};font-weight:600;margin-top:4px">${iconoProgreso}</div>
       </td>
-      <td style="padding:14px 16px;font-family:'DM Mono',monospace;font-size:12px;text-align:center;color:var(--black)">${p.presion}</td>
-      <td style="padding:14px 16px;font-size:11px;color:var(--gray-400);text-align:center">${p.created}</td>
+      <td style="padding:14px 16px;font-family:'DM Mono',monospace;font-size:12px;text-align:center;color:var(--black)">${p.presion || '—'}</td>
+      <td style="padding:14px 16px;font-size:11px;color:var(--gray-400);text-align:center">${p.ultimaEvaluacion || 'Sin evaluación'}</td>
       <td style="padding:14px 16px;text-align:center" onclick="event.stopPropagation()">
         <div style="display:flex;gap:6px;justify-content:center">
           <button class="btn btn-olive btn-sm" title="Nueva evaluación" onclick="openEvalModal('${p.id}')">+ Eval</button>
@@ -3476,13 +3592,23 @@ function renderPatientsTable(list) {
   }).join('');
 }
 
+function normalizePatientSearch(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+function formatPatientSex(value) {
+  const s = normalizePatientSearch(value);
+  if (['f','femenino','female','mujer'].includes(s)) return 'Femenino';
+  if (['m','masculino','male','hombre'].includes(s)) return 'Masculino';
+  return value ? String(value) : 'Sin especificar';
+}
 function filterPatients() {
-  const q = document.getElementById('patient-search').value.toLowerCase();
-  const st = document.getElementById('patient-filter-status').value;
-  const filtered = DB.patients.filter(p =>
-    (!q || p.nombre.toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || p.estado.toLowerCase().includes(q)) &&
-    (!st || p.estado.includes(st))
-  );
+  const q = normalizePatientSearch(document.getElementById('patient-search')?.value);
+  const st = normalizePatientSearch(document.getElementById('patient-filter-status')?.value);
+  const filtered = (DB.patients || []).filter(p => {
+    const haystack = [p.nombre,p.email,p.telefono,p.cedula,p.estado].map(normalizePatientSearch).join(' ');
+    const estado = normalizePatientSearch(p.estado);
+    return (!q || haystack.includes(q)) && (!st || estado.includes(st));
+  });
   renderPatientsTable(filtered);
 }
 
@@ -4667,6 +4793,7 @@ function editEvaluacion(patientId, evalId) {
 async function deleteEvaluacion(patientId, evalId) {
   showConfirm('¿Eliminar esta evaluación?', async () => {
     try {
+      await SB.deleteSeguimientoByEvaluacion(evalId);
       await SB.deleteEvaluacion(evalId);
       const patient = DB.patients.find(p => p.id == patientId);
       if (patient && patient.evaluaciones) {
@@ -4893,8 +5020,10 @@ async function saveEvaluation() {
   const facil = document.getElementById('eval-facil')?.value.trim() || '';
   const habito = document.getElementById('eval-habito')?.value.trim() || '';
   const proximoObjetivo = document.getElementById('eval-proximo-objetivo')?.value.trim() || '';
-  const followupEncoded = encodeEvalFollowup({ dificil, facil, habito, proximoObjetivo });
-  const obs = cleanEvalObs(obsVisible) + (followupEncoded ? `\n[[SEGUIMIENTO_JSON:${followupEncoded}]]` : '');
+  // Las respuestas de seguimiento se guardan en seguimiento_paciente.
+  // No se incrustan nuevos datos dentro de observaciones; cleanEvalObs mantiene
+  // compatibilidad con registros históricos que sí contenían el JSON antiguo.
+  const obs = cleanEvalObs(obsVisible);
   const fecha   = document.getElementById('eval-fecha').value;
   // New anthropometric fields
   const cuello  = parseFloat(document.getElementById('eval-cuello')?.value) || null;
@@ -4917,6 +5046,16 @@ async function saveEvaluation() {
     if (evalId) {
       // Actualizar evaluación existente
       await SB.updateEvaluacion(evalId, evalData);
+      await SB.upsertSeguimientoByEvaluacion(evalId, {
+        paciente_id: pid,
+        fecha: fecha || new Date().toISOString().slice(0,10),
+        dificil: dificil || null,
+        facil: facil || null,
+        habito_mantenido: habito || null,
+        proximo_objetivo: proximoObjetivo || null,
+        observaciones: null,
+        created_by: currentAuthUserId()
+      });
       const p = DB.patients.find(x => x.id == pid);
       if (p && p.evaluaciones) {
         const idx = p.evaluaciones.findIndex(e => e.id == evalId);
@@ -4929,6 +5068,18 @@ async function saveEvaluation() {
     } else {
       // Crear nueva evaluación
       const created = await SB.createEvaluacion(evalData);
+      if (!created?.id) throw new Error('Supabase no devolvió el ID de la evaluación creada. No se pudo vincular el seguimiento.');
+      await SB.createSeguimiento({
+        paciente_id: pid,
+        evaluacion_id: created.id,
+        fecha: fecha || new Date().toISOString().slice(0,10),
+        dificil: dificil || null,
+        facil: facil || null,
+        habito_mantenido: habito || null,
+        proximo_objetivo: proximoObjetivo || null,
+        observaciones: null,
+        created_by: currentAuthUserId()
+      });
       const p = DB.patients.find(x => x.id == pid);
       if (p) {
         if (!p.evaluaciones) p.evaluaciones = [];
@@ -5504,7 +5655,7 @@ function openHistoriaClinica(patientId, activeTab) {
           <div style="opacity:0.8;font-size:13px;margin-bottom:10px">${p.edad} años · ${p.sexo==='F'?'Femenino':'Masculino'}${p.cedula?' · C.I. '+p.cedula:''}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <span style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500">${p.estado}</span>
-            <span style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:12px">IMC ${(p.imc||0).toFixed(1)}</span>
+            <span style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:12px">IMC ${Number(p.imc)>0 ? Number(p.imc).toFixed(1) : '—'}</span>
             <span style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:12px">${p.activo?'✓ Activo':'Inactivo'}</span>
           </div>
         </div>
@@ -5567,7 +5718,7 @@ function openHistoriaClinica(patientId, activeTab) {
         <div class="card">
           <div class="card-header" style="padding:14px 16px 8px">
             <div class="card-title" style="font-size:13px">IMC</div>
-            <div style="font-size:11px;color:var(--gray-400)">${(p.imc||0).toFixed(1)} — ${p.estado}</div>
+            <div style="font-size:11px;color:var(--gray-400)">${Number(p.imc)>0 ? Number(p.imc).toFixed(1) : '—'} — ${p.estado}</div>
           </div>
           <div style="padding:4px 16px 16px"><div style="height:150px"><canvas id="hcp-gauge-imc"></canvas></div></div>
         </div>
@@ -6196,7 +6347,7 @@ tbody tr:nth-child(even) td{background:#F5FAF0}
   </div>
   <div class="kpis">
     <div class="kpi"><div class="kpi-val">${p.peso}</div><div class="kpi-lbl">kg</div></div>
-    <div class="kpi"><div class="kpi-val">${(p.imc||0).toFixed(1)}</div><div class="kpi-lbl">IMC</div></div>
+    <div class="kpi"><div class="kpi-val">${Number(p.imc)>0 ? Number(p.imc).toFixed(1) : '—'}</div><div class="kpi-lbl">IMC</div></div>
     <div class="kpi"><div class="kpi-val">${evals.length}</div><div class="kpi-lbl">Eval.</div></div>
   </div>
 </div>
@@ -6240,7 +6391,7 @@ function viewEvaluationReport(patientId, evalId) {
         <p style="margin:0;opacity:0.85">Evaluación del ${eval_.fecha}</p>
       </div>
       <div style="text-align:right;font-size:12px;opacity:0.8">
-        <div>${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'}</div>
+        <div>${p.edad || '—'} años · ${formatPatientSex(p.sexo)}</div>
         <div>${p.cedula || '—'}</div>
       </div>
     </div>
@@ -6747,7 +6898,7 @@ table tbody tr:last-child td{border-bottom:2px solid ${C3}}
   </div>
   <div class="info-chip">
     <div class="chip-label">Peso · Talla · IMC</div>
-    <div class="chip-value">${p.peso} kg · ${p.talla} m · ${(p.imc||0).toFixed(1)}</div>
+    <div class="chip-value">${p.peso} kg · ${p.talla} m · ${Number(p.imc)>0 ? Number(p.imc).toFixed(1) : '—'}</div>
   </div>
 </div>
 
@@ -9097,7 +9248,7 @@ function renderPortal() {
           <div style="font-size:12px;color:var(--gray-400);margin-top:2px">Índice de Masa Corporal</div>
         </div>
         <div>
-          <span style="font-size:32px;font-weight:800;font-family:'DM Mono',monospace;color:${imcColor}">${(p.imc||0).toFixed(1)}</span>
+          <span style="font-size:32px;font-weight:800;font-family:'DM Mono',monospace;color:${imcColor}">${Number(p.imc)>0 ? Number(p.imc).toFixed(1) : '—'}</span>
           <span class="badge ${getImcBadge(p.imc)}" style="margin-left:8px;font-size:12px">${imcCat}</span>
         </div>
       </div>
@@ -11321,7 +11472,7 @@ function openEvaluationDetail(patientId, evalId) {
       <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">${p.initials}</div>
       <div style="flex:1">
         <div style="font-size:20px;font-weight:600;margin-bottom:4px">${p.nombre}</div>
-        <div style="font-size:13px;opacity:0.8;margin-bottom:8px">${p.edad} años · ${p.sexo === 'F' ? 'Femenino' : 'Masculino'} · ${p.cedula || '—'}</div>
+        <div style="font-size:13px;opacity:0.8;margin-bottom:8px">${p.edad || '—'} años · ${formatPatientSex(p.sexo)} · ${p.cedula || '—'}</div>
         <div style="font-size:12px;opacity:0.7">Evaluación: ${eval_.fecha}</div>
       </div>
       <button class="btn btn-outline btn-sm" onclick="openHistoriaClinica('${patientId}')">← Volver</button>
@@ -11897,6 +12048,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   function dbRole(){return String(DB?.currentUser?.role||DB?.currentRole||'').toLowerCase();}
   function canManageBilling(){return ['admin','doctor','recepcion','reception','assistant','asistente'].includes(dbRole());}
   function currentCreatorId(){
+    const authId=currentAuthUserId();
+    if(authId) return authId;
     const candidates=[DB?.currentUser?.supabaseId,DB?.currentUser?.id];
     return candidates.find(isUuid)||null;
   }
