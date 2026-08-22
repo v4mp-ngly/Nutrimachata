@@ -2043,8 +2043,6 @@ async function supa(path, method='GET', body=null) {
 
   const execute = async (attempt=0) => {
     await ensureSupaSession();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
     try {
       const token = supaAccessToken();
       const wantsRepresentation = ['POST','PATCH','DELETE'].includes(method);
@@ -2057,7 +2055,7 @@ async function supa(path, method='GET', body=null) {
           'Prefer': wantsRepresentation ? 'return=representation' : '',
           'X-Client-Info': 'nutrimachata/1.0'
         },
-        mode: 'cors', credentials: 'omit', signal: controller.signal
+        mode: 'cors', credentials: 'omit'
       };
       if (body !== null && body !== undefined) opts.body = JSON.stringify(body);
       const url = SUPA_URL.endsWith('/') ? SUPA_URL + 'rest/v1/' + path : SUPA_URL + '/rest/v1/' + path;
@@ -2069,7 +2067,6 @@ async function supa(path, method='GET', body=null) {
       const detail = typeof parsed === 'string' ? parsed : (parsed?.message || parsed?.details || parsed?.hint || JSON.stringify(parsed || {}));
       const jwtExpired = res.status===401 || /jwt.*expired|token.*expired|invalid.*jwt/i.test(detail || '');
       if (jwtExpired && attempt===0) {
-        clearTimeout(timeout);
         saveEvaluationDraft();
         await refreshSupaSession(true);
         return execute(1);
@@ -2086,14 +2083,13 @@ async function supa(path, method='GET', body=null) {
       SUPA_ONLINE = true;
       return parsed;
     } catch(e) {
-      if (e.name === 'AbortError') { SUPA_ONLINE=false; throw new Error('Supabase tardó demasiado en responder. No se guardó ningún cambio.'); }
       if (/Failed to fetch|NetworkError|Load failed/i.test(e.message || '')) { SUPA_ONLINE=false; throw new Error('No hay conexión con Supabase. No se guardó ningún cambio.'); }
       if(e?.code==='AUTH_SESSION_EXPIRED'){
         saveEvaluationDraft();
         notify?.('Tu sesión venció. Tus datos de la evaluación quedaron guardados temporalmente en esta pestaña. Inicia sesión nuevamente.', 'danger');
       }
       throw e;
-    } finally { clearTimeout(timeout); }
+    }
   };
   return execute(0);
 }
@@ -4941,8 +4937,6 @@ function openEvalModal(patientId) {
       </div>
     </div>
 
-    ${evalFollowupFields()}
-
     <div class="form-group mt-4">
       <label>Estado Clínico</label>
       <div id="eval-estado-display" style="padding:10px 14px;background:var(--beige);border-radius:var(--radius);font-weight:600;font-size:13px;color:var(--gray-500);border:1px solid var(--gray-200)">
@@ -4955,11 +4949,10 @@ function openEvalModal(patientId) {
     </div>
     <div class="modal-footer" style="padding:20px 0 0;margin-top:20px;border-top:1px solid var(--gray-100)">
       <button class="btn btn-outline" onclick="closeModal('modal-evaluation')">Cancelar</button>
-      <button class="btn btn-olive" id="eval-save-btn" onclick="saveEvaluation()" disabled style="opacity:.55;cursor:not-allowed" title="Completa las 4 preguntas de seguimiento para continuar">Guardar Evaluación</button>
+      <button class="btn btn-olive" id="eval-save-btn" onclick="saveEvaluation()">Guardar Evaluación</button>
     </div>
   `;
   if (patient) setTimeout(calcEvalIMC, 100);
-  setTimeout(() => updateEvalFollowupState(false), 0);
   openModal('modal-evaluation');
 }
 
@@ -5018,8 +5011,6 @@ function editEvaluacion(patientId, evalId) {
       </div>
     </div>
 
-    ${evalFollowupFields(eval_)}
-
     <div class="form-group mt-4">
       <label>Estado Clínico</label>
       <div id="eval-estado-display" style="padding:10px 14px;background:var(--beige);border-radius:var(--radius);font-weight:600;font-size:13px;color:var(--gray-500);border:1px solid var(--gray-200)">
@@ -5040,7 +5031,6 @@ function editEvaluacion(patientId, evalId) {
   `;
   setTimeout(() => {
     calcEvalIMC();
-    updateEvalFollowupState(false);
     console.log('calcEvalIMC ejecutado');
   }, 100);
   openModal('modal-evaluation');
@@ -5261,7 +5251,6 @@ function calcEvalIMC() {
 }
 
 async function saveEvaluation() {
-  if (!validateEvalFollowup()) return;
   const evalId = document.getElementById('eval-id')?.value; // Para editar
   const pid = document.getElementById('eval-patient-select').value;
   if (!pid) { notify('Seleccione un paciente', 'danger'); return; }
@@ -5273,13 +5262,6 @@ async function saveEvaluation() {
   const presion = document.getElementById('eval-presion').value;
   const estado  = document.getElementById('eval-estado').value || getImcCategory(imc);
   const obsVisible = document.getElementById('eval-obs').value;
-  const dificil = document.getElementById('eval-dificil')?.value.trim() || '';
-  const facil = document.getElementById('eval-facil')?.value.trim() || '';
-  const habito = document.getElementById('eval-habito')?.value.trim() || '';
-  const proximoObjetivo = document.getElementById('eval-proximo-objetivo')?.value.trim() || '';
-  // Las respuestas de seguimiento se guardan en seguimiento_paciente.
-  // No se incrustan nuevos datos dentro de observaciones; cleanEvalObs mantiene
-  // compatibilidad con registros históricos que sí contenían el JSON antiguo.
   const obs = cleanEvalObs(obsVisible);
   const fecha   = document.getElementById('eval-fecha').value;
   // New anthropometric fields
@@ -5303,21 +5285,11 @@ async function saveEvaluation() {
     if (evalId) {
       // Actualizar evaluación existente
       await SB.updateEvaluacion(evalId, evalData);
-      await SB.upsertSeguimientoByEvaluacion(evalId, {
-        paciente_id: pid,
-        fecha: fecha || new Date().toISOString().slice(0,10),
-        dificil: dificil || null,
-        facil: facil || null,
-        habito_mantenido: habito || null,
-        proximo_objetivo: proximoObjetivo || null,
-        observaciones: null,
-        created_by: currentAuthUserId()
-      });
       const p = DB.patients.find(x => x.id == pid);
       if (p && p.evaluaciones) {
         const idx = p.evaluaciones.findIndex(e => e.id == evalId);
         if (idx >= 0) {
-          p.evaluaciones[idx] = { id: evalId, fecha, peso, talla, imc, presion, estado, obs: cleanEvalObs(obs), dificil, facil, habito, proximoObjetivo,
+          p.evaluaciones[idx] = { id: evalId, fecha, peso, talla, imc, presion, estado, obs: cleanEvalObs(obs),
             cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc };
         }
       }
@@ -5326,21 +5298,10 @@ async function saveEvaluation() {
       // Crear nueva evaluación
       const created = await SB.createEvaluacion(evalData);
       if (!created?.id) throw new Error('Supabase no devolvió el ID de la evaluación creada. No se pudo vincular el seguimiento.');
-      await SB.createSeguimiento({
-        paciente_id: pid,
-        evaluacion_id: created.id,
-        fecha: fecha || new Date().toISOString().slice(0,10),
-        dificil: dificil || null,
-        facil: facil || null,
-        habito_mantenido: habito || null,
-        proximo_objetivo: proximoObjetivo || null,
-        observaciones: null,
-        created_by: currentAuthUserId()
-      });
       const p = DB.patients.find(x => x.id == pid);
       if (p) {
         if (!p.evaluaciones) p.evaluaciones = [];
-        p.evaluaciones.push({ id: created ? created.id : ('local-'+Date.now()), fecha, peso, talla, imc, presion, estado, obs: cleanEvalObs(obs), dificil, facil, habito, proximoObjetivo,
+        p.evaluaciones.push({ id: created ? created.id : ('local-'+Date.now()), fecha, peso, talla, imc, presion, estado, obs: cleanEvalObs(obs),
           cuello, pecho, muneca, cintura, abdomen, cadera, muslo, grasa, fc });
       }
       notify('Evaluación guardada correctamente', 'success');
@@ -12330,11 +12291,9 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       ...extraHeaders
     };
     if(method==='POST'||method==='PATCH')headers.Prefer='return=representation';
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),12000);
     try{
       const url=SUPA_URL.replace(/\/$/,'')+'/rest/v1/'+path;
-      const res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),signal:controller.signal,mode:'cors',credentials:'omit'});
+      const res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'});
       const raw=await res.text();
       let data=null; try{data=raw?JSON.parse(raw):null}catch(_){data=raw;}
       if(!res.ok){
@@ -12343,9 +12302,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       }
       return data;
     }catch(e){
-      if(e.name==='AbortError')throw new Error('La conexión con Supabase tardó demasiado. Intenta nuevamente.');
       throw e;
-    }finally{clearTimeout(timer);}
+    }
   }
 
   function humanDbError(e,action='guardar'){
@@ -12647,7 +12605,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 
 <script id="nm-supabase-save-audit">
 (function(){
-  const TABLES=['pacientes','evaluaciones','seguimiento_paciente','historias_clinicas','dietas','citas','productos_servicios','facturas','factura_detalles','pagos','movimientos_inventario'];
+  const TABLES=['pacientes','evaluaciones','historias_clinicas','dietas','citas','productos_servicios','facturas','factura_detalles','pagos','movimientos_inventario'];
   window.nmSupabaseSaveAudit = async function(showOk=true){
     const failures=[];
     for(const table of TABLES){
