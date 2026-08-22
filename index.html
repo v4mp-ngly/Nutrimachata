@@ -1929,45 +1929,64 @@ const IS_LOCAL = window.location.protocol === 'file:';
 let SUPA_ONLINE = !IS_LOCAL; // will be set false if connection fails
 
 async function supa(path, method='GET', body=null) {
+  method = String(method || 'GET').toUpperCase();
   if (IS_LOCAL) {
-    return method === 'GET' ? [] : { id: 'local-' + Date.now() };
+    if (method === 'GET') return [];
+    throw new Error('Supabase no está disponible desde archivo local. Abre NutriMachata desde su sitio para guardar datos.');
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
+    const token = supaAccessToken();
+    if (!token) throw new Error('No hay una sesión válida de Supabase. Inicia sesión nuevamente.');
+    const wantsRepresentation = ['POST','PATCH','DELETE'].includes(method);
     const opts = {
       method,
       headers: {
         'apikey': SUPA_ANON,
-        'Authorization': 'Bearer ' + supaAccessToken(),
+        'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
-        'Prefer': (method === 'POST' || method === 'PATCH') ? 'return=representation' : '',
+        'Prefer': wantsRepresentation ? 'return=representation' : '',
         'X-Client-Info': 'nutrimachata/1.0'
-      }
+      },
+      mode: 'cors',
+      credentials: 'omit',
+      signal: controller.signal
     };
-    if (body) opts.body = JSON.stringify(body);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    opts.signal = controller.signal;
+    if (body !== null && body !== undefined) opts.body = JSON.stringify(body);
     const url = SUPA_URL.endsWith('/') ? SUPA_URL + 'rest/v1/' + path : SUPA_URL + '/rest/v1/' + path;
-    opts.mode = 'cors';
-    opts.credentials = 'omit';
     const res = await fetch(url, opts);
-    clearTimeout(timeout);
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[supa] ${method} ${path} → HTTP ${res.status}:`, errText);
-      console.error(`[supa] Body enviado:`, body ? JSON.stringify(body).substring(0, 500) : 'ninguno');
-      return null;
-    }
     const text = await res.text();
-    return text ? JSON.parse(text) : null;
+    let parsed = null;
+    if (text) {
+      try { parsed = JSON.parse(text); } catch (_) { parsed = text; }
+    }
+    if (!res.ok) {
+      const detail = typeof parsed === 'string' ? parsed : (parsed?.message || parsed?.details || JSON.stringify(parsed || {}));
+      const err = new Error(`Supabase HTTP ${res.status}: ${detail || 'operación rechazada'}`);
+      err.status = res.status; err.path = path; err.method = method;
+      console.error('[supa]', err, body || '');
+      throw err;
+    }
+    if (['POST','PATCH','DELETE'].includes(method)) {
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error(`Supabase no confirmó ningún registro para ${method} ${path}. Revisa RLS, ID o filtros.`);
+      }
+    }
+    SUPA_ONLINE = true;
+    return parsed;
   } catch(e) {
     if (e.name === 'AbortError') {
-      console.warn('Supabase timeout');
-    } else {
-      console.warn('Supabase unavailable:', e.message);
       SUPA_ONLINE = false;
+      throw new Error('Supabase tardó demasiado en responder. No se guardó ningún cambio.');
     }
-    return method === 'GET' ? [] : { id: 'local-' + Date.now() };
+    if (/Failed to fetch|NetworkError|Load failed/i.test(e.message || '')) {
+      SUPA_ONLINE = false;
+      throw new Error('No hay conexión con Supabase. No se guardó ningún cambio.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -2140,7 +2159,7 @@ const SB = {
 async function testSupabaseConnection() {
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/usuarios?limit=1', {
-      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON },
+      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + supaAccessToken() },
       mode: 'cors', credentials: 'omit',
       signal: AbortSignal.timeout(8000)
     });
@@ -3745,6 +3764,7 @@ async function savePatient(id) {
       notify('Paciente actualizado', 'success');
     } else {
       const created = await SB.createPaciente(sbData);
+      if (!created?.id) throw new Error('Supabase no confirmó la creación del paciente.');
       if (created && created.id) {
         const newP = mapPaciente(created, [], [], null);
         DB.patients.push(newP);
@@ -3766,7 +3786,8 @@ async function savePatient(id) {
       }
     }
   } catch(e) {
-    console.error(e); notify('Error al guardar', 'danger');
+    console.error(e); notify('No se pudo guardar el paciente en Supabase: ' + (e.message || 'error desconocido'), 'danger');
+    return;
   }
   closeModal('modal-patient');
   renderPatients();
@@ -4384,8 +4405,8 @@ async function finishWizard() {
       color, initials, activo: true,
     });
 
-    // Use Supabase UUID if available, otherwise keep temp ID
-    const realId = (sbPac && sbPac.id) ? sbPac.id : tempId;
+    if (!sbPac?.id) throw new Error('Supabase no confirmó la creación del paciente.');
+    const realId = sbPac.id;
     newPatient.id = realId;
 
     if (sbPac && sbPac.id) {
@@ -4454,16 +4475,15 @@ async function finishWizard() {
       });
 
       notify('✓ Paciente guardado en Supabase correctamente', 'success');
-    } else {
-      // Supabase failed — still save locally
-      notify('Paciente registrado localmente (sin conexión a Supabase)', 'warning');
     }
   } catch(e) {
     console.error('Error guardando paciente en Supabase:', e);
-    notify('Error al guardar en Supabase. Registrado solo localmente.', 'warning');
+    notify('No se pudo completar el expediente en Supabase: ' + (e.message || 'error desconocido'), 'danger');
+    navigate('patients');
+    return;
   }
 
-  // Add to local DB (with real ID)
+  // Solo reflejar localmente después de confirmación real de Supabase.
   newPatient.portalPassword = autoPass;
   DB.patients.push(newPatient);
   USERS[autoEmail] = {
@@ -4605,6 +4625,8 @@ function downloadHistoriaClinica(patientId) {
   <div style="margin-top:24px;text-align:center;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px">
     NutriMachata · Dra. María Alejandra Chalas · ${new Date().toLocaleDateString('es-DO')}
   </div>
+
+
 </body></html>`;
 
   downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -6861,14 +6883,9 @@ async function saveDiet(existingId) {
       const created = await SB.createDieta(dietData);
       // created can be: {id,...} or [{id,...}] or null
       const createdObj = Array.isArray(created) ? created[0] : created;
-      const newId = createdObj?.id || ('local-' + Date.now());
-      p.dietas.unshift({ id: newId, nombre: dietData.nombre, fecha: dietData.fecha, calorias: dietData.calorias, tipo: 'Semanal', weekPlan, indicaciones: dietData.indicaciones });
-      if (createdObj?.id) {
-        notify('Plan semanal guardado ✓', 'success');
-      } else {
-        notify('Plan guardado — verifica conexión a Supabase', 'warning');
-        console.warn('[saveDiet] No se recibió ID de Supabase. Respuesta:', created);
-      }
+      if (!createdObj?.id) throw new Error('Supabase no confirmó la creación del plan nutricional.');
+      p.dietas.unshift({ id: createdObj.id, nombre: dietData.nombre, fecha: dietData.fecha, calorias: dietData.calorias, tipo: 'Semanal', weekPlan, indicaciones: dietData.indicaciones });
+      notify('Plan semanal guardado ✓', 'success');
     }
     closeModal('modal-diet');
     if(currentPage==='diets') renderDiets();
@@ -12537,5 +12554,27 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 })();
 </script>
 
+
+<script id="nm-supabase-save-audit">
+(function(){
+  const TABLES=['pacientes','evaluaciones','seguimiento_paciente','historias_clinicas','dietas','citas','productos_servicios','facturas','factura_detalles','pagos','movimientos_inventario'];
+  window.nmSupabaseSaveAudit = async function(showOk=true){
+    const failures=[];
+    for(const table of TABLES){
+      try{
+        await supa(table + '?select=*&limit=1','GET');
+      }catch(e){ failures.push({table,error:e.message||String(e)}); }
+    }
+    if(failures.length){
+      console.table(failures);
+      notify?.('Supabase: ' + failures.length + ' módulo(s) sin acceso. Revisa consola/RLS.','danger');
+      return {ok:false,failures};
+    }
+    if(showOk) notify?.('Supabase conectado: módulos principales accesibles ✓','success');
+    return {ok:true,failures:[]};
+  };
+  window.addEventListener('online',()=>{ if(typeof currentAuthUserId==='function' && currentAuthUserId()) nmSupabaseSaveAudit(false); });
+})();
+</script>
 </body>
 </html>
