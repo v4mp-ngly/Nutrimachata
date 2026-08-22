@@ -1901,6 +1901,18 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
 const SUPA_URL = 'https://nhcsuvcubdvciuyihrcm.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oY3N1dmN1YmR2Y2l1eWlocmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzY1NzcsImV4cCI6MjA5NTY1MjU3N30.dD8E__TOZao-gaaqItNPYe4pocDNiEL0lUtjLrI47Ic';
 const SUPA_ANON = SUPA_KEY;
+const NUTRI_ADMIN_EMAIL = 'admin@nutrimachata.com';
+let SUPA_AUTH_SESSION = null;
+function supaAccessToken(){ return SUPA_AUTH_SESSION?.access_token || SUPA_ANON; }
+async function supaAuthLogin(email,password){
+  const res=await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:SUPA_ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data?.msg||data?.error_description||data?.message||'No se pudo iniciar sesión');
+  SUPA_AUTH_SESSION=data; sessionStorage.setItem('nutri_supa_session',JSON.stringify(data)); return data;
+}
+function restoreSupaSession(){try{const x=JSON.parse(sessionStorage.getItem('nutri_supa_session')||'null');if(x?.access_token)SUPA_AUTH_SESSION=x;}catch(_){}}
+async function supaAuthLogout(){try{if(SUPA_AUTH_SESSION?.access_token)await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/logout',{method:'POST',headers:{apikey:SUPA_ANON,Authorization:'Bearer '+SUPA_AUTH_SESSION.access_token}});}catch(_){} SUPA_AUTH_SESSION=null;sessionStorage.removeItem('nutri_supa_session');}
+restoreSupaSession();
 
 // Detect if running locally (file://) or online
 const IS_LOCAL = window.location.protocol === 'file:';
@@ -1915,7 +1927,7 @@ async function supa(path, method='GET', body=null) {
       method,
       headers: {
         'apikey': SUPA_ANON,
-        'Authorization': 'Bearer ' + SUPA_ANON,
+        'Authorization': 'Bearer ' + supaAccessToken(),
         'Content-Type': 'application/json',
         'Prefer': (method === 'POST' || method === 'PATCH') ? 'return=representation' : '',
         'X-Client-Info': 'nutrimachata/1.0'
@@ -2450,66 +2462,25 @@ function setRole(r) {
 }
 
 async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pass  = document.getElementById('login-password').value;
-  if (!email || !pass) { notify('Ingrese email y contraseña', 'danger'); return; }
-
-  const btn = document.querySelector('.btn-primary');
-  if (btn) { btn.textContent = 'Verificando...'; btn.disabled = true; }
-
-  const enterApp = async (user) => {
-    DB.currentUser = user;
-    DB.currentRole = user.role;
-    document.getElementById('login-page').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    await loadFromSupabase();
-    // After loading, resolve patientId by email for patients (handles local USERS fallback)
-    if (user.role === 'patient') {
-      const myRecord = DB.patients.find(x => x.email === user.email);
-      if (myRecord) DB.currentUser.patientId = myRecord.id;
-    }
-    initApp();
-    notify('¡Bienvenido/a, ' + user.name + '!', 'success');
-  };
-
-  try {
-    // 1. Try Supabase
-    const u = await SB.getUsuario(email);
-    if (u && u.password_hash === pass) {
-      let patientId = null;
-      if (u.rol === 'patient') {
-        const pacs = await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1`);
-        if (pacs && pacs[0]) patientId = pacs[0].id;
-      }
-      await enterApp({
-        email, name: u.nombre, role: u.rol, patientId,
-        initials: u.nombre.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),
-        supabaseId: u.id
-      });
-      return;
-    }
-
-    // 2. Fallback: local USERS object
-    const local = USERS[email];
-    if (local && local.pass === pass) {
-      await enterApp({ ...local, email });
-      return;
-    }
-
-    // 3. Nothing matched
-    notify('Credenciales incorrectas', 'danger');
-  } catch(e) {
-    console.error('doLogin error:', e);
-    // Last resort: try local
-    const local = USERS[email];
-    if (local && local.pass === pass) {
-      await enterApp({ ...local, email });
-      return;
-    }
-    notify('Error de conexión. Verifique su internet.', 'danger');
-  } finally {
-    if (btn) { btn.textContent = 'Iniciar sesión'; btn.disabled = false; }
-  }
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const pass=document.getElementById('login-password').value;
+  if(!email||!pass){notify('Ingrese email y contraseña','danger');return;}
+  const btn=document.getElementById('login-submit'); if(btn){btn.textContent='Verificando...';btn.disabled=true;}
+  try{
+    const auth=await supaAuthLogin(email,pass);
+    const au=auth.user||{};
+    let role=(au.user_metadata?.role||au.app_metadata?.role||'').toLowerCase();
+    if(email===NUTRI_ADMIN_EMAIL) role='admin';
+    if(!role) role=DB.loginRole==='patient'?'patient':'admin';
+    let patientId=null;
+    if(role==='patient'){const pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=*`);patientId=pacs?.[0]?.id||null;}
+    const name=au.user_metadata?.name||au.user_metadata?.nombre||(email===NUTRI_ADMIN_EMAIL?'Administrador NutriMachata':email.split('@')[0]);
+    DB.currentUser={email,name,role,patientId,initials:name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),supabaseId:au.id,id:au.id};
+    DB.currentRole=role;
+    document.getElementById('login-page').style.display='none';document.getElementById('app').style.display='block';
+    await loadFromSupabase(); initApp(); notify('¡Bienvenido/a, '+name+'!','success');
+  }catch(e){console.error('Supabase Auth:',e);notify('No se pudo iniciar sesión: '+(e.message||'credenciales incorrectas'),'danger');}
+  finally{if(btn){btn.textContent='Iniciar sesión';btn.disabled=false;}}
 }
 
 // Expone las acciones de acceso y evita depender de la resolución de nombres
@@ -2932,10 +2903,9 @@ function prefillPatientLogin(email, pass) {
 }
 
 function doLogout() {
-  showConfirm('¿Cerrar sesión?', () => {
-    DB.currentUser = null;
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('login-page').style.display = 'flex';
+  showConfirm('¿Cerrar sesión?', async () => {
+    await supaAuthLogout(); DB.currentUser=null; DB.currentRole=null;
+    document.getElementById('app').style.display='none';document.getElementById('login-page').style.display='flex';
   });
 }
 
@@ -11950,7 +11920,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     if(IS_LOCAL) throw new Error('Abre NutriMachata desde una URL web (http/https). Supabase no se usa en modo file://.');
     const headers={
       apikey:SUPA_ANON,
-      Authorization:'Bearer '+SUPA_ANON,
+      Authorization:'Bearer '+supaAccessToken(),
       'Content-Type':'application/json',
       ...extraHeaders
     };
