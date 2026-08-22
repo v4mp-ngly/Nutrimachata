@@ -4613,14 +4613,62 @@ function cleanEvalObs(obs) {
 function evalFollowupFields(values={}) {
   const esc = v => String(v || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   return `
-    <div style="background:#f7f8f1;border:1px solid var(--olive-pale);border-radius:var(--radius);padding:16px;margin:18px 0 4px">
-      <div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">🌱 Seguimiento del paciente</div>
-      <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Estas respuestas quedarán registradas en la evaluación y se agregarán automáticamente a la Historia Clínica.</div>
-      <div class="form-group mb-3"><label>¿Qué fue lo más difícil?</label><textarea class="form-textarea" id="eval-dificil" placeholder="Respuesta del paciente...">${esc(values.dificil)}</textarea></div>
-      <div class="form-group mb-3"><label>¿Qué fue lo más fácil?</label><textarea class="form-textarea" id="eval-facil" placeholder="Respuesta del paciente...">${esc(values.facil)}</textarea></div>
-      <div class="form-group mb-3"><label>¿Qué hábito ya no cuesta mantener?</label><textarea class="form-textarea" id="eval-habito" placeholder="Respuesta del paciente...">${esc(values.habito)}</textarea></div>
-      <div class="form-group"><label>¿Cuál será tu próximo objetivo?</label><textarea class="form-textarea" id="eval-proximo-objetivo" placeholder="Respuesta del paciente...">${esc(values.proximoObjetivo)}</textarea></div>
+    <div id="eval-followup-block" style="background:#f7f8f1;border:1px solid var(--olive-pale);border-radius:var(--radius);padding:16px;margin:18px 0 4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px">🌱 Seguimiento del paciente</div>
+        <span id="eval-followup-progress" style="font-size:11px;font-weight:700;color:var(--danger);background:#fff;border:1px solid #f3d2d2;border-radius:999px;padding:4px 9px">0/4 respondidas</span>
+      </div>
+      <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Las 4 preguntas son obligatorias. No se podrá guardar ni continuar hasta responderlas todas.</div>
+      <div class="form-group mb-3"><label for="eval-dificil">¿Qué fue lo más difícil? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-dificil" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.dificil)}</textarea><div class="eval-followup-error" data-for="eval-dificil" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
+      <div class="form-group mb-3"><label for="eval-facil">¿Qué fue lo más fácil? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-facil" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.facil)}</textarea><div class="eval-followup-error" data-for="eval-facil" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
+      <div class="form-group mb-3"><label for="eval-habito">¿Qué hábito ya no cuesta mantener? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-habito" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.habito)}</textarea><div class="eval-followup-error" data-for="eval-habito" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
+      <div class="form-group"><label for="eval-proximo-objetivo">¿Cuál será tu próximo objetivo? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-proximo-objetivo" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.proximoObjetivo)}</textarea><div class="eval-followup-error" data-for="eval-proximo-objetivo" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
     </div>`;
+}
+
+function getEvalFollowupState() {
+  const ids = ['eval-dificil','eval-facil','eval-habito','eval-proximo-objetivo'];
+  const values = ids.map(id => (document.getElementById(id)?.value || '').trim());
+  return { ids, values, completed: values.filter(Boolean).length, valid: values.every(Boolean) };
+}
+
+function updateEvalFollowupState(showErrors=false) {
+  const state = getEvalFollowupState();
+  state.ids.forEach((id, i) => {
+    const field = document.getElementById(id);
+    const err = document.querySelector(`.eval-followup-error[data-for="${id}"]`);
+    if (!field) return;
+    const missing = !state.values[i];
+    field.style.borderColor = showErrors && missing ? 'var(--danger)' : '';
+    field.setAttribute('aria-invalid', showErrors && missing ? 'true' : 'false');
+    if (err) err.style.display = showErrors && missing ? 'block' : 'none';
+  });
+  const badge = document.getElementById('eval-followup-progress');
+  if (badge) {
+    badge.textContent = `${state.completed}/4 respondidas`;
+    badge.style.color = state.valid ? 'var(--olive-dark)' : 'var(--danger)';
+    badge.style.borderColor = state.valid ? 'var(--olive-pale)' : '#f3d2d2';
+    badge.style.background = state.valid ? '#f3f7e8' : '#fff';
+  }
+  const saveBtn = document.getElementById('eval-save-btn');
+  if (saveBtn) {
+    saveBtn.disabled = !state.valid;
+    saveBtn.style.opacity = state.valid ? '1' : '.55';
+    saveBtn.style.cursor = state.valid ? 'pointer' : 'not-allowed';
+    saveBtn.title = state.valid ? '' : 'Completa las 4 preguntas de seguimiento para continuar';
+  }
+  return state.valid;
+}
+
+function validateEvalFollowup() {
+  const valid = updateEvalFollowupState(true);
+  if (!valid) {
+    notify('Completa las 4 preguntas de seguimiento antes de continuar', 'danger');
+    const firstMissing = getEvalFollowupState().ids.find(id => !(document.getElementById(id)?.value || '').trim());
+    const el = firstMissing ? document.getElementById(firstMissing) : null;
+    if (el) { el.focus(); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+  }
+  return valid;
 }
 
 function resolveEvalPatientSearch() {
@@ -4701,10 +4749,11 @@ function openEvalModal(patientId) {
     </div>
     <div class="modal-footer" style="padding:20px 0 0;margin-top:20px;border-top:1px solid var(--gray-100)">
       <button class="btn btn-outline" onclick="closeModal('modal-evaluation')">Cancelar</button>
-      <button class="btn btn-olive" onclick="saveEvaluation()">Guardar Evaluación</button>
+      <button class="btn btn-olive" id="eval-save-btn" onclick="saveEvaluation()" disabled style="opacity:.55;cursor:not-allowed" title="Completa las 4 preguntas de seguimiento para continuar">Guardar Evaluación</button>
     </div>
   `;
   if (patient) setTimeout(calcEvalIMC, 100);
+  setTimeout(() => updateEvalFollowupState(false), 0);
   openModal('modal-evaluation');
 }
 
@@ -4779,12 +4828,13 @@ function editEvaluacion(patientId, evalId) {
       <button class="btn btn-danger btn-sm" onclick="deleteEvaluacion('${patientId}', '${evalId}')">🗑 Eliminar</button>
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="btn btn-outline" onclick="closeModal('modal-evaluation')">Cancelar</button>
-        <button class="btn btn-olive" onclick="saveEvaluation()">Guardar Cambios</button>
+        <button class="btn btn-olive" id="eval-save-btn" onclick="saveEvaluation()">Guardar Cambios</button>
       </div>
     </div>
   `;
   setTimeout(() => {
     calcEvalIMC();
+    updateEvalFollowupState(false);
     console.log('calcEvalIMC ejecutado');
   }, 100);
   openModal('modal-evaluation');
@@ -5005,6 +5055,7 @@ function calcEvalIMC() {
 }
 
 async function saveEvaluation() {
+  if (!validateEvalFollowup()) return;
   const evalId = document.getElementById('eval-id')?.value; // Para editar
   const pid = document.getElementById('eval-patient-select').value;
   if (!pid) { notify('Seleccione un paciente', 'danger'); return; }
