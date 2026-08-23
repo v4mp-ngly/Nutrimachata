@@ -2857,7 +2857,7 @@ function savePubWizStep() {
       pubWizData.sueno         = getVal('sueno');
       pubWizData.estres        = getRadio('estres');
       // habitos stored via onclick - keep existing
-      if (!pubWizData.habitos) pubWizData.habitos = getChecked('habitos');
+      pubWizData.habitos = getChecked('habitos');
       pubWizData.habitosOtros  = getVal('habitos-otros');
       break;
     case 4:
@@ -4067,11 +4067,8 @@ function getWizHTML(step) {
           </div>
           <div style="display:flex;flex-direction:column;gap:10px">
             ${['Alcohol','Tabaco','Café','Ninguno'].map(h=>`
-            <label onclick="this.classList.toggle('habit-active',this.querySelector('input').checked===false);this.querySelector('input').checked=!this.querySelector('input').checked;this.classList.toggle('habit-active',this.querySelector('input').checked)"
-              style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:var(--radius);cursor:pointer;font-size:14px;transition:all 0.15s;user-select:none" 
-              class="${chk('habitos',h)?'habit-active':''}">
-              <span style="width:20px;height:20px;border:2px solid var(--gray-300);border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s" class="hab-chk">${chk('habitos',h)?'✓':''}</span>
-              <input type="checkbox" name="wf-habitos" value="${h}" ${chk('habitos',h)} style="display:none"> ${h}
+            <label class="checkbox-pill" style="cursor:pointer;user-select:none">
+              <input type="checkbox" name="wf-habitos" value="${h}" ${chk('habitos',h)} onchange="handleExclusiveNone(this,'wf-habitos')">${h}
             </label>`).join('')}
             <div class="form-group mt-2"><label>Otros</label>
               <input class="form-control" id="wf-habitos-otros" value="${val('habitosOtros')}" placeholder="Especifique">
@@ -4087,7 +4084,7 @@ function getWizHTML(step) {
       </div>
       <div class="checkbox-group mb-5">
         ${['Náuseas','Vómitos','Distensión','Estreñimiento','Diarrea','Ninguno'].map(s=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-sintomas" value="${s}" ${chk('sintomas',s)}>${s}</label>`).join('')}
+        <label class="checkbox-pill"><input type="checkbox" name="wf-sintomas" value="${s}" ${chk('sintomas',s)} onchange="handleExclusiveNone(this,'wf-sintomas')">${s}</label>`).join('')}
       </div>
       <div class="form-group"><label>Alteraciones metabólicas</label>
         <input class="form-control" id="wf-metabolicas" value="${val('metabolicas')}" placeholder="Especifique alteraciones metabólicas si las hay">
@@ -4222,6 +4219,10 @@ function handleExclusiveNone(input, groupName) {
     const none = boxes.find(b => b.value === 'Ninguno');
     if (none) none.checked = false;
   }
+  boxes.forEach(b => {
+    const label = b.closest('label');
+    if (label) label.classList.toggle('checked', b.checked);
+  });
 }
 
 function saveWizStep() {
@@ -4260,7 +4261,7 @@ function saveWizStep() {
       wizData.frecuencia = getVal('wf-frecuencia');
       wizData.sueno = getVal('wf-sueno');
       wizData.estres = getRadio('wf-estres');
-      if (!wizData.habitos) wizData.habitos = getChecked('wf-habitos');
+      wizData.habitos = getChecked('wf-habitos');
       wizData.habitosOtros = getVal('wf-habitos-otros');
       break;
     case 4:
@@ -4349,7 +4350,7 @@ function hcStepValidation(step,data,isPublic=false){
       break;
     case 4:
       need(arr(data.sintomas),'Síntomas recientes o “Ninguno”',null,'wf-sintomas');
-      need(txt(data.metabolicas),'Alteraciones metabólicas o escribir “Ninguna”','wf-metabolicas');
+      // Alteraciones metabólicas es un campo opcional.
       break;
     case 5:
       ['comeEstres','comeAburrido','hambreEmocional','comeRapido','comeLleno','culpaComer','dietasRepetidas','horariosRegulares'].forEach(k=>{
