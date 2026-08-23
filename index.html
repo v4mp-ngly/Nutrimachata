@@ -3992,7 +3992,7 @@ function getWizHTML(step) {
       </div>
       <div class="checkbox-group mb-4">
         ${['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad','Ninguno'].map(e=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-antec" value="${e}" ${chk('antecedentes',e)}>${e}</label>`).join('')}
+        <label class="checkbox-pill"><input type="checkbox" name="wf-antec" value="${e}" ${chk('antecedentes',e)} onchange="handleExclusiveNone(this,'wf-antec')">${e}</label>`).join('')}
       </div>
       <div class="form-group mb-5"><label>Otros antecedentes</label>
         <input class="form-control" id="wf-antec-otros" value="${val('antecOtros')}" placeholder="Especifique otras condiciones">
@@ -4003,7 +4003,7 @@ function getWizHTML(step) {
       </div>
       <div class="checkbox-group mb-4">
         ${['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular','Ninguno'].map(e=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-fam" value="${e}" ${chk('antecFam',e)}>${e}</label>`).join('')}
+        <label class="checkbox-pill"><input type="checkbox" name="wf-fam" value="${e}" ${chk('antecFam',e)} onchange="handleExclusiveNone(this,'wf-fam')">${e}</label>`).join('')}
       </div>
       <div class="form-group"><label>Otros antecedentes familiares</label>
         <input class="form-control" id="wf-fam-otros" value="${val('antecFamOtros')}" placeholder="Especifique">
@@ -4213,6 +4213,17 @@ function wizCalcIMC() {
   renderIMCIndicator('wiz-imc-indicator', imc);
 }
 
+function handleExclusiveNone(input, groupName) {
+  const boxes = [...document.querySelectorAll(`input[name="${groupName}"]`)];
+  if (!input || !boxes.length) return;
+  if (input.value === 'Ninguno' && input.checked) {
+    boxes.forEach(b => { if (b !== input) b.checked = false; });
+  } else if (input.checked) {
+    const none = boxes.find(b => b.value === 'Ninguno');
+    if (none) none.checked = false;
+  }
+}
+
 function saveWizStep() {
   const getChecked = (name) => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
   const getRadio = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
@@ -4300,10 +4311,69 @@ function markHCGroup(name,isPublic=false){
   return el;
 }
 function hcStepValidation(step,data,isPublic=false){
-  // Sin restricciones de campos: cualquier paso puede continuar aunque existan campos vacios.
-  // Se limpian marcas antiguas de validacion para no mostrar avisos rojos.
   const root=document.getElementById(isPublic?'pub-wizard-body':'wizard-body')||document;
   clearHCRequiredMarks(root);
+  const missing=[];
+  const need=(ok,label,fieldId=null,groupName=null)=>{ if(ok) return; missing.push(label); if(fieldId) markHCField(fieldId,isPublic); if(groupName) markHCGroup(groupName,isPublic); };
+  const txt=v=>String(v??'').trim().length>0;
+  const arr=v=>Array.isArray(v)&&v.length>0;
+  switch(step){
+    case 0:
+      need(txt(data.nombre),'Nombre completo','wf-nombre');
+      need(txt(data.cedula),'Cédula','wf-cedula');
+      need(txt(data.dob),'Fecha de nacimiento','wf-dob');
+      need(txt(data.telefono),'Teléfono','wf-tel');
+      need(txt(data.direccion),'Dirección','wf-dir');
+      need(txt(data.sexo),'Género',null,'wf-sexo');
+      need(txt(data.motivo),'Motivo de consulta','wf-motivo');
+      need(txt(data.objetivo),'Objetivo del tratamiento','wf-objetivo');
+      need(txt(data.plazo),'Tiempo esperado para lograrlo','wf-plazo');
+      break;
+    case 1:
+      need(arr(data.antecedentes),'Antecedentes personales',null,'wf-antec');
+      need(arr(data.antecFam),'Antecedentes familiares',null,'wf-fam');
+      break;
+    case 2:
+      need(txt(data.medicamentos),'Medicamentos o escribir “Ninguno”','wf-medicamentos');
+      need(txt(data.tieneAlergias),'Indicar si tiene alergias',null,'wf-alerg');
+      if(data.tieneAlergias==='si') need(txt(data.alergias),'Especificar alergias','wf-alergias');
+      need(txt(data.noConsume),'Alimentos que no consume o escribir “Ninguno”','wf-no-consume');
+      break;
+    case 3:
+      need(txt(data.actividad),'Nivel de actividad',null,'wf-act');
+      need(txt(data.ejercicio),'Tipo de ejercicio','wf-ejercicio');
+      need(txt(data.frecuencia),'Frecuencia semanal','wf-frecuencia');
+      need(txt(data.sueno),'Horas de sueño','wf-sueno');
+      need(txt(data.estres),'Nivel de estrés',null,'wf-estres');
+      need(arr(data.habitos),'Hábitos tóxicos o “Ninguno”',null,'wf-habitos');
+      break;
+    case 4:
+      need(arr(data.sintomas),'Síntomas recientes o “Ninguno”',null,'wf-sintomas');
+      need(txt(data.metabolicas),'Alteraciones metabólicas o escribir “Ninguna”','wf-metabolicas');
+      break;
+    case 5:
+      ['comeEstres','comeAburrido','hambreEmocional','comeRapido','comeLleno','culpaComer','dietasRepetidas','horariosRegulares'].forEach(k=>{
+        need(data[k]==='si'||data[k]==='no','Responder todas las preguntas de conducta alimentaria');
+      });
+      need(txt(data.comidasFuera),'Frecuencia de comidas fuera de casa',null,'wf-fuera');
+      break;
+    case 6:
+      // Paso clínico del profesional: peso y talla son obligatorios; las medidas marcadas como opcionales se mantienen opcionales.
+      need(Number(data.peso)>0,'Peso','wf-peso');
+      need(Number(data.talla)>0,'Talla','wf-talla-cm');
+      break;
+  }
+  if(missing.length){
+    const unique=[...new Set(missing)];
+    const note=document.createElement('div'); note.className='hc-required-note';
+    note.innerHTML='<strong>Complete este paso para continuar.</strong><br>'+unique.join(' · ');
+    root.prepend(note);
+    const first=root.querySelector('.hc-required-missing,.hc-required-group');
+    first?.scrollIntoView({behavior:'smooth',block:'center'});
+    first?.focus?.();
+    notify('Faltan campos obligatorios en la Historia Clínica','danger');
+    return false;
+  }
   return true;
 }
 
@@ -4761,18 +4831,18 @@ function evalFollowupFields(values={}) {
         <div style="font-size:11px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:1px">🌱 Seguimiento del paciente</div>
         <span id="eval-followup-progress" style="font-size:11px;font-weight:700;color:var(--danger);background:#fff;border:1px solid #f3d2d2;border-radius:999px;padding:4px 9px">0/4 respondidas</span>
       </div>
-      <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Estas preguntas son opcionales. Puedes responder todas, algunas o dejarlas vacías.</div>
-      <div class="form-group mb-3"><label for="eval-dificil">¿Qué fue lo más difícil?</label><textarea class="form-textarea" id="eval-dificil" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.dificil)}</textarea></div>
-      <div class="form-group mb-3"><label for="eval-facil">¿Qué fue lo más fácil?</label><textarea class="form-textarea" id="eval-facil" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.facil)}</textarea></div>
-      <div class="form-group mb-3"><label for="eval-habito">¿Qué hábito ya no cuesta mantener?</label><textarea class="form-textarea" id="eval-habito" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.habito)}</textarea></div>
-      <div class="form-group"><label for="eval-proximo-objetivo">¿Cuál será tu próximo objetivo?</label><textarea class="form-textarea" id="eval-proximo-objetivo" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.proximoObjetivo)}</textarea></div>
+      <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Las 4 preguntas son obligatorias. No se podrá guardar ni continuar hasta responderlas todas.</div>
+      <div class="form-group mb-3"><label for="eval-dificil">¿Qué fue lo más difícil? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-dificil" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.dificil)}</textarea><div class="eval-followup-error" data-for="eval-dificil" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
+      <div class="form-group mb-3"><label for="eval-facil">¿Qué fue lo más fácil? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-facil" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.facil)}</textarea><div class="eval-followup-error" data-for="eval-facil" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
+      <div class="form-group mb-3"><label for="eval-habito">¿Qué hábito ya no cuesta mantener? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-habito" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.habito)}</textarea><div class="eval-followup-error" data-for="eval-habito" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
+      <div class="form-group"><label for="eval-proximo-objetivo">¿Cuál será tu próximo objetivo? <span style="color:var(--danger)">*</span></label><textarea class="form-textarea" id="eval-proximo-objetivo" required aria-required="true" placeholder="Respuesta del paciente..." oninput="updateEvalFollowupState()">${esc(values.proximoObjetivo)}</textarea><div class="eval-followup-error" data-for="eval-proximo-objetivo" style="display:none;color:var(--danger);font-size:11px;margin-top:4px">Esta respuesta es obligatoria.</div></div>
     </div>`;
 }
 
 function getEvalFollowupState() {
   const ids = ['eval-dificil','eval-facil','eval-habito','eval-proximo-objetivo'];
   const values = ids.map(id => (document.getElementById(id)?.value || '').trim());
-  return { ids, values, completed: values.filter(Boolean).length, valid: true };
+  return { ids, values, completed: values.filter(Boolean).length, valid: values.every(Boolean) };
 }
 
 function updateEvalFollowupState(showErrors=false) {
@@ -4795,10 +4865,10 @@ function updateEvalFollowupState(showErrors=false) {
   }
   const saveBtn = document.getElementById('eval-save-btn');
   if (saveBtn) {
-    saveBtn.disabled = false;
-    saveBtn.style.opacity = '1';
-    saveBtn.style.cursor = 'pointer';
-    saveBtn.title = '';
+    saveBtn.disabled = !state.valid;
+    saveBtn.style.opacity = state.valid ? '1' : '.55';
+    saveBtn.style.cursor = state.valid ? 'pointer' : 'not-allowed';
+    saveBtn.title = state.valid ? '' : 'Completa las 4 preguntas de seguimiento para continuar';
   }
   return state.valid;
 }
@@ -10761,11 +10831,17 @@ function buildHCEditForm(p) {
       ${yesNoField('hc-comidasFuera','¿Come frecuentemente fuera de casa?',hc.comidasFuera)}
       <div></div>
     </div>
-    <div class="form-group mb-3"><label>Antecedentes personales (separados por coma)</label>
-      <input class="form-control" id="hc-antecedentes" value="${(hc.antecedentes||[]).join(', ')}">
+    <div class="form-group mb-3"><label>Antecedentes personales</label>
+      <div class="checkbox-group" id="hc-antecedentes-group">
+        ${['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad','Ninguno'].map(e=>`
+          <label class="checkbox-pill" style="cursor:pointer;user-select:none"><input type="checkbox" name="hc-antecedentes" value="${e}" ${(hc.antecedentes||[]).includes(e)?'checked':''} onchange="handleExclusiveNone(this,'hc-antecedentes')"> ${e}</label>`).join('')}
+      </div>
     </div>
-    <div class="form-group mb-3"><label>Antecedentes familiares (separados por coma)</label>
-      <input class="form-control" id="hc-antecFam" value="${(hc.antecFam||[]).join(', ')}">
+    <div class="form-group mb-3"><label>Antecedentes familiares</label>
+      <div class="checkbox-group" id="hc-antecFam-group">
+        ${['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular','Ninguno'].map(e=>`
+          <label class="checkbox-pill" style="cursor:pointer;user-select:none"><input type="checkbox" name="hc-antecFam" value="${e}" ${(hc.antecFam||[]).includes(e)?'checked':''} onchange="handleExclusiveNone(this,'hc-antecFam')"> ${e}</label>`).join('')}
+      </div>
     </div>
     <div class="form-group mb-3"><label>Síntomas recientes (separados por coma)</label>
       <input class="form-control" id="hc-sintomas" value="${(hc.sintomas||[]).join(', ')}">
@@ -10817,8 +10893,8 @@ async function saveEditPatient(patientId) {
     dietasRepetidas:  parseBool(gv('hc-dietasRepetidas')),
     horariosRegulares:parseBool(gv('hc-horariosRegulares')),
     comidasFuera:     parseBool(gv('hc-comidasFuera')),
-    antecedentes:     (gv('hc-antecedentes')||'').split(',').map(s=>s.trim()).filter(Boolean),
-    antecFam:         (gv('hc-antecFam')||'').split(',').map(s=>s.trim()).filter(Boolean),
+    antecedentes:     [...document.querySelectorAll('input[name="hc-antecedentes"]:checked')].map(i=>i.value),
+    antecFam:         [...document.querySelectorAll('input[name="hc-antecFam"]:checked')].map(i=>i.value),
     sintomas:         (gv('hc-sintomas')||'').split(',').map(s=>s.trim()).filter(Boolean),
     antecOtros:       gv('hc-antecOtros'),
   };
