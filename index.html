@@ -1611,6 +1611,13 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
 .hc-required-group{outline:2px solid rgba(200,68,68,.35);outline-offset:4px;border-radius:10px}
 .hc-required-note{font-size:12px;color:#8d2d2d;background:#fff2f2;border:1px solid #f2caca;border-radius:10px;padding:10px 12px;margin:0 0 16px}
 </style>
+
+<style id="nm-antecedent-selection-fix">
+.nm-antecedent-pill{display:inline-flex;align-items:center;gap:8px;cursor:default!important}
+.nm-antecedent-pill input[type="checkbox"]{display:inline-block!important;width:18px!important;height:18px!important;margin:0!important;flex:0 0 18px;accent-color:var(--olive);pointer-events:auto}
+.nm-antecedent-pill label{cursor:pointer;display:inline-block;margin:0;line-height:1.25;user-select:none;-webkit-user-select:none}
+.nm-antecedent-pill.checked{background:rgba(94,140,42,.12)!important;border-color:var(--olive)!important;color:var(--olive-dark)!important;font-weight:600!important}
+</style>
 </head>
 <body>
 
@@ -4024,8 +4031,8 @@ function getWizHTML(step) {
         <div style="font-size:12px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:0.5px">Antecedentes Personales</div>
       </div>
       <div class="checkbox-group mb-4">
-        ${['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad','Ninguno'].map(e=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-antec" value="${e}" ${chk('antecedentes',e)} onchange="handleExclusiveNone(this,'wf-antec')">${e}</label>`).join('')}
+        ${['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad','Ninguno'].map((e,i)=>`
+        <span class="checkbox-pill nm-antecedent-pill ${chk('antecedentes',e)?'checked':''}"><input type="checkbox" id="wf-antec-opt-${i}" name="wf-antec" value="${e}" ${chk('antecedentes',e)} onchange="handleAntecedentSelection(this,'wf-antec')"><label for="wf-antec-opt-${i}">${e}</label></span>`).join('')}
       </div>
       <div class="form-group mb-5"><label>Otros antecedentes</label>
         <input class="form-control" id="wf-antec-otros" value="${val('antecOtros')}" placeholder="Especifique otras condiciones">
@@ -4035,8 +4042,8 @@ function getWizHTML(step) {
         <div style="font-size:12px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:0.5px">Antecedentes Familiares</div>
       </div>
       <div class="checkbox-group mb-4">
-        ${['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular','Ninguno'].map(e=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-fam" value="${e}" ${chk('antecFam',e)} onchange="handleExclusiveNone(this,'wf-fam')">${e}</label>`).join('')}
+        ${['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular','Ninguno'].map((e,i)=>`
+        <span class="checkbox-pill nm-antecedent-pill ${chk('antecFam',e)?'checked':''}"><input type="checkbox" id="wf-fam-opt-${i}" name="wf-fam" value="${e}" ${chk('antecFam',e)} onchange="handleAntecedentSelection(this,'wf-fam')"><label for="wf-fam-opt-${i}">${e}</label></span>`).join('')}
       </div>
       <div class="form-group"><label>Otros antecedentes familiares</label>
         <input class="form-control" id="wf-fam-otros" value="${val('antecFamOtros')}" placeholder="Especifique">
@@ -4251,31 +4258,20 @@ function syncCheckboxPillState(box) {
   if (pill) pill.classList.toggle('checked', !!box.checked);
 }
 
-function handleExclusiveNone(input, groupName) {
-  const boxes = [...document.querySelectorAll(`input[name="${groupName}"]`)];
-  if (!input || !boxes.length) return;
-
-  // Solo "Ninguno" es exclusivo. Las demas condiciones SI pueden seleccionarse juntas.
-  if (input.value === 'Ninguno' && input.checked) {
-    boxes.forEach(b => {
-      if (b !== input) b.checked = false;
-      syncCheckboxPillState(b);
-    });
-  } else if (input.checked) {
-    const none = boxes.find(b => b.value === 'Ninguno');
-    if (none) {
-      none.checked = false;
-      syncCheckboxPillState(none);
-    }
-  }
+function handleAntecedentSelection(input, groupName) {
+  // Multiseleccion libre: cada checkbox es completamente independiente.
+  // No se desmarca ninguna otra opcion automaticamente.
+  if (!input) return;
   syncCheckboxPillState(input);
+  const boxes = [...document.querySelectorAll(`input[name="${groupName}"]`)];
+  const selected = boxes.filter(b => b.checked).map(b => b.value);
+  if (groupName === 'wf-antec') wizData.antecedentes = selected;
+  if (groupName === 'wf-fam') wizData.antecFam = selected;
+}
 
-  // Persistencia inmediata en memoria del wizard: no esperar a pulsar Siguiente.
-  if (groupName === 'wf-antec') {
-    wizData.antecedentes = boxes.filter(b => b.checked).map(b => b.value);
-  } else if (groupName === 'wf-fam') {
-    wizData.antecFam = boxes.filter(b => b.checked).map(b => b.value);
-  }
+// Alias por compatibilidad con versiones previas; ya no aplica exclusividad.
+function handleExclusiveNone(input, groupName) {
+  handleAntecedentSelection(input, groupName);
 }
 
 function saveWizStep() {
@@ -10892,13 +10888,13 @@ function buildHCEditForm(p) {
     <div class="form-group mb-3"><label>Antecedentes personales</label>
       <div class="checkbox-group" id="hc-antecedentes-group">
         ${['Hipertensión','Dislipidemia','Enfermedad cardíaca','Asma','Obesidad','Enfermedad tiroidea','Gastritis','Diabetes','Depresión','Ansiedad','Ninguno'].map(e=>`
-          <label class="checkbox-pill" style="cursor:pointer;user-select:none"><input type="checkbox" name="hc-antecedentes" value="${e}" ${(hc.antecedentes||[]).includes(e)?'checked':''} onchange="handleExclusiveNone(this,'hc-antecedentes')"> ${e}</label>`).join('')}
+          <span class="checkbox-pill nm-antecedent-pill ${(hc.antecedentes||[]).includes(e)?'checked':''}"><input type="checkbox" id="hc-antec-${e.replace(/[^a-zA-Z0-9]/g,'-')}" name="hc-antecedentes" value="${e}" ${(hc.antecedentes||[]).includes(e)?'checked':''} onchange="handleExclusiveNone(this,'hc-antecedentes')"><label for="hc-antec-${e.replace(/[^a-zA-Z0-9]/g,'-')}">${e}</label></span>`).join('')}
       </div>
     </div>
     <div class="form-group mb-3"><label>Antecedentes familiares</label>
       <div class="checkbox-group" id="hc-antecFam-group">
         ${['Cáncer','Diabetes','Hipertensión','Ansiedad','Enfermedad cardiovascular','Ninguno'].map(e=>`
-          <label class="checkbox-pill" style="cursor:pointer;user-select:none"><input type="checkbox" name="hc-antecFam" value="${e}" ${(hc.antecFam||[]).includes(e)?'checked':''} onchange="handleExclusiveNone(this,'hc-antecFam')"> ${e}</label>`).join('')}
+          <span class="checkbox-pill nm-antecedent-pill ${(hc.antecFam||[]).includes(e)?'checked':''}"><input type="checkbox" id="hc-fam-${e.replace(/[^a-zA-Z0-9]/g,'-')}" name="hc-antecFam" value="${e}" ${(hc.antecFam||[]).includes(e)?'checked':''} onchange="handleExclusiveNone(this,'hc-antecFam')"><label for="hc-fam-${e.replace(/[^a-zA-Z0-9]/g,'-')}">${e}</label></span>`).join('')}
       </div>
     </div>
     <div class="form-group mb-3"><label>Síntomas recientes (separados por coma)</label>
