@@ -2224,12 +2224,23 @@ const SB = {
     return r && r[0] ? r[0] : null;
   },
   async upsertHistoria(pacienteId, data) {
+    if (!pacienteId) throw new Error('No se puede guardar la historia clínica sin paciente_id.');
+    const clean = { ...data, paciente_id: pacienteId };
+    // Los campos multiselección siempre viajan como arrays reales a Supabase.
+    ['antecedentes','antec_fam','habitos','sintomas'].forEach(k => {
+      if (clean[k] == null) clean[k] = [];
+      else if (!Array.isArray(clean[k])) clean[k] = [clean[k]].filter(Boolean);
+    });
     const existing = await SB.getHistoria(pacienteId);
     if (existing) {
-      return await supa(`historias_clinicas?paciente_id=eq.${pacienteId}`, 'PATCH', data);
+      await supa(`historias_clinicas?paciente_id=eq.${pacienteId}`, 'PATCH', clean);
     } else {
-      return await supa('historias_clinicas', 'POST', {...data, paciente_id: pacienteId});
+      await supa('historias_clinicas', 'POST', clean);
     }
+    // Verificación real: no mostramos éxito hasta volver a leer lo persistido.
+    const saved = await SB.getHistoria(pacienteId);
+    if (!saved) throw new Error('Supabase no devolvió la historia clínica después de guardarla.');
+    return saved;
   },
 
   // DIETAS
@@ -2991,7 +3002,7 @@ function finishPublicReg() {
 
       // 2. Save historia clinica
       if (pacId) {
-        await supa('historias_clinicas', 'POST', {
+        await SB.upsertHistoria(pacId, {
           paciente_id:       pacId,
           motivo:            pubWizData.motivo,
           objetivo:          pubWizData.objetivo,
@@ -4561,7 +4572,7 @@ async function finishWizard() {
 
     if (sbPac && sbPac.id) {
       // 2. Historia clínica: obligatoria y persistida en Supabase.
-      await supa('historias_clinicas', 'POST', {
+      await SB.upsertHistoria(realId, {
         paciente_id:        realId,
         motivo:             wizData.motivo,
         objetivo:           wizData.objetivo,
