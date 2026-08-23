@@ -1445,6 +1445,24 @@ tbody td{padding:12px 13px;font-size:12px}tbody tr:hover{background:#f7faF3!impo
 /* Browser zoom effectively reduces CSS viewport width, so these breakpoints also
    prevent the patient detail panel from pushing the table off-screen at 110-150% zoom. */
 
+
+  /* Antecedentes: seleccion visible y estable en desktop/movil */
+  .checkbox-pill { position: relative; touch-action: manipulation; }
+  .checkbox-pill input[type="checkbox"] {
+    display: inline-block !important;
+    appearance: auto;
+    -webkit-appearance: checkbox;
+    width: 16px; height: 16px; margin: 0 6px 0 0;
+    accent-color: var(--olive);
+    flex: 0 0 auto;
+  }
+  .checkbox-pill.checked {
+    background: rgba(94,140,42,0.12) !important;
+    border-color: var(--olive) !important;
+    color: var(--olive-dark) !important;
+    font-weight: 600 !important;
+  }
+
 </style>
 
 <style id="nm-modern-dashboard-style">
@@ -2247,7 +2265,6 @@ async function testSupabaseConnection() {
     const res = await fetch(SUPA_URL + '/rest/v1/usuarios?limit=1', {
       headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + supaAccessToken() },
       mode: 'cors', credentials: 'omit',
-      signal: AbortSignal.timeout(8000)
     });
     // 200 = ok, 406 = no rows, 401/403 = RLS blocking but server IS reachable
     const ok = res.ok || [200,401,403,406].includes(res.status);
@@ -2278,6 +2295,7 @@ function decodeCitaDescripcion(valor) {
 }
 
 async function loadFromSupabase() {
+  const previouslyLoaded = !!DB.loaded;
   if (IS_LOCAL) {
     console.info('Modo local — usando datos de ejemplo.');
     showLoadingOverlay(false);
@@ -2297,14 +2315,19 @@ async function loadFromSupabase() {
   showLoadingOverlay(true);
   try {
     // Load everything in parallel with bulk queries
-    const [pacientesRaw, citasRaw, evalsRaw, dietasRaw, hcsRaw, usuariosRaw, seguimientosRaw] = await Promise.all([
-      supaFetchAll('pacientes?order=created_at.desc&select=*'),
-      supaFetchAll('citas?order=fecha.asc,hora.asc&select=*'),
-      supaFetchAll('evaluaciones?order=fecha.asc&select=*'),
-      supaFetchAll('dietas?order=created_at.desc&select=*'),
-      supaFetchAll('historias_clinicas?select=*'),
-      supaFetchAll('usuarios?select=id,email,password_hash,rol,nombre'),
-      supaFetchAll('seguimiento_paciente?order=fecha.asc,created_at.asc&select=*'),
+    // Pacientes es la tabla crítica. Las demás tablas se cargan de forma independiente:
+    // si una tabla opcional falla por RLS/esquema, NO vaciamos ni ocultamos pacientes.
+    const pacientesRaw = await supaFetchAll('pacientes?order=created_at.desc&select=*');
+    const safeLoad = async (label, path) => {
+      try { return await supaFetchAll(path); }
+      catch (e) { console.warn(`[carga opcional] ${label}:`, e); return []; }
+    };
+    const [citasRaw, evalsRaw, dietasRaw, hcsRaw, usuariosRaw] = await Promise.all([
+      safeLoad('citas','citas?order=fecha.asc,hora.asc&select=*'),
+      safeLoad('evaluaciones','evaluaciones?order=fecha.asc&select=*'),
+      safeLoad('dietas','dietas?order=created_at.desc&select=*'),
+      safeLoad('historias_clinicas','historias_clinicas?select=*'),
+      safeLoad('usuarios','usuarios?select=id,email,password_hash,rol,nombre'),
     ]);
 
     const pacs    = pacientesRaw || [];
@@ -2313,7 +2336,8 @@ async function loadFromSupabase() {
     const hcs     = hcsRaw      || [];
     const citas   = citasRaw    || [];
     const usuarios = usuariosRaw || [];
-    const seguimientos = seguimientosRaw || [];
+    // Seguimiento ya no forma parte del guardado/carga obligatoria de Evaluación.
+    const seguimientos = [];
 
     // Combinar seguimiento estructurado con cada evaluación. La tabla
     // seguimiento_paciente es la fuente principal; el JSON antiguo en obs
@@ -2426,12 +2450,16 @@ async function loadFromSupabase() {
 
     // Refresh current page if already in app
     if (currentPage) navigate(currentPage);
+    showLoadingOverlay(false);
+    return true;
 
   } catch(e) {
     console.error('Error loading from Supabase:', e);
-    notify('Error al conectar con la base de datos', 'danger');
+    DB.loaded = previouslyLoaded;
+    notify('No se pudieron actualizar los datos desde Supabase. Se conserva la información ya cargada.', 'danger');
+    showLoadingOverlay(false);
+    throw e;
   }
-  showLoadingOverlay(false);
 }
 
 function mapPaciente(p, evals, dietas, hc) {
@@ -2857,7 +2885,7 @@ function savePubWizStep() {
       pubWizData.sueno         = getVal('sueno');
       pubWizData.estres        = getRadio('estres');
       // habitos stored via onclick - keep existing
-      pubWizData.habitos = getChecked('habitos');
+      if (!pubWizData.habitos) pubWizData.habitos = getChecked('habitos');
       pubWizData.habitosOtros  = getVal('habitos-otros');
       break;
     case 4:
@@ -3859,13 +3887,18 @@ async function savePatient(id) {
         const passVal  = document.getElementById('pm-pass')?.value?.trim();
         if (emailVal) {
           const autoPass = passVal || generatePassword(sbData.nombre);
-          await supa('usuarios', 'POST', {
-            email: emailVal, password_hash: autoPass,
-            rol: 'patient', nombre: sbData.nombre,
-          });
-          newP.portalPassword = autoPass;
-          USERS[emailVal] = { pass:autoPass, role:'patient', name:sbData.nombre, initials:newP.initials, patientId:newP.id };
-          notify(`Paciente registrado ✓ · Contraseña portal: ${autoPass}`, 'success');
+          try {
+            await supa('usuarios', 'POST', {
+              email: emailVal, password_hash: autoPass,
+              rol: 'patient', nombre: sbData.nombre,
+            });
+            newP.portalPassword = autoPass;
+            USERS[emailVal] = { pass:autoPass, role:'patient', name:sbData.nombre, initials:newP.initials, patientId:newP.id };
+            notify(`Paciente registrado ✓ · Contraseña portal: ${autoPass}`, 'success');
+          } catch (portalErr) {
+            console.warn('Paciente guardado; no se pudo crear acceso de portal:', portalErr);
+            notify('Paciente guardado en Supabase. El acceso al portal quedó pendiente.', 'warning');
+          }
         } else {
           notify('Paciente registrado correctamente', 'success');
         }
@@ -4067,8 +4100,11 @@ function getWizHTML(step) {
           </div>
           <div style="display:flex;flex-direction:column;gap:10px">
             ${['Alcohol','Tabaco','Café','Ninguno'].map(h=>`
-            <label class="checkbox-pill" style="cursor:pointer;user-select:none">
-              <input type="checkbox" name="wf-habitos" value="${h}" ${chk('habitos',h)} onchange="handleExclusiveNone(this,'wf-habitos')">${h}
+            <label onclick="this.classList.toggle('habit-active',this.querySelector('input').checked===false);this.querySelector('input').checked=!this.querySelector('input').checked;this.classList.toggle('habit-active',this.querySelector('input').checked)"
+              style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:var(--radius);cursor:pointer;font-size:14px;transition:all 0.15s;user-select:none" 
+              class="${chk('habitos',h)?'habit-active':''}">
+              <span style="width:20px;height:20px;border:2px solid var(--gray-300);border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s" class="hab-chk">${chk('habitos',h)?'✓':''}</span>
+              <input type="checkbox" name="wf-habitos" value="${h}" ${chk('habitos',h)} style="display:none"> ${h}
             </label>`).join('')}
             <div class="form-group mt-2"><label>Otros</label>
               <input class="form-control" id="wf-habitos-otros" value="${val('habitosOtros')}" placeholder="Especifique">
@@ -4084,7 +4120,7 @@ function getWizHTML(step) {
       </div>
       <div class="checkbox-group mb-5">
         ${['Náuseas','Vómitos','Distensión','Estreñimiento','Diarrea','Ninguno'].map(s=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-sintomas" value="${s}" ${chk('sintomas',s)} onchange="handleExclusiveNone(this,'wf-sintomas')">${s}</label>`).join('')}
+        <label class="checkbox-pill"><input type="checkbox" name="wf-sintomas" value="${s}" ${chk('sintomas',s)}>${s}</label>`).join('')}
       </div>
       <div class="form-group"><label>Alteraciones metabólicas</label>
         <input class="form-control" id="wf-metabolicas" value="${val('metabolicas')}" placeholder="Especifique alteraciones metabólicas si las hay">
@@ -4210,19 +4246,36 @@ function wizCalcIMC() {
   renderIMCIndicator('wiz-imc-indicator', imc);
 }
 
+function syncCheckboxPillState(box) {
+  const pill = box?.closest?.('.checkbox-pill');
+  if (pill) pill.classList.toggle('checked', !!box.checked);
+}
+
 function handleExclusiveNone(input, groupName) {
   const boxes = [...document.querySelectorAll(`input[name="${groupName}"]`)];
   if (!input || !boxes.length) return;
+
+  // Solo "Ninguno" es exclusivo. Las demas condiciones SI pueden seleccionarse juntas.
   if (input.value === 'Ninguno' && input.checked) {
-    boxes.forEach(b => { if (b !== input) b.checked = false; });
+    boxes.forEach(b => {
+      if (b !== input) b.checked = false;
+      syncCheckboxPillState(b);
+    });
   } else if (input.checked) {
     const none = boxes.find(b => b.value === 'Ninguno');
-    if (none) none.checked = false;
+    if (none) {
+      none.checked = false;
+      syncCheckboxPillState(none);
+    }
   }
-  boxes.forEach(b => {
-    const label = b.closest('label');
-    if (label) label.classList.toggle('checked', b.checked);
-  });
+  syncCheckboxPillState(input);
+
+  // Persistencia inmediata en memoria del wizard: no esperar a pulsar Siguiente.
+  if (groupName === 'wf-antec') {
+    wizData.antecedentes = boxes.filter(b => b.checked).map(b => b.value);
+  } else if (groupName === 'wf-fam') {
+    wizData.antecFam = boxes.filter(b => b.checked).map(b => b.value);
+  }
 }
 
 function saveWizStep() {
@@ -4261,7 +4314,7 @@ function saveWizStep() {
       wizData.frecuencia = getVal('wf-frecuencia');
       wizData.sueno = getVal('wf-sueno');
       wizData.estres = getRadio('wf-estres');
-      wizData.habitos = getChecked('wf-habitos');
+      if (!wizData.habitos) wizData.habitos = getChecked('wf-habitos');
       wizData.habitosOtros = getVal('wf-habitos-otros');
       break;
     case 4:
@@ -4350,7 +4403,7 @@ function hcStepValidation(step,data,isPublic=false){
       break;
     case 4:
       need(arr(data.sintomas),'Síntomas recientes o “Ninguno”',null,'wf-sintomas');
-      // Alteraciones metabólicas es un campo opcional.
+      need(txt(data.metabolicas),'Alteraciones metabólicas o escribir “Ninguna”','wf-metabolicas');
       break;
     case 5:
       ['comeEstres','comeAburrido','hambreEmocional','comeRapido','comeLleno','culpaComer','dietasRepetidas','horariosRegulares'].forEach(k=>{
@@ -4506,9 +4559,12 @@ async function finishWizard() {
     if (!sbPac?.id) throw new Error('Supabase no confirmó la creación del paciente.');
     const realId = sbPac.id;
     newPatient.id = realId;
+    // El paciente YA existe en Supabase desde este punto. Reflejarlo inmediatamente
+    // para que un fallo posterior nunca haga parecer que fue borrado.
+    if (!DB.patients.some(p => String(p.id) === String(realId))) DB.patients.push(newPatient);
 
     if (sbPac && sbPac.id) {
-      // 2. Save historia clinica
+      // 2. Historia clínica: obligatoria y persistida en Supabase.
       await supa('historias_clinicas', 'POST', {
         paciente_id:        realId,
         motivo:             wizData.motivo,
@@ -4544,9 +4600,9 @@ async function finishWizard() {
         comidas_fuera:      wizData.comidasFuera,
       });
 
-      // 3. Save initial evaluation if has measurements
+      // 3. Evaluación inicial es secundaria: si falla, paciente + historia NO se pierden.
       if (peso > 0) {
-        await supa('evaluaciones', 'POST', {
+        try { await supa('evaluaciones', 'POST', {
           paciente_id:         realId,
           fecha: today, peso, talla, imc,
           presion:             wizData.presion     || newPatient.presion || '—',
@@ -4561,18 +4617,24 @@ async function finishWizard() {
           muslo:               wizData.muslo       || null,
           porcentaje_grasa:    wizData.grasa       || null,
           frecuencia_cardiaca: wizData.fc          || null,
-        });
+        }); } catch (evalErr) { console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr); }
       }
 
-      // 4. Create user account in usuarios table
-      await supa('usuarios', 'POST', {
-        email:         autoEmail,
-        password_hash: autoPass,
-        rol:           'patient',
-        nombre:        newPatient.nombre,
-      });
+      // 4. Acceso de portal es secundario y no puede invalidar un paciente ya guardado.
+      try {
+        await supa('usuarios', 'POST', {
+          email:         autoEmail,
+          password_hash: autoPass,
+          rol:           'patient',
+          nombre:        newPatient.nombre,
+        });
+        newPatient.portalPassword = autoPass;
+        USERS[autoEmail] = { pass:autoPass, role:'patient', name:newPatient.nombre, initials, patientId:realId };
+      } catch (portalErr) {
+        console.warn('Paciente e historia guardados; acceso de portal pendiente:', portalErr);
+      }
 
-      notify('✓ Paciente guardado en Supabase correctamente', 'success');
+      notify('✓ Paciente e historia clínica guardados en Supabase', 'success');
     }
   } catch(e) {
     console.error('Error guardando paciente en Supabase:', e);
@@ -4582,13 +4644,8 @@ async function finishWizard() {
   }
 
   // Solo reflejar localmente después de confirmación real de Supabase.
-  newPatient.portalPassword = autoPass;
-  DB.patients.push(newPatient);
-  USERS[autoEmail] = {
-    pass: autoPass, role: 'patient',
-    name: newPatient.nombre, initials,
-    patientId: newPatient.id
-  };
+  // El paciente ya fue añadido al estado local inmediatamente tras confirmarlo Supabase.
+  if (!DB.patients.some(p => String(p.id) === String(newPatient.id))) DB.patients.push(newPatient);
 
   // Show credentials screen
   document.getElementById('page-content').innerHTML = `
@@ -11128,11 +11185,17 @@ function handleResize() {
 handleResize();
 window.addEventListener('resize', handleResize);
 
-// Checkbox pill JS toggle (Android/older browser fallback)
+// Checkbox pill JS toggle (Android/iPhone/Safari fallback)
 document.addEventListener('change', e => {
   if (e.target && e.target.closest('.checkbox-pill')) {
     const pill = e.target.closest('.checkbox-pill');
     pill.classList.toggle('checked', e.target.checked);
+    // Guardar las selecciones del paso de antecedentes inmediatamente.
+    if (e.target.name === 'wf-antec') {
+      wizData.antecedentes = [...document.querySelectorAll('input[name="wf-antec"]:checked')].map(i=>i.value);
+    } else if (e.target.name === 'wf-fam') {
+      wizData.antecFam = [...document.querySelectorAll('input[name="wf-fam"]:checked')].map(i=>i.value);
+    }
   }
 });
 // Also init existing checked states
@@ -12036,7 +12099,7 @@ new MutationObserver(m=>{m.forEach(x=>x.addedNodes.forEach(n=>{if(n.nodeType===1
     loadFromSupabase=async function(){
       try{
         const result=await rawLoad.apply(this,arguments);
-        if(DB?.loaded){saveSnapshot('servidor-cargado');return result}
+        if(result===true && DB?.loaded){saveSnapshot('servidor-cargado');return result}
         if(restoreSnapshot()){
           showBanner('Base de datos no disponible. Se abrió la última copia local guardada.','offline',6500);
           try{notify('Mostrando la última copia local disponible','warning')}catch(_e){}
