@@ -4137,8 +4137,10 @@ function getWizHTML(step) {
         <div style="font-size:12px;font-weight:700;color:var(--olive-dark);text-transform:uppercase;letter-spacing:0.5px">¿Ha tenido alguno de estos síntomas recientemente?</div>
       </div>
       <div class="checkbox-group mb-5">
-        ${['Náuseas','Vómitos','Distensión','Estreñimiento','Diarrea','Ninguno'].map(s=>`
-        <label class="checkbox-pill"><input type="checkbox" name="wf-sintomas" value="${s}" ${chk('sintomas',s)}>${s}</label>`).join('')}
+        ${['Náuseas','Vómitos','Distensión','Estreñimiento','Diarrea','Ninguno'].map((s,i)=>{
+          const sid='wf-sintoma-'+i;
+          return `<label class="checkbox-pill nm-symptom-pill ${chk('sintomas',s)?'checked':''}" for="${sid}"><input type="checkbox" id="${sid}" name="wf-sintomas" value="${s}" ${chk('sintomas',s)}> ${s}</label>`;
+        }).join('')}
       </div>
       <div class="form-group"><label>Alteraciones metabólicas</label>
         <input class="form-control" id="wf-metabolicas" value="${val('metabolicas')}" placeholder="Especifique alteraciones metabólicas si las hay">
@@ -4371,76 +4373,28 @@ function markHCGroup(name,isPublic=false){
   if(el) el.classList.add('hc-required-group');
   return el;
 }
-function hcStepValidation(step,data,isPublic=false){
-  const root=document.getElementById(isPublic?'pub-wizard-body':'wizard-body')||document;
-  clearHCRequiredMarks(root);
-  const missing=[];
-  const need=(ok,label,fieldId=null,groupName=null)=>{ if(ok) return; missing.push(label); if(fieldId) markHCField(fieldId,isPublic); if(groupName) markHCGroup(groupName,isPublic); };
-  const txt=v=>String(v??'').trim().length>0;
-  const arr=v=>Array.isArray(v)&&v.length>0;
-  switch(step){
-    case 0:
-      need(txt(data.nombre),'Nombre completo','wf-nombre');
-      need(txt(data.cedula),'Cédula','wf-cedula');
-      need(txt(data.dob),'Fecha de nacimiento','wf-dob');
-      need(txt(data.telefono),'Teléfono','wf-tel');
-      need(txt(data.direccion),'Dirección','wf-dir');
-      need(txt(data.sexo),'Género',null,'wf-sexo');
-      need(txt(data.motivo),'Motivo de consulta','wf-motivo');
-      need(txt(data.objetivo),'Objetivo del tratamiento','wf-objetivo');
-      need(txt(data.plazo),'Tiempo esperado para lograrlo','wf-plazo');
-      break;
-    case 1:
-      need(arr(data.antecedentes),'Antecedentes personales',null,'wf-antec');
-      need(arr(data.antecFam),'Antecedentes familiares',null,'wf-fam');
-      break;
-    case 2:
-      need(txt(data.medicamentos),'Medicamentos o escribir “Ninguno”','wf-medicamentos');
-      need(txt(data.tieneAlergias),'Indicar si tiene alergias',null,'wf-alerg');
-      if(data.tieneAlergias==='si') need(txt(data.alergias),'Especificar alergias','wf-alergias');
-      need(txt(data.noConsume),'Alimentos que no consume o escribir “Ninguno”','wf-no-consume');
-      break;
-    case 3:
-      need(txt(data.actividad),'Nivel de actividad',null,'wf-act');
-      need(txt(data.ejercicio),'Tipo de ejercicio','wf-ejercicio');
-      need(txt(data.frecuencia),'Frecuencia semanal','wf-frecuencia');
-      need(txt(data.sueno),'Horas de sueño','wf-sueno');
-      need(txt(data.estres),'Nivel de estrés',null,'wf-estres');
-      need(arr(data.habitos),'Hábitos tóxicos o “Ninguno”',null,'wf-habitos');
-      break;
-    case 4:
-      need(arr(data.sintomas),'Síntomas recientes o “Ninguno”',null,'wf-sintomas');
-      need(txt(data.metabolicas),'Alteraciones metabólicas o escribir “Ninguna”','wf-metabolicas');
-      break;
-    case 5:
-      ['comeEstres','comeAburrido','hambreEmocional','comeRapido','comeLleno','culpaComer','dietasRepetidas','horariosRegulares'].forEach(k=>{
-        need(data[k]==='si'||data[k]==='no','Responder todas las preguntas de conducta alimentaria');
-      });
-      need(txt(data.comidasFuera),'Frecuencia de comidas fuera de casa',null,'wf-fuera');
-      break;
-    case 6:
-      // Paso clínico del profesional: peso y talla son obligatorios; las medidas marcadas como opcionales se mantienen opcionales.
-      need(Number(data.peso)>0,'Peso','wf-peso');
-      need(Number(data.talla)>0,'Talla','wf-talla-cm');
-      break;
-  }
-  if(missing.length){
-    const unique=[...new Set(missing)];
-    const note=document.createElement('div'); note.className='hc-required-note';
-    note.innerHTML='<strong>Complete este paso para continuar.</strong><br>'+unique.join(' · ');
-    root.prepend(note);
-    const first=root.querySelector('.hc-required-missing,.hc-required-group');
-    first?.scrollIntoView({behavior:'smooth',block:'center'});
-    first?.focus?.();
-    notify('Faltan campos obligatorios en la Historia Clínica','danger');
-    return false;
-  }
+function hcStepValidation(step, data, finalCheck=false) {
+  // Historia Clínica flexible: ningún campo bloquea el avance o el guardado.
+  // Los campos vacíos se permiten y se persisten como vacíos/arrays vacíos.
+  document.querySelectorAll('.hc-required-note,.hc-required-missing,.hc-required-group').forEach(el=>{
+    el.classList?.remove('hc-required-missing','hc-required-group');
+    if(el.classList?.contains('hc-required-note')) el.remove();
+  });
   return true;
 }
 
+// Sincronización independiente de síntomas: cada checkbox conserva su propio valor.
+document.addEventListener('change', function(e){
+  if(e.target && e.target.matches('input[name="wf-sintomas"]')){
+    wizData.sintomas = Array.from(document.querySelectorAll('input[name="wf-sintomas"]:checked')).map(x=>x.value);
+    const pill=e.target.closest('.nm-symptom-pill');
+    if(pill) pill.classList.toggle('checked', e.target.checked);
+  }
+});
+
 async function wizNext() {
   saveWizStep();
-  if (!hcStepValidation(wizStep,wizData,false)) return;
+  // Historia Clínica flexible: se permite continuar con campos vacíos.
   if (wizStep===WIZ_STEPS.length-1) { await finishWizard(); return; }
   wizStep++;
   renderWizard();
