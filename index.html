@@ -2244,22 +2244,39 @@ const SB = {
   async upsertHistoria(pacienteId, data) {
     if (!pacienteId) throw new Error('No se puede guardar la historia clínica sin paciente_id.');
     const clean = { ...data, paciente_id: pacienteId };
-    // Los campos multiselección siempre viajan como arrays reales a Supabase.
     ['antecedentes','antec_fam','habitos','sintomas'].forEach(k => {
       if (clean[k] == null) clean[k] = [];
       else if (!Array.isArray(clean[k])) clean[k] = [clean[k]].filter(Boolean);
     });
-    const existing = await SB.getHistoria(pacienteId);
     Object.keys(clean).forEach(k => { if (clean[k] === undefined) delete clean[k]; });
-    if (existing) {
-      await supaWriteAdaptive(`historias_clinicas?paciente_id=eq.${pacienteId}`, 'PATCH', clean);
-    } else {
-      await supaWriteAdaptive('historias_clinicas', 'POST', clean);
-    }
-    // Verificación real: no mostramos éxito hasta volver a leer lo persistido.
-    const saved = await SB.getHistoria(pacienteId);
-    if (!saved) throw new Error('Supabase no devolvió la historia clínica después de guardarla.');
-    return saved;
+
+    // UPSERT ATOMICO: UNIQUE(paciente_id) decide si crea o actualiza.
+    // Evita la carrera GET -> INSERT y hace imposible crear una segunda HC.
+    const write = async (attempt=0) => {
+      await ensureSupaSession();
+      const url = SUPA_URL.replace(/\/$/,'') + '/rest/v1/historias_clinicas?on_conflict=paciente_id';
+      const res = await fetch(url, {
+        method:'POST', mode:'cors', credentials:'omit',
+        headers:{
+          apikey:SUPA_ANON,
+          Authorization:'Bearer ' + supaAccessToken(),
+          'Content-Type':'application/json',
+          Prefer:'resolution=merge-duplicates,return=representation'
+        },
+        body:JSON.stringify(clean)
+      });
+      const text=await res.text();
+      let parsed=null; if(text){ try{ parsed=JSON.parse(text); }catch(_){ parsed=text; } }
+      const detail=typeof parsed==='string'?parsed:(parsed?.message||parsed?.details||parsed?.hint||'');
+      if((res.status===401 || /jwt.*expired|token.*expired|invalid.*jwt/i.test(detail||'')) && attempt===0){
+        await refreshSupaSession(true); return write(1);
+      }
+      if(!res.ok) throw new Error(`Supabase HTTP ${res.status}: ${detail||'no se pudo guardar la historia clínica'}`);
+      const row=Array.isArray(parsed)?parsed[0]:parsed;
+      if(!row?.id) throw new Error('Supabase no confirmó la Historia Clínica guardada.');
+      return row;
+    };
+    return await write(0);
   },
 
   // DIETAS
