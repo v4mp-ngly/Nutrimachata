@@ -2145,6 +2145,24 @@ async function supaFetchAll(path, pageSize=500) {
 
 
 // ── CRUD helpers ──────────────────────────────
+// Reintenta escrituras cuando el frontend contiene un campo opcional que aún no existe
+// en el esquema de Supabase. Nunca elimina campos requeridos de forma silenciosa.
+async function supaWriteAdaptive(path, method, body, maxRetries=12) {
+  let payload={...(body||{})};
+  for(let attempt=0; attempt<=maxRetries; attempt++){
+    try{return await supa(path,method,payload)}catch(e){
+      const msg=String(e?.message||'');
+      const m=msg.match(/Could not find the ['"]([^'"]+)['"] column|column ["]?([a-zA-Z0-9_]+)["]? .*does not exist/i);
+      const missing=m&&(m[1]||m[2]);
+      if(missing && Object.prototype.hasOwnProperty.call(payload,missing)){
+        console.warn(`[Supabase] ${missing} no existe en ${path}; reintento sin ese campo opcional.`);
+        delete payload[missing]; continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error(`No se pudo adaptar el guardado a ${path}.`);
+}
 const SB = {
   // USUARIOS
   async getUsuario(email) {
@@ -2164,7 +2182,7 @@ const SB = {
     return r && r[0] ? r[0] : null;
   },
   async createPaciente(data) {
-    const r = await supa('pacientes', 'POST', data);
+    const r = await supaWriteAdaptive('pacientes', 'POST', data);
     return r && r[0] ? r[0] : null;
   },
   async updatePaciente(id, data) {
@@ -2232,10 +2250,11 @@ const SB = {
       else if (!Array.isArray(clean[k])) clean[k] = [clean[k]].filter(Boolean);
     });
     const existing = await SB.getHistoria(pacienteId);
+    Object.keys(clean).forEach(k => { if (clean[k] === undefined) delete clean[k]; });
     if (existing) {
-      await supa(`historias_clinicas?paciente_id=eq.${pacienteId}`, 'PATCH', clean);
+      await supaWriteAdaptive(`historias_clinicas?paciente_id=eq.${pacienteId}`, 'PATCH', clean);
     } else {
-      await supa('historias_clinicas', 'POST', clean);
+      await supaWriteAdaptive('historias_clinicas', 'POST', clean);
     }
     // Verificación real: no mostramos éxito hasta volver a leer lo persistido.
     const saved = await SB.getHistoria(pacienteId);
@@ -4486,7 +4505,7 @@ async function finishWizard() {
     historiaClinica: { ...wizData }
   };
 
-  closeModal('modal-wizard');
+  try { sessionStorage.setItem('nutri_hc_draft', JSON.stringify(wizData)); } catch (_) {}
 
   // Show loading screen while saving
   document.getElementById('page-content').innerHTML = `
@@ -4595,12 +4614,15 @@ async function finishWizard() {
         console.warn('Paciente e historia guardados; acceso de portal pendiente:', portalErr);
       }
 
-      notify('✓ Paciente e historia clínica guardados en Supabase', 'success');
+      try { sessionStorage.removeItem('nutri_hc_draft'); } catch (_) {}
+      closeModal('modal-wizard');
+      notify('✓ Paciente e historia clínica guardados y verificados en Supabase', 'success');
     }
   } catch(e) {
-    console.error('Error guardando paciente en Supabase:', e);
+    console.error('Error guardando paciente/historia en Supabase:', e);
     notify('No se pudo completar el expediente en Supabase: ' + (e.message || 'error desconocido'), 'danger');
-    navigate('patients');
+    if (nextBtn) { nextBtn.disabled=false; nextBtn.textContent='Guardar Historia Clínica'; }
+    try { sessionStorage.setItem('nutri_hc_draft', JSON.stringify(wizData)); } catch (_) {}
     return;
   }
 
@@ -12220,11 +12242,11 @@ window.addEventListener('beforeprint',()=>{document.documentElement.classList.ad
 window.addEventListener('afterprint',()=>{document.documentElement.classList.remove('nm-printing')});
 </script>
 
-\n<style id="nm-consent-style">
+<style id="nm-consent-style">
 .consent-tabs{display:flex;gap:6px;background:#f3f6ef;padding:5px;border-radius:10px;margin-bottom:16px;flex-wrap:wrap}.consent-tab{border:0;background:transparent;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;color:#687066;cursor:pointer}.consent-tab.active{background:#fff;color:var(--olive-dark);box-shadow:0 2px 8px rgba(31,61,18,.08)}
 .consent-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.consent-kpi{background:#fff;border:1px solid #e6ebe2;border-radius:12px;padding:16px}.consent-kpi b{font-size:24px;color:#244c15;display:block}.consent-kpi span{font-size:11px;color:#7a8376}.consent-card{background:#fff;border:1px solid #e6ebe2;border-radius:12px;padding:17px;margin-bottom:12px}.consent-form-grid{display:grid;grid-template-columns:1.1fr 2fr .7fr .7fr;gap:10px;align-items:end}.consent-status{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:700}.consent-ok{background:#eaf6e6;color:#387120}.consent-pending{background:#fff3dc;color:#a36c0d}.consent-link{color:#5c8d25;text-decoration:none;font-weight:600}.consent-table-actions{display:flex;gap:6px;flex-wrap:wrap}.consent-inline-box{border:1px solid #e4eadf;background:#fbfcfa;border-radius:10px;padding:12px;margin:10px 0}.consent-inline-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.consent-meter{height:7px;background:#edf0ea;border-radius:99px;overflow:hidden;margin-top:8px}.consent-meter>i{display:block;height:100%;background:#669c2f}.consent-note{font-size:10px;color:#7d8579;margin-top:5px}.consent-switch{display:flex;align-items:center;gap:6px;font-size:11px;color:#5e655a}.consent-switch input{width:auto!important;accent-color:var(--olive)}
 @media(max-width:900px){.consent-kpis{grid-template-columns:repeat(2,1fr)}.consent-form-grid{grid-template-columns:1fr 1fr}.consent-form-grid .wide{grid-column:1/-1}}@media(max-width:560px){.consent-kpis{grid-template-columns:1fr 1fr}.consent-form-grid{grid-template-columns:1fr}.consent-form-grid .wide{grid-column:auto}}
-</style>\n
+</style>
 <script id="nm-consent-module">
 (function(){
  const CFG='nutrimachata_consent_config_v1', REC='nutrimachata_consent_records_v1';
