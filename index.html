@@ -12565,6 +12565,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       if(hero2){hero2.insertAdjacentHTML('afterend',`<div id="billing-db-status" style="margin:-10px 0 16px;padding:9px 12px;border:1px solid ${uuidOk?'#d4ead0':'#f1c7c0'};background:${uuidOk?'#f5fbf2':'#fff5f3'};border-radius:10px;font-size:12px;color:${uuidOk?'#315c2b':'#9b2c22'}">${uuidOk?'✓ Facturación sincronizada con Supabase':'⚠️ El ID de pacientes no parece UUID. facturas.paciente_id es UUID; la factura guardará paciente_nombre pero no paciente_id hasta corregir el tipo.'}</div>`);}
     });
   };
+  
 
   function invoiceDbPayload(p,items,totals,old){
     const patientRawId=p?.id;
