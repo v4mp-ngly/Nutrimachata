@@ -1962,6 +1962,16 @@ async function supaAuthLogin(email,password){
   if(!res.ok) throw new Error(data?.msg||data?.error_description||data?.message||'No se pudo iniciar sesión');
   return persistSupaSession(data);
 }
+async function supaAuthSignUp(email,password,metadata={}){
+  const res=await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/signup',{
+    method:'POST',
+    headers:{apikey:SUPA_ANON,'Content-Type':'application/json'},
+    body:JSON.stringify({email,password,data:metadata})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data?.msg||data?.error_description||data?.message||'No se pudo crear la cuenta de acceso');
+  return data;
+}
 function restoreSupaSession(){
   try{
     const x=JSON.parse(sessionStorage.getItem('nutri_supa_session')||'null');
@@ -2778,9 +2788,16 @@ async function doLogin() {
     const au=auth.user||{};
     let role=(au.user_metadata?.role||au.app_metadata?.role||'').toLowerCase();
     if(email===NUTRI_ADMIN_EMAIL) role='admin';
+    if(!role){
+      try { const profile=await SB.getUsuario(email); role=String(profile?.rol||'').toLowerCase(); } catch(_) {}
+    }
     if(!role) role=DB.loginRole==='patient'?'patient':'admin';
     let patientId=null;
-    if(role==='patient'){const pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=*`);patientId=pacs?.[0]?.id||null;}
+    if(role==='patient'){
+      const pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=*`);
+      patientId=pacs?.[0]?.id||null;
+      if(!patientId) throw new Error('La cuenta existe, pero todavía no está vinculada a un paciente. Contacte a la doctora.');
+    }
     const name=au.user_metadata?.name||au.user_metadata?.nombre||(email===NUTRI_ADMIN_EMAIL?'Administrador NutriMachata':email.split('@')[0]);
     DB.currentUser={email,name,role,patientId,initials:name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),supabaseId:au.id,id:au.id};
     DB.currentRole=role;
@@ -3020,6 +3037,16 @@ function finishPublicReg() {
   // Save to Supabase async
   (async () => {
     try {
+      // 0. Crear primero la cuenta REAL en Supabase Auth.
+      // El login usa Auth, por eso guardar solo en public.usuarios no es suficiente.
+      const signUp = await supaAuthSignUp(autoEmail, autoPass, {
+        role: 'patient', nombre: pubWizData.nombre
+      });
+      if (!signUp?.access_token) {
+        throw new Error('Supabase creó la cuenta, pero requiere confirmación de correo antes de completar el registro. Desactiva Confirm email para este flujo o confirma el correo y vuelve a intentarlo.');
+      }
+      persistSupaSession(signUp);
+
       // 1. Save paciente
       const sbPac = await SB.createPaciente({
         nombre:           pubWizData.nombre,
@@ -3101,13 +3128,17 @@ function finishPublicReg() {
         }
       }
 
-      // 4. Create login account in usuarios table
-      await supa('usuarios', 'POST', {
-        email:         autoEmail,
-        password_hash: autoPass,
-        rol:           'patient',
-        nombre:        pubWizData.nombre,
-      });
+      // 4. Guardar perfil de acceso. La contraseña vive en Supabase Auth,
+      // nunca en texto plano dentro de public.usuarios.
+      const existingUser = await SB.getUsuario(autoEmail);
+      if (!existingUser) {
+        await supaWriteAdaptive('usuarios', 'POST', {
+          id: signUp?.user?.id || undefined,
+          email: autoEmail,
+          rol: 'patient',
+          nombre: pubWizData.nombre,
+        });
+      }
 
       // 5. Register locally too for current session
       USERS[autoEmail] = {
@@ -3138,9 +3169,21 @@ function finishPublicReg() {
 
     } catch(e) {
       console.error('Error guardando paciente:', e);
+      clearSupaSession();
+      if (loginRight) {
+        loginRight.innerHTML = `
+          <div style="width:100%;max-width:420px;text-align:center">
+            <div style="font-size:42px;margin-bottom:14px">⚠️</div>
+            <h2 style="font-family:'Playfair Display',serif;font-size:24px;color:var(--black);margin-bottom:8px">No se completó el registro</h2>
+            <p style="font-size:13px;color:var(--gray-500);line-height:1.6;margin-bottom:20px">${escapeHtml(e.message || 'Ocurrió un error al guardar en Supabase.')}</p>
+            <button class="btn-primary" type="button" onclick="location.reload()">Volver al inicio</button>
+          </div>`;
+      }
+      notify('No se completó el registro: ' + (e.message || 'error desconocido'), 'danger');
+      return;
     }
 
-    // 6. Show success screen
+    // 6. Show success screen SOLO si Auth + paciente + historia/perfil terminaron bien.
     if (loginRight) {
       loginRight.innerHTML = `
         <div style="width:100%;max-width:420px;text-align:center">
@@ -3953,10 +3996,20 @@ async function savePatient(id) {
         if (emailVal) {
           const autoPass = passVal || generatePassword(sbData.nombre);
           try {
-            await supa('usuarios', 'POST', {
-              email: emailVal, password_hash: autoPass,
-              rol: 'patient', nombre: sbData.nombre,
-            });
+            let authCreated = null;
+            try {
+              authCreated = await supaAuthSignUp(emailVal, autoPass, { role:'patient', nombre:sbData.nombre });
+            } catch(authErr) {
+              // Si ya existe en Auth, no duplicamos; conservamos el paciente y revisamos el perfil.
+              if (!/already|registered|exists|existente/i.test(String(authErr?.message||''))) throw authErr;
+            }
+            const existingPortal = await SB.getUsuario(emailVal);
+            if (!existingPortal) {
+              await supaWriteAdaptive('usuarios', 'POST', {
+                id: authCreated?.user?.id || undefined,
+                email: emailVal, rol:'patient', nombre:sbData.nombre,
+              });
+            }
             newP.portalPassword = autoPass;
             USERS[emailVal] = { pass:autoPass, role:'patient', name:sbData.nombre, initials:newP.initials, patientId:newP.id };
             notify(`Paciente registrado ✓ · Contraseña portal: ${autoPass}`, 'success');
