@@ -3175,7 +3175,7 @@ function finishPublicReg() {
           <div style="width:100%;max-width:420px;text-align:center">
             <div style="font-size:42px;margin-bottom:14px">⚠️</div>
             <h2 style="font-family:'Playfair Display',serif;font-size:24px;color:var(--black);margin-bottom:8px">No se completó el registro</h2>
-            <p style="font-size:13px;color:var(--gray-500);line-height:1.6;margin-bottom:20px">${escapeHtml(e.message || 'Ocurrió un error al guardar en Supabase.')}</p>
+            <p style="font-size:13px;color:var(--gray-500);line-height:1.6;margin-bottom:20px">${String(e.message || 'Ocurrió un error al guardar en Supabase.').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch] || ch))}</p>
             <button class="btn-primary" type="button" onclick="location.reload()">Volver al inicio</button>
           </div>`;
       }
