@@ -2182,8 +2182,14 @@ const SB = {
     return r && r[0] ? r[0] : null;
   },
   async createPaciente(data) {
-    const r = await supaWriteAdaptive('pacientes', 'POST', data);
-    return r && r[0] ? r[0] : null;
+    // Inserta y exige que PostgREST devuelva el registro creado.
+    const r = await supaWriteAdaptive('pacientes?select=*', 'POST', data);
+    const created = Array.isArray(r) ? r[0] : null;
+    if (!created?.id) throw new Error('Supabase no devolvió el UUID del paciente creado. Revisa RLS/permisos de INSERT y SELECT.');
+    // Verificación real: no damos éxito hasta poder leer el mismo UUID.
+    const verify = await supa(`pacientes?id=eq.${encodeURIComponent(created.id)}&select=*&limit=1`, 'GET');
+    if (!Array.isArray(verify) || !verify[0]?.id) throw new Error('El paciente fue enviado, pero no pudo verificarse en Supabase. Revisa la política SELECT de pacientes.');
+    return verify[0];
   },
   async updatePaciente(id, data) {
     return await supa(`pacientes?id=eq.${id}`, 'PATCH', data);
@@ -3899,18 +3905,23 @@ function calcIMCModal() {
   }
 }
 
+let NM_PATIENT_SAVE_BUSY = false;
 async function savePatient(id) {
+  if (NM_PATIENT_SAVE_BUSY) return;
+  const saveBtn = document.querySelector('#modal-patient .btn-olive');
+  NM_PATIENT_SAVE_BUSY = true;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.nmOldText = saveBtn.textContent; saveBtn.textContent = 'Guardando…'; }
   const nombre = document.getElementById('pm-nombre').value.trim();
   const dob    = document.getElementById('pm-dob')?.value || '';
   let edad = parseInt(document.getElementById('pm-edad').value);
   if (!edad && dob) edad = calcAgeFromDobStr(dob);
-  if (!nombre || !edad) { notify('Nombre y edad son requeridos', 'danger'); return; }
+  if (!nombre || !edad) { notify('Nombre y edad son requeridos', 'danger'); NM_PATIENT_SAVE_BUSY=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';} return; }
   const peso  = parseFloat(document.getElementById('pm-peso').value) || 0;
   const talla = parseTalla(document.getElementById('pm-talla-cm')?.value || document.getElementById('pm-talla')?.value) || 0;
   const cedula    = document.getElementById('pm-cedula')?.value.trim()     || '';
   const direccion = document.getElementById('pm-direccion')?.value.trim()  || '';
   const objetivo  = document.getElementById('pm-objetivo')?.value.trim()   || '';
-  const imc   = parseFloat((peso / (talla * talla)).toFixed(1));
+  const imc   = (peso > 0 && talla > 0) ? parseFloat((peso / (talla * talla)).toFixed(1)) : null;
   const sbData = {
     nombre, edad, cedula, fecha_nacimiento: dob || null, direccion, objetivo,
     sexo:     document.getElementById('pm-sexo').value,
@@ -3918,7 +3929,7 @@ async function savePatient(id) {
     email:    document.getElementById('pm-email').value,
     peso, talla, imc,
     presion:  document.getElementById('pm-presion').value || '—',
-    estado:   getImcCategory(imc),
+    estado:   Number.isFinite(imc) ? getImcCategory(imc) : '',
     color:    getPatientColor(nombre),
     initials: nombre.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),
     activo:   true,
@@ -3959,9 +3970,25 @@ async function savePatient(id) {
       }
     }
   } catch(e) {
-    console.error(e); notify('No se pudo guardar el paciente en Supabase: ' + (e.message || 'error desconocido'), 'danger');
+    console.error(e);
+    notify('No se pudo guardar el paciente en Supabase: ' + (e.message || 'error desconocido'), 'danger');
+    NM_PATIENT_SAVE_BUSY=false;
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';}
     return;
   }
+  // Recarga desde Supabase para que la pantalla refleje la base real y no una copia local.
+  try {
+    const pacientesRaw = await SB.getPacientes();
+    if (Array.isArray(pacientesRaw)) {
+      const current = Array.isArray(DB.patients) ? DB.patients : [];
+      DB.patients = pacientesRaw.map(row => {
+        const existing = current.find(x => String(x.id) === String(row.id));
+        return mapPaciente(row, existing?.evaluations || [], existing?.diets || [], existing?.historiaClinica || null);
+      });
+    }
+  } catch(syncErr) { console.warn('Paciente guardado; no se pudo refrescar el directorio:', syncErr); }
+  NM_PATIENT_SAVE_BUSY=false;
+  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';}
   closeModal('modal-patient');
   renderPatients();
 }
