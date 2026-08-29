@@ -2076,7 +2076,7 @@ function restoreEvaluationDraft(){
 function clearEvaluationDraft(){ sessionStorage.removeItem('nutri_eval_draft'); }
 document.addEventListener('input',e=>{ if(e.target.closest?.('#modal-evaluation')) saveEvaluationDraft(); });
 document.addEventListener('change',e=>{ if(e.target.closest?.('#modal-evaluation')) saveEvaluationDraft(); });
-setInterval(()=>{
+NMRuntime.interval('global:auth-refresh',()=>{
   if(SUPA_AUTH_SESSION?.access_token && supaSessionExpiresSoon(180)) refreshSupaSession(true).catch(()=>{});
 },60000);
 // Detect if running locally (file://) or online
@@ -2491,7 +2491,7 @@ async function loadFromSupabase() {
     // ═══════════════════════════════════════════════
     // Actualiza citas cada 3 minutos para detectar cambios de otros usuarios
     if (!window._citasSyncInterval) {
-      window._citasSyncInterval = setInterval(async () => {
+      window._citasSyncInterval = NMRuntime.interval('global:citas-sync', async () => {
         try {
           const citasActuales = await supa('citas?order=fecha.asc,hora.asc&select=*');
           if (citasActuales && Array.isArray(citasActuales)) {
@@ -3367,7 +3367,7 @@ function prefillPatientLogin(email, pass) {
 
 function doLogout() {
   showConfirm('¿Cerrar sesión?', async () => {
-    await supaAuthLogout(); DB.currentUser=null; DB.currentRole=null;
+    await supaAuthLogout(); NMRuntime.resetInit(); NMRuntime.clearPageTimers(); DB.currentUser=null; DB.currentRole=null;
     document.getElementById('app').style.display='none';document.getElementById('login-page').style.display='flex';
   });
 }
@@ -3398,7 +3398,77 @@ const PATIENT_NAV = [
   { id: 'my-measures', icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M12 2v20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/></svg>`, label: 'Mis Medidas', section: null },
 ];
 
+// ═══════════════════════════════════════════════
+//  NUTRIMACHATA JS RUNTIME — ciclo de vida centralizado
+// ═══════════════════════════════════════════════
+const NMRuntime = (() => {
+  const intervals = new Map();
+  const timeouts = new Map();
+  let appInitKey = '';
+  let navToken = 0;
+  let delegated = false;
+  const clearTimer = (map,key,clearFn) => { const id=map.get(key); if(id!=null){ clearFn(id); map.delete(key); } };
+  return {
+    nextNavigation(){ navToken += 1; return navToken; },
+    navigationToken(){ return navToken; },
+    timeout(key, fn, ms=0){
+      clearTimer(timeouts,key,clearTimeout);
+      const id=setTimeout(()=>{ timeouts.delete(key); fn(); },ms);
+      timeouts.set(key,id); return id;
+    },
+    interval(key, fn, ms){
+      clearTimer(intervals,key,clearInterval);
+      const id=setInterval(fn,ms); intervals.set(key,id); return id;
+    },
+    clearInterval(key){ clearTimer(intervals,key,clearInterval); },
+    clearTimeout(key){ clearTimer(timeouts,key,clearTimeout); },
+    clearPageTimers(){
+      [...timeouts.keys()].filter(k=>String(k).startsWith('page:')).forEach(k=>clearTimer(timeouts,k,clearTimeout));
+    },
+    shouldInit(key){ if(appInitKey===key) return false; appInitKey=key; return true; },
+    resetInit(){ appInitKey=''; },
+    bindDelegates(){
+      if(delegated) return; delegated=true;
+      document.addEventListener('click', e => {
+        const overlay=e.target?.classList?.contains('modal-overlay') ? e.target : null;
+        if(overlay) closeModal(overlay.id);
+      });
+      document.addEventListener('keydown', e => {
+        if(e.key==='Escape'){
+          const open=[...document.querySelectorAll('.modal-overlay.open')].pop();
+          if(open) closeModal(open.id);
+        }
+      });
+    }
+  };
+})();
+
+// Protección global de Chart.js: un canvas nunca conserva dos instancias.
+(function installChartGuard(){
+  if(typeof window.Chart!=='function' || window.Chart.__nmGuarded) return;
+  const OriginalChart=window.Chart;
+  const GuardedChart=new Proxy(OriginalChart,{
+    construct(Target,args,newTarget){
+      try{
+        const target=args?.[0];
+        const canvas=target?.canvas || target;
+        const existing=typeof OriginalChart.getChart==='function' ? OriginalChart.getChart(canvas) : null;
+        if(existing) existing.destroy();
+      }catch(e){ console.warn('[NutriMachata] Chart cleanup:',e); }
+      return Reflect.construct(Target,args,newTarget===GuardedChart?Target:newTarget);
+    }
+  });
+  Object.defineProperty(GuardedChart,'__nmGuarded',{value:true});
+  window.Chart=GuardedChart;
+})();
+
 function initApp() {
+  const initKey = `${DB.currentRole||''}:${DB.currentUser?.id||DB.currentUser?.email||''}`;
+  if (!NMRuntime.shouldInit(initKey)) {
+    console.info('[NutriMachata] initApp duplicado ignorado:', initKey);
+    return;
+  }
+  NMRuntime.bindDelegates();
   const nav = DB.currentRole === 'admin' ? ADMIN_NAV : PATIENT_NAV;
   const sidebar = document.getElementById('sidebar-nav');
   let html = '', lastSection = null;
@@ -3449,6 +3519,8 @@ let chartInstances = {};
 let nmDashboardRenderToken = 0; // invalida renders/timers anteriores del dashboard
 
 function navigate(page) {
+  const navigationToken = NMRuntime.nextNavigation();
+  NMRuntime.clearPageTimers();
   currentPage = page;
   // Close sidebar on mobile after navigation
   if (window.innerWidth <= 768) closeSidebar();
@@ -3699,7 +3771,7 @@ function renderDashboard() {
   document.querySelector('[data-quick="patient"]')?.addEventListener('click',()=>openWizard());
   document.querySelector('[data-quick="appointment"]')?.addEventListener('click',()=>openAppointmentModal());
 
-  setTimeout(()=>{
+  NMRuntime.timeout('page:dashboard-charts',()=>{
     // Si hubo otro render mientras esperaba este timer, este callback ya es obsoleto.
     if (dashboardRenderToken !== nmDashboardRenderToken || currentPage !== 'dashboard') return;
     const safeChart = (canvas, key, config) => {
@@ -11350,21 +11422,20 @@ function getPatientColor(name) {
 //  MODAL HELPERS
 // ═══════════════════════════════════════════════
 function openModal(id) {
-  document.getElementById(id).classList.add('open');
+  const modal=document.getElementById(id);
+  if(!modal){ console.warn('[NutriMachata] Modal inexistente:',id); return false; }
+  modal.classList.add('open');
   document.body.style.overflow = 'hidden';
+  return true;
 }
 
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-  document.body.style.overflow = '';
+  const modal=document.getElementById(id);
+  if(!modal) return false;
+  modal.classList.remove('open');
+  if(!document.querySelector('.modal-overlay.open')) document.body.style.overflow = '';
+  return true;
 }
-
-// Close on backdrop click
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeModal(overlay.id);
-  });
-});
 
 // ═══════════════════════════════════════════════
 //  UTILITIES
@@ -12235,7 +12306,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
   window.runClinicAlert=function(i){const a=(window.__clinicAlerts||[])[i];document.getElementById('clinic-alert-panel')?.classList.remove('open');if(a?.action)a.action()};
   window.toggleClinicAlerts=function(ev){ev?.stopPropagation?.();const p=document.getElementById('clinic-alert-panel');if(!p)return;const opening=!p.classList.contains('open');if(opening)renderClinicAlerts();p.classList.toggle('open',opening)};
   document.addEventListener('click',e=>{const p=document.getElementById('clinic-alert-panel');if(p?.classList.contains('open')&&!p.contains(e.target)&&!e.target.closest('#notif-btn'))p.classList.remove('open')});
-  setTimeout(refreshClinicAlertBadge,1000);setInterval(refreshClinicAlertBadge,60000);
+  NMRuntime.timeout('global:clinic-alert-first',refreshClinicAlertBadge,1000);NMRuntime.interval('global:clinic-alert',refreshClinicAlertBadge,60000);
   const _notify=window.notify;if(typeof _notify==='function'){window.notify=function(){const r=_notify.apply(this,arguments);setTimeout(refreshClinicAlertBadge,200);return r}}
 })();
 </script>
@@ -12411,7 +12482,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
   ].forEach(x=>wrapMutation(x[0],x[1]));
 
   // Copia local periódica y al abandonar la pestaña.
-  setInterval(()=>saveSnapshot('periodica'),60000);
+  NMRuntime.interval('global:snapshot',()=>saveSnapshot('periodica'),60000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveSnapshot('ocultar-pagina')});
   window.addEventListener('beforeunload',()=>saveSnapshot('cerrar-pagina'));
   if(IS_LOCAL)restoreSnapshot();
