@@ -2834,7 +2834,7 @@ async function doLogin() {
     Promise.resolve().then(async()=>{
       try{
         await loadFromSupabase();
-        try { initApp(); } catch(e) { console.warn('initApp posterior:',e); }
+        try { navigate(DB.currentPage || (DB.currentRole === 'admin' ? 'dashboard' : 'patient-home')); } catch(e) { console.warn('render posterior:',e); }
         if(sessionStorage.getItem('nutri_eval_draft')) notify('Hay una evaluación temporal pendiente. Al volver a abrirla podrás recuperar los campos.','warning');
       }catch(e){
         console.error('Carga posterior al login:',e);
@@ -2878,6 +2878,37 @@ function bindLoginControls() {
 
 bindLoginControls();
 
+
+// Reanudar una sesión válida al recargar la página, sin pedir login otra vez.
+async function resumeExistingSession(){
+  if (!SUPA_AUTH_SESSION?.access_token || !SUPA_AUTH_SESSION?.user?.id) return false;
+  try {
+    await ensureSupaSession();
+    const au=SUPA_AUTH_SESSION.user||{};
+    const email=String(au.email||'').trim().toLowerCase();
+    let role=String(au.user_metadata?.role||au.app_metadata?.role||'').toLowerCase();
+    if(email===NUTRI_ADMIN_EMAIL) role='admin';
+    if(!role) role='patient';
+    let patientId=null;
+    if(role==='patient'){
+      let pacs=[];
+      try{pacs=await supa(`pacientes?auth_user_id=eq.${encodeURIComponent(au.id)}&limit=1&select=id,email,nombre`);}catch(_){}
+      if(!pacs?.[0] && email){try{pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=id,email,nombre`);}catch(_){} }
+      patientId=pacs?.[0]?.id||null;
+      if(!patientId) return false;
+    }
+    const name=au.user_metadata?.name||au.user_metadata?.nombre||(email===NUTRI_ADMIN_EMAIL?'Administrador NutriMachata':email.split('@')[0]);
+    DB.currentUser={email,name,role,patientId,initials:name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),supabaseId:au.id,id:au.id};
+    DB.currentRole=role;
+    const loginPage=document.getElementById('login-page'), app=document.getElementById('app');
+    if(loginPage) loginPage.style.display='none';
+    if(app) app.style.display='block';
+    try{initApp();}catch(e){console.warn('initApp resume:',e);}
+    Promise.resolve().then(async()=>{try{await loadFromSupabase(); navigate(DB.currentPage || (role==='admin'?'dashboard':'patient-home'));}catch(e){console.error('Carga sesión restaurada:',e); notify('Sesión restaurada, pero hubo un problema cargando datos: '+(e.message||''),'danger');}});
+    return true;
+  } catch(e){ console.warn('No se pudo restaurar la sesión:',e); return false; }
+}
+setTimeout(()=>{ resumeExistingSession().catch(()=>{}); },0);
 
 // ═══════════════════════════════════════════════
 //  REGISTRO PÚBLICO DE PACIENTE (desde login)
@@ -12107,28 +12138,31 @@ new MutationObserver(m=>{m.forEach(x=>x.addedNodes.forEach(n=>{if(n.nodeType===1
     const weight=validNumber(last?.peso)?`${Number(last.peso).toFixed(1)} kg`:validNumber(p.peso)?`${Number(p.peso).toFixed(1)} kg`:'—';
     const imc=validNumber(last?.imc)?Number(last.imc).toFixed(1):validNumber(p.imc)?Number(p.imc).toFixed(1):'—';
     const pressure=last?.presion||p.presion||'—';
-    box.innerHTML=`<div class="apt-context-head"><div class="apt-context-avatar" style="background:${p.color||'#5E8C2A'}">${safeText(p.initials||p.nombre?.split(/\s+/).map(x=>x[0]).slice(0,2).join('')||'P')}</div><div><div class="apt-context-name">${safeText(p.nombre)}</div><div class="apt-context-goal">Objetivo: ${safeText(p.objetivo||last?.proximoObjetivo||'No registrado')}</div></div></div><div class="apt-context-grid"><div class="apt-context-metric"><span>Última evaluación</span><b>${safeText(lastDate)}</b></div><div class="apt-context-metric"><span>Peso</span><b>${safeText(weight)}</b></div><div class="apt-context-metric"><span>IMC</span><b>${safeText(imc)}</b></div><div class="apt-context-metric"><span>Presión</span><b>${safeText(pressure)}</b></div></div><div class="apt-context-actions"><button type="button" class="btn btn-olive btn-sm" onclick="startEvaluationFromAppointment('${p.id}')">＋ Iniciar evaluación</button><button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modal-appointment');navigateTo('patients');setTimeout(()=>openPatientDetail?.('${p.id}'),120)">Ver paciente</button></div>`;
+    box.innerHTML=`<div class="apt-context-head"><div class="apt-context-avatar" style="background:${p.color||'#5E8C2A'}">${safeText(p.initials||p.nombre?.split(/\s+/).map(x=>x[0]).slice(0,2).join('')||'P')}</div><div><div class="apt-context-name">${safeText(p.nombre)}</div><div class="apt-context-goal">Objetivo: ${safeText(p.objetivo||last?.proximoObjetivo||'No registrado')}</div></div></div><div class="apt-context-grid"><div class="apt-context-metric"><span>Última evaluación</span><b>${safeText(lastDate)}</b></div><div class="apt-context-metric"><span>Peso</span><b>${safeText(weight)}</b></div><div class="apt-context-metric"><span>IMC</span><b>${safeText(imc)}</b></div><div class="apt-context-metric"><span>Presión</span><b>${safeText(pressure)}</b></div></div><div class="apt-context-actions"><button type="button" class="btn btn-olive btn-sm" onclick="startEvaluationFromAppointment('${p.id}')">＋ Iniciar evaluación</button><button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modal-appointment');navigate('patients');setTimeout(()=>openPatientDetail?.('${p.id}'),120)">Ver paciente</button></div>`;
     box.style.display='block';
   };
   window.startEvaluationFromAppointment=function(patientId){closeModal('modal-appointment');setTimeout(()=>openEvalModal(patientId),120)};
 
-  function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d+)/);return !!m&&(Number(m[1])>=140||Number(m[2])>=90)}
+  // Compatibilidad con alertas/markup antiguo: toda navegacion usa navigate().
+window.navigateTo = function(page){ return navigate(page); };
+
+function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d+)/);return !!m&&(Number(m[1])>=140||Number(m[2])>=90)}
   window.computeClinicAlerts=function(){
     const alerts=[]; const now=isoToday();
     (DB.patients||[]).filter(p=>p.activo!==false).forEach(p=>{
       const evs=(p.evaluaciones||[]).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
       const last=evs[evs.length-1];
-      if(!last){alerts.push({type:'warning',icon:'◷',title:'Paciente sin evaluación',text:`${p.nombre} no tiene evaluaciones registradas.`,date:'Seguimiento',action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),100)}})}
+      if(!last){alerts.push({type:'warning',icon:'◷',title:'Paciente sin evaluación',text:`${p.nombre} no tiene evaluaciones registradas.`,date:'Seguimiento',action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),100)}})}
       else{
-        const days=daysFromToday(last.fecha); if(days!==null&&days<-45) alerts.push({type:'warning',icon:'◷',title:'Evaluación atrasada',text:`${p.nombre}: última evaluación hace ${Math.abs(days)} días.`,date:'Evaluación',action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),100)}});
-        const imc=validNumber(last.imc)?Number(last.imc):(validNumber(p.imc)?Number(p.imc):null); if(imc!==null&&(imc<18.5||imc>=30)) alerts.push({type:'info',icon:'⚕',title:'IMC fuera de rango',text:`${p.nombre}: IMC ${imc.toFixed(1)}.`,date:'Clínico',action:()=>navigateTo('evaluations')});
-        const press=last.presion||p.presion;if(pressureHigh(press)) alerts.push({type:'danger',icon:'♥',title:'Presión arterial elevada',text:`${p.nombre}: ${press}.`,date:'Clínico',action:()=>navigateTo('evaluations')});
-        if(evs.length>1&&validNumber(last.peso)&&validNumber(evs[evs.length-2].peso)){const prev=Number(evs[evs.length-2].peso),cur=Number(last.peso),pct=prev?Math.abs(cur-prev)/prev*100:0;if(pct>=5) alerts.push({type:'warning',icon:'↕',title:'Cambio de peso significativo',text:`${p.nombre}: ${cur>prev?'+':''}${(cur-prev).toFixed(1)} kg (${pct.toFixed(1)}%).`,date:'Evolución',action:()=>navigateTo('evaluations')})}
+        const days=daysFromToday(last.fecha); if(days!==null&&days<-45) alerts.push({type:'warning',icon:'◷',title:'Evaluación atrasada',text:`${p.nombre}: última evaluación hace ${Math.abs(days)} días.`,date:'Evaluación',action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),100)}});
+        const imc=validNumber(last.imc)?Number(last.imc):(validNumber(p.imc)?Number(p.imc):null); if(imc!==null&&(imc<18.5||imc>=30)) alerts.push({type:'info',icon:'⚕',title:'IMC fuera de rango',text:`${p.nombre}: IMC ${imc.toFixed(1)}.`,date:'Clínico',action:()=>navigate('evaluations')});
+        const press=last.presion||p.presion;if(pressureHigh(press)) alerts.push({type:'danger',icon:'♥',title:'Presión arterial elevada',text:`${p.nombre}: ${press}.`,date:'Clínico',action:()=>navigate('evaluations')});
+        if(evs.length>1&&validNumber(last.peso)&&validNumber(evs[evs.length-2].peso)){const prev=Number(evs[evs.length-2].peso),cur=Number(last.peso),pct=prev?Math.abs(cur-prev)/prev*100:0;if(pct>=5) alerts.push({type:'warning',icon:'↕',title:'Cambio de peso significativo',text:`${p.nombre}: ${cur>prev?'+':''}${(cur-prev).toFixed(1)} kg (${pct.toFixed(1)}%).`,date:'Evolución',action:()=>navigate('evaluations')})}
       }
-      (p.dietas||[]).forEach(d=>{const end=d.fechaFin||d.fecha_fin||d.fin||d.endDate;const days=daysFromToday(end);if(days!==null&&days>=0&&days<=7)alerts.push({type:'info',icon:'◫',title:'Plan por finalizar',text:`${p.nombre}: ${d.nombre||'Plan nutricional'} finaliza en ${days===0?'hoy':days+' días'}.`,date:'Plan',action:()=>navigateTo('diets')})})
+      (p.dietas||[]).forEach(d=>{const end=d.fechaFin||d.fecha_fin||d.fin||d.endDate;const days=daysFromToday(end);if(days!==null&&days>=0&&days<=7)alerts.push({type:'info',icon:'◫',title:'Plan por finalizar',text:`${p.nombre}: ${d.nombre||'Plan nutricional'} finaliza en ${days===0?'hoy':days+' días'}.`,date:'Plan',action:()=>navigate('diets')})})
     });
-    (DB.appointments||[]).forEach(a=>{if(['completada','cancelada'].includes(String(a.estado||'').toLowerCase()))return;const dt=new Date(`${a.fecha}T${(a.hora||'00:00').slice(0,5)}:00`);const hours=(dt-new Date())/3600000;if(hours>=0&&hours<=24){const p=(DB.patients||[]).find(x=>x.id==a.patientId);alerts.push({type:'info',icon:'◷',title:'Cita cercana',text:`${p?.nombre||a.nombreManual||'Paciente'} · ${a.fecha} ${a.hora||''}.`,date:hours<=2?'Muy pronto':'Próxima',action:()=>{navigateTo('agenda');setTimeout(()=>editAppointment(a.id),100)}})}});
-    try{const b=typeof getBillingData==='function'?getBillingData():null;(b?.invoices||[]).forEach(x=>{const st=typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):x.status;if(st==='Vencida')alerts.push({type:'danger',icon:'$',title:'Factura vencida',text:`${x.patient||'Paciente'} · ${x.number||'Factura'} · saldo ${typeof moneyRD==='function'?moneyRD((x.total||0)-(x.paid||0)):''}`,date:x.dueDate||'Vencida',action:()=>navigateTo('billing')})});(b?.products||[]).filter(p=>p.type!=='Servicio'&&p.active!==false&&validNumber(p.stock)&&validNumber(p.min)&&Number(p.stock)<=Number(p.min)).forEach(p=>alerts.push({type:'warning',icon:'▣',title:'Stock bajo',text:`${p.name}: ${p.stock} disponibles (mín. ${p.min}).`,date:'Inventario',action:()=>navigateTo('billing')}))}catch(e){console.warn('Alertas de facturación:',e)}
+    (DB.appointments||[]).forEach(a=>{if(['completada','cancelada'].includes(String(a.estado||'').toLowerCase()))return;const dt=new Date(`${a.fecha}T${(a.hora||'00:00').slice(0,5)}:00`);const hours=(dt-new Date())/3600000;if(hours>=0&&hours<=24){const p=(DB.patients||[]).find(x=>x.id==a.patientId);alerts.push({type:'info',icon:'◷',title:'Cita cercana',text:`${p?.nombre||a.nombreManual||'Paciente'} · ${a.fecha} ${a.hora||''}.`,date:hours<=2?'Muy pronto':'Próxima',action:()=>{navigate('agenda');setTimeout(()=>editAppointment(a.id),100)}})}});
+    try{const b=typeof getBillingData==='function'?getBillingData():null;(b?.invoices||[]).forEach(x=>{const st=typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):x.status;if(st==='Vencida')alerts.push({type:'danger',icon:'$',title:'Factura vencida',text:`${x.patient||'Paciente'} · ${x.number||'Factura'} · saldo ${typeof moneyRD==='function'?moneyRD((x.total||0)-(x.paid||0)):''}`,date:x.dueDate||'Vencida',action:()=>navigate('billing')})});(b?.products||[]).filter(p=>p.type!=='Servicio'&&p.active!==false&&validNumber(p.stock)&&validNumber(p.min)&&Number(p.stock)<=Number(p.min)).forEach(p=>alerts.push({type:'warning',icon:'▣',title:'Stock bajo',text:`${p.name}: ${p.stock} disponibles (mín. ${p.min}).`,date:'Inventario',action:()=>navigate('billing')}))}catch(e){console.warn('Alertas de facturación:',e)}
     const priority={danger:0,warning:1,info:2,success:3};alerts.sort((a,b)=>(priority[a.type]??9)-(priority[b.type]??9));return alerts;
   };
   window.refreshClinicAlertBadge=function(){const n=computeClinicAlerts().length;const b=document.getElementById('clinic-alert-badge');if(!b)return;b.textContent=n>99?'99+':n;b.style.display=n?'block':'none'};
@@ -12882,33 +12916,33 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       const evs=(p.evaluaciones||[]).filter(Boolean).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
       const last=evs[evs.length-1];
       if(!last){
-        push({type:'warning',icon:'◷',title:'Paciente sin evaluación',text:`${name} no tiene evaluaciones registradas.`,date:'Seguimiento',key:`noeval:${p.id}`,action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
+        push({type:'warning',icon:'◷',title:'Paciente sin evaluación',text:`${name} no tiene evaluaciones registradas.`,date:'Seguimiento',key:`noeval:${p.id}`,action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
       }else{
         const days=typeof daysFromToday==='function'?daysFromToday(last.fecha):null;
-        if(days!==null&&days<-45)push({type:'warning',icon:'◷',title:'Evaluación atrasada',text:`${name}: última evaluación hace ${Math.abs(days)} días.`,date:fmtDate(last.fecha),key:`lateeval:${p.id}:${String(last.fecha).slice(0,10)}`,action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
+        if(days!==null&&days<-45)push({type:'warning',icon:'◷',title:'Evaluación atrasada',text:`${name}: última evaluación hace ${Math.abs(days)} días.`,date:fmtDate(last.fecha),key:`lateeval:${p.id}:${String(last.fecha).slice(0,10)}`,action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
         const imc=(typeof validNumber==='function'&&validNumber(last.imc))?Number(last.imc):((typeof validNumber==='function'&&validNumber(p.imc))?Number(p.imc):null);
-        if(imc!==null&&(imc<18.5||imc>=30))push({type:'info',icon:'⚕',title:'IMC fuera de rango',text:`${name}: IMC ${imc.toFixed(1)}.`,date:'Clínico',key:`imc:${p.id}:${imc.toFixed(1)}`,action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
+        if(imc!==null&&(imc<18.5||imc>=30))push({type:'info',icon:'⚕',title:'IMC fuera de rango',text:`${name}: IMC ${imc.toFixed(1)}.`,date:'Clínico',key:`imc:${p.id}:${imc.toFixed(1)}`,action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
         const press=last.presion||p.presion;
-        if(typeof pressureHigh==='function'&&pressureHigh(press))push({type:'danger',icon:'♥',title:'Presión arterial elevada',text:`${name}: ${press}.`,date:'Clínico',key:`bp:${p.id}:${press}`,action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
+        if(typeof pressureHigh==='function'&&pressureHigh(press))push({type:'danger',icon:'♥',title:'Presión arterial elevada',text:`${name}: ${press}.`,date:'Clínico',key:`bp:${p.id}:${press}`,action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
         if(evs.length>1&&typeof validNumber==='function'&&validNumber(last.peso)&&validNumber(evs[evs.length-2].peso)){
           const prev=Number(evs[evs.length-2].peso),cur=Number(last.peso),pct=prev?Math.abs(cur-prev)/prev*100:0;
-          if(pct>=5)push({type:'warning',icon:'↕',title:'Cambio de peso significativo',text:`${name}: ${cur>prev?'+':''}${(cur-prev).toFixed(1)} kg (${pct.toFixed(1)}%).`,date:'Evolución',key:`weight:${p.id}:${cur}:${prev}`,action:()=>{navigateTo('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
+          if(pct>=5)push({type:'warning',icon:'↕',title:'Cambio de peso significativo',text:`${name}: ${cur>prev?'+':''}${(cur-prev).toFixed(1)} kg (${pct.toFixed(1)}%).`,date:'Evolución',key:`weight:${p.id}:${cur}:${prev}`,action:()=>{navigate('evaluations');setTimeout(()=>openEvalModal(p.id),120)}});
         }
       }
       (p.dietas||[]).filter(Boolean).forEach(d=>{
         const end=d.fechaFin||d.fecha_fin||d.fin||d.endDate; const days=typeof daysFromToday==='function'?daysFromToday(end):null;
-        if(days!==null&&days>=0&&days<=7)push({type:'info',icon:'◫',title:'Plan por finalizar',text:`${name}: ${d.nombre||'Plan nutricional'} finaliza ${days===0?'hoy':'en '+days+' días'}.`,date:fmtDate(end),key:`diet:${p.id}:${d.id||d.nombre}:${end}`,action:()=>navigateTo('diets')});
+        if(days!==null&&days>=0&&days<=7)push({type:'info',icon:'◫',title:'Plan por finalizar',text:`${name}: ${d.nombre||'Plan nutricional'} finaliza ${days===0?'hoy':'en '+days+' días'}.`,date:fmtDate(end),key:`diet:${p.id}:${d.id||d.nombre}:${end}`,action:()=>navigate('diets')});
       });
     });
     (DB.appointments||[]).filter(Boolean).forEach(a=>{
       if(['completada','cancelada'].includes(String(a.estado||'').toLowerCase())||!a.fecha)return;
       const dt=new Date(`${a.fecha}T${String(a.hora||'00:00').slice(0,5)}:00`);if(Number.isNaN(dt.getTime()))return;
-      const hours=(dt-new Date())/3600000;if(hours>=0&&hours<=24){const p=patientById(a.patientId);push({type:'info',icon:'◷',title:'Cita cercana',text:`${patientName(p)||a.nombreManual||'Paciente'} · ${fmtDate(a.fecha)} ${a.hora||''}.`,date:hours<=2?'Muy pronto':'Próxima',key:`appt:${a.id||a.fecha+a.hora}`,action:()=>{navigateTo('agenda');setTimeout(()=>{if(typeof editAppointment==='function')editAppointment(a.id)},120)}})};
+      const hours=(dt-new Date())/3600000;if(hours>=0&&hours<=24){const p=patientById(a.patientId);push({type:'info',icon:'◷',title:'Cita cercana',text:`${patientName(p)||a.nombreManual||'Paciente'} · ${fmtDate(a.fecha)} ${a.hora||''}.`,date:hours<=2?'Muy pronto':'Próxima',key:`appt:${a.id||a.fecha+a.hora}`,action:()=>{navigate('agenda');setTimeout(()=>{if(typeof editAppointment==='function')editAppointment(a.id)},120)}})};
     });
     try{
       const b=typeof getBillingData==='function'?getBillingData():null;
-      (b?.invoices||[]).filter(Boolean).forEach(x=>{const st=typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):x.status;if(String(st).toLowerCase()==='vencida'){const bal=Math.max(0,Number(x.total||0)-Number(x.paid||0));push({type:'danger',icon:'$',title:'Factura vencida',text:`${x.patient||'Paciente'} · ${x.number||'Factura'} · saldo ${typeof moneyRD==='function'?moneyRD(bal):bal}`,date:fmtDate(x.dueDate),key:`invoice:${x.id||x.number}:${x.dueDate}`,action:()=>navigateTo('billing')})}});
-      (b?.products||[]).filter(p=>p&&p.type!=='Servicio'&&p.active!==false&&typeof validNumber==='function'&&validNumber(p.stock)&&validNumber(p.min)&&Number(p.stock)<=Number(p.min)).forEach(p=>push({type:'warning',icon:'▣',title:'Stock bajo',text:`${p.name}: ${p.stock} disponibles (mín. ${p.min}).`,date:'Inventario',key:`stock:${p.id||p.name}:${p.stock}`,action:()=>navigateTo('billing')}));
+      (b?.invoices||[]).filter(Boolean).forEach(x=>{const st=typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):x.status;if(String(st).toLowerCase()==='vencida'){const bal=Math.max(0,Number(x.total||0)-Number(x.paid||0));push({type:'danger',icon:'$',title:'Factura vencida',text:`${x.patient||'Paciente'} · ${x.number||'Factura'} · saldo ${typeof moneyRD==='function'?moneyRD(bal):bal}`,date:fmtDate(x.dueDate),key:`invoice:${x.id||x.number}:${x.dueDate}`,action:()=>navigate('billing')})}});
+      (b?.products||[]).filter(p=>p&&p.type!=='Servicio'&&p.active!==false&&typeof validNumber==='function'&&validNumber(p.stock)&&validNumber(p.min)&&Number(p.stock)<=Number(p.min)).forEach(p=>push({type:'warning',icon:'▣',title:'Stock bajo',text:`${p.name}: ${p.stock} disponibles (mín. ${p.min}).`,date:'Inventario',key:`stock:${p.id||p.name}:${p.stock}`,action:()=>navigate('billing')}));
     }catch(e){console.warn('Alertas de facturación:',e)}
     const priority={danger:0,warning:1,info:2,success:3};
     const unique=new Map();alerts.forEach(a=>{if(!unique.has(a.key))unique.set(a.key,a)});
