@@ -2183,6 +2183,12 @@ const SB = {
   async createUsuario(data) {
     return await supa('usuarios', 'POST', data);
   },
+  async linkPacienteAuth(pacienteId, authUserId) {
+    if (!pacienteId || !authUserId) return null;
+    // auth_user_id es una columna nueva y nullable. supaWriteAdaptive mantiene
+    // compatibilidad si el SQL de migración todavía no se ha ejecutado.
+    return await supaWriteAdaptive(`pacientes?id=eq.${encodeURIComponent(pacienteId)}`, 'PATCH', { auth_user_id: authUserId });
+  },
 
   // PACIENTES
   async getPacientes() {
@@ -2398,7 +2404,7 @@ async function loadFromSupabase() {
       safeLoad('evaluaciones','evaluaciones?order=fecha.asc&select=*'),
       safeLoad('dietas','dietas?order=created_at.desc&select=*'),
       safeLoad('historias_clinicas','historias_clinicas?select=*'),
-      safeLoad('usuarios','usuarios?select=id,email,password_hash,rol,nombre'),
+      safeLoad('usuarios','usuarios?select=id,email,rol,nombre'),
     ]);
 
     const pacs    = pacientesRaw || [];
@@ -2431,10 +2437,7 @@ async function loadFromSupabase() {
       const pHC     = hcs.find(h => h.paciente_id === p.id) || null;
       const mapped = mapPaciente(p, pEvals, pDietas, pHC);
       const portal = usuarios.find(u => String(u.email||'').toLowerCase() === String(mapped.email||p.email||'').toLowerCase() && u.rol === 'patient');
-      if (portal) {
-        mapped.portalPassword = portal.password_hash || '';
-        if (mapped.email) USERS[mapped.email] = { pass: portal.password_hash || '', role:'patient', name:mapped.nombre, initials:mapped.initials, patientId:mapped.id };
-      }
+      if (portal) mapped.portalAuth = true;
       return mapped;
     });
 
@@ -2766,11 +2769,7 @@ const DB = {
 // ═══════════════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════════════
-const USERS = {
-  'admin@nutrimachata.com': { pass: '', role: 'admin', name: 'Dra. María Chalas', initials: 'MC' },
-  'paciente@demo.com': { pass: 'demo123', role: 'patient', name: 'Sofía Martínez', initials: 'SM', patientId: 1 },
-  'sofia@demo.com': { pass: 'demo123', role: 'patient', name: 'Sofía Martínez', initials: 'SM', patientId: 1 },
-};
+const USERS = {}; // Compatibilidad visual; las credenciales viven exclusivamente en Supabase Auth.
 
 function setRole(r) {
   DB.loginRole = r;
@@ -2795,7 +2794,11 @@ async function doLogin() {
     if(!role) role=DB.loginRole==='patient'?'patient':'admin';
     let patientId=null;
     if(role==='patient'){
-      const pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=*`);
+      let pacs=[];
+      // Vinculación segura para cuentas nuevas/migradas. Si la columna aún no existe,
+      // mantenemos compatibilidad temporal por email para pacientes históricos.
+      try { pacs=await supa(`pacientes?auth_user_id=eq.${encodeURIComponent(au.id)}&limit=1&select=*`); } catch(_) { pacs=[]; }
+      if(!pacs?.[0]) pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=*`);
       patientId=pacs?.[0]?.id||null;
       if(!patientId) throw new Error('La cuenta existe, pero todavía no está vinculada a un paciente. Contacte a la doctora.');
     }
@@ -3057,6 +3060,7 @@ function finishPublicReg() {
         sexo:             pubWizData.sexo     || 'F',
         telefono:         pubWizData.telefono || '',
         email:            autoEmail,
+        auth_user_id:     signUp?.user?.id || null,
         direccion:        pubWizData.direccion || '',
         peso, talla, imc,
         presion:          pubWizData.presion  || '—',
@@ -3141,12 +3145,8 @@ function finishPublicReg() {
         });
       }
 
-      // 5. Register locally too for current session
-      USERS[autoEmail] = {
-        pass: autoPass, role: 'patient',
-        name: pubWizData.nombre, initials,
-        patientId: pacId
-      };
+      // 5. Vincular el expediente con el UID de Supabase Auth.
+      await SB.linkPacienteAuth(pacId, signUp?.user?.id);
 
       // Add to local DB so it shows without reload
       if (pacId) {
@@ -4011,9 +4011,9 @@ async function savePatient(id) {
                 email: emailVal, rol:'patient', nombre:sbData.nombre,
               });
             }
-            newP.portalPassword = autoPass;
-            USERS[emailVal] = { pass:autoPass, role:'patient', name:sbData.nombre, initials:newP.initials, patientId:newP.id };
-            notify(`Paciente registrado ✓ · Contraseña portal: ${autoPass}`, 'success');
+            if (authCreated?.user?.id) await SB.linkPacienteAuth(newP.id, authCreated.user.id);
+            if (authCreated?.user?.id) notify(`Paciente registrado ✓ · Acceso creado en Supabase Auth`, 'success');
+            else notify('Paciente registrado ✓ · La cuenta Auth ya existía; use recuperación de contraseña si necesita restablecer el acceso.', 'success');
           } catch (portalErr) {
             console.warn('Paciente guardado; no se pudo crear acceso de portal:', portalErr);
             notify('Paciente guardado en Supabase. El acceso al portal quedó pendiente.', 'warning');
@@ -4698,18 +4698,24 @@ async function finishWizard() {
         }); } catch (evalErr) { console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr); }
       }
 
-      // 4. Acceso de portal es secundario y no puede invalidar un paciente ya guardado.
+      // 4. Acceso de portal exclusivamente con Supabase Auth (nunca password_hash).
       try {
-        await supa('usuarios', 'POST', {
-          email:         autoEmail,
-          password_hash: autoPass,
-          rol:           'patient',
-          nombre:        newPatient.nombre,
-        });
-        newPatient.portalPassword = autoPass;
-        USERS[autoEmail] = { pass:autoPass, role:'patient', name:newPatient.nombre, initials, patientId:realId };
+        let authCreated = null;
+        try {
+          authCreated = await supaAuthSignUp(autoEmail, autoPass, { role:'patient', nombre:newPatient.nombre });
+        } catch(authErr) {
+          if (!/already|registered|exists|existente/i.test(String(authErr?.message||''))) throw authErr;
+        }
+        const existingPortal = await SB.getUsuario(autoEmail);
+        if (!existingPortal) {
+          await supaWriteAdaptive('usuarios', 'POST', {
+            id: authCreated?.user?.id || undefined,
+            email: autoEmail, rol:'patient', nombre:newPatient.nombre,
+          });
+        }
+        if (authCreated?.user?.id) await SB.linkPacienteAuth(realId, authCreated.user.id);
       } catch (portalErr) {
-        console.warn('Paciente e historia guardados; acceso de portal pendiente:', portalErr);
+        console.warn('Paciente e historia guardados; acceso Auth del portal pendiente:', portalErr);
       }
 
       try { sessionStorage.removeItem('nutri_hc_draft'); } catch (_) {}
@@ -9390,8 +9396,7 @@ function generateReportHTML(p) {
   const doctor = esc((DB.settings && DB.settings.doctorName) || 'Profesional de nutrición');
   const clinic = esc((DB.settings && DB.settings.clinicName) || 'NutriMachata');
   const accessEmail = esc(p.email || p.usuario || '—');
-  const accessUser = (typeof USERS !== 'undefined' && (p.email || p.usuario) && USERS[p.email || p.usuario]) ? USERS[p.email || p.usuario] : null;
-  const accessPass = esc((accessUser && accessUser.pass) || p.portalPassword || p.password || p.clave || 'No disponible');
+  const accessPass = 'Gestionada de forma segura por Supabase Auth';
   const imcLabel = imc!=null ? getImcCategory(imc) : 'Sin dato';
   const metric = (label,value,sub='')=>`<div class="cr-kpi"><small>${label}</small><b>${value}</b><span>${sub}</span></div>`;
 
