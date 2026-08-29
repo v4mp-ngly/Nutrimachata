@@ -3376,6 +3376,7 @@ const PAGES = {
 
 let currentPage = '';
 let chartInstances = {};
+let nmDashboardRenderToken = 0; // invalida renders/timers anteriores del dashboard
 
 function navigate(page) {
   currentPage = page;
@@ -3549,6 +3550,12 @@ function renderHistoriasList(list) {
 //  DASHBOARD
 // ═══════════════════════════════════════════════
 function renderDashboard() {
+  const dashboardRenderToken = ++nmDashboardRenderToken;
+  // Destruye cualquier grafica asociada a los canvases del dashboard antes de recrear el DOM.
+  ['modernLine','modernDonut','modernBars'].forEach(k => {
+    try { chartInstances[k]?.destroy(); } catch(e) {}
+    delete chartInstances[k];
+  });
   const patients = DB.patients || [];
   const total = patients.length;
   const active = patients.filter(p => p.activo !== false).length;
@@ -3623,12 +3630,25 @@ function renderDashboard() {
   document.querySelector('[data-quick="appointment"]')?.addEventListener('click',()=>openAppointmentModal());
 
   setTimeout(()=>{
+    // Si hubo otro render mientras esperaba este timer, este callback ya es obsoleto.
+    if (dashboardRenderToken !== nmDashboardRenderToken || currentPage !== 'dashboard') return;
+    const safeChart = (canvas, key, config) => {
+      if (!canvas || dashboardRenderToken !== nmDashboardRenderToken) return;
+      try {
+        const existing = (typeof Chart !== 'undefined' && typeof Chart.getChart === 'function') ? Chart.getChart(canvas) : null;
+        if (existing) existing.destroy();
+        try { chartInstances[key]?.destroy(); } catch(e) {}
+        chartInstances[key] = new Chart(canvas, config);
+      } catch (e) {
+        console.error('[NutriMachata] Error creando grafica '+key+':', e);
+      }
+    };
     const c1=document.getElementById('chart-imc-evolution');
-    if(c1) chartInstances.modernLine=new Chart(c1,{type:'line',data:{labels:['Mar','Abr','May','Jun','Jul','Ago'],datasets:[{data:[avgImc+.8,avgImc+.3,avgImc+.35,avgImc+.65,avgImc+.4,avgImc],borderColor:'#5E8C2A',backgroundColor:'rgba(94,140,42,.08)',fill:true,tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:'#5E8C2A'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}}}}});
+    if(c1) safeChart(c1,'modernLine',{type:'line',data:{labels:['Mar','Abr','May','Jun','Jul','Ago'],datasets:[{data:[avgImc+.8,avgImc+.3,avgImc+.35,avgImc+.65,avgImc+.4,avgImc],borderColor:'#5E8C2A',backgroundColor:'rgba(94,140,42,.08)',fill:true,tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:'#5E8C2A'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}}}}});
     const c2=document.getElementById('chart-imc-modern');
-    if(c2) chartInstances.modernDonut=new Chart(c2,{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false}}}});
+    if(c2) safeChart(c2,'modernDonut',{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false}}}});
     const c3=document.getElementById('chart-imc-bars-modern');
-    if(c3) chartInstances.modernBars=new Chart(c3,{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false}}}});
+    if(c3) safeChart(c3,'modernBars',{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false}}}});
   },80);
 }
 
