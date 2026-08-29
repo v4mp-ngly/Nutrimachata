@@ -8344,6 +8344,7 @@ function renderAgenda() {
             <div class="flex items-center gap-2"><div style="width:12px;height:12px;border-radius:3px;background:var(--olive-pale)"></div><span class="text-sm">Confirmada</span></div>
             <div class="flex items-center gap-2"><div style="width:12px;height:12px;border-radius:3px;background:rgba(196,122,26,0.2)"></div><span class="text-sm">Pendiente</span></div>
             <div class="flex items-center gap-2"><div style="width:12px;height:12px;border-radius:3px;background:rgba(45,122,74,0.15)"></div><span class="text-sm">Completada</span></div>
+            <div class="flex items-center gap-2"><div style="width:12px;height:12px;border-radius:3px;background:rgba(196,74,42,0.15)"></div><span class="text-sm">Cancelada</span></div>
           </div>
         </div>
       </div>
@@ -8730,6 +8731,7 @@ function openAppointmentModal(defaultDate, existingApt) {
         <option value="pendiente"  ${!existingApt || existingApt.estado === 'pendiente'  ? 'selected' : ''}>Pendiente</option>
         <option value="confirmada" ${existingApt && existingApt.estado === 'confirmada'  ? 'selected' : ''}>Confirmada</option>
         <option value="completada" ${existingApt && existingApt.estado === 'completada'  ? 'selected' : ''}>Completada</option>
+        <option value="cancelada" ${existingApt && existingApt.estado === 'cancelada' ? 'selected' : ''}>Cancelada</option>
       </select>
     </div>
 
@@ -8737,7 +8739,7 @@ function openAppointmentModal(defaultDate, existingApt) {
       ${eid ? `<button class="btn btn-danger btn-sm" onclick="deleteAppointment('${eid}')">🗑 Eliminar</button>` : '<div></div>'}
       <div style="display:flex;gap:8px">
         <button class="btn btn-outline" onclick="closeModal('modal-appointment')">Cancelar</button>
-        <button class="btn btn-olive" onclick="saveAppointment()">${eid ? 'Guardar Cambios' : 'Agendar Cita'}</button>
+        <button class="btn btn-olive" id="apt-save-btn" onclick="saveAppointment()">${eid ? 'Guardar Cambios' : 'Agendar Cita'}</button>
       </div>
     </div>
   `;
@@ -8783,8 +8785,9 @@ function aptSwitchTab(tab) {
 
 function filterPacientesApt(search) {
   const list = document.getElementById('apt-patient-list');
-  const searchInput = document.getElementById('apt-patient-search');
-  const filtered = DB.patients.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+  if (!list) return;
+  const q = String(search || '').trim().toLocaleLowerCase('es');
+  const filtered = (DB.patients || []).filter(p => String(p?.nombre || '').toLocaleLowerCase('es').includes(q));
   
   if (!search.trim()) {
     list.style.display = 'none';
@@ -8794,7 +8797,7 @@ function filterPacientesApt(search) {
   list.innerHTML = filtered.map(p => `
     <div style="padding:10px 14px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background 0.15s"
       onmouseover="this.style.background='rgba(94,140,42,0.05)'" onmouseout="this.style.background=''"
-      onclick="selectPacienteApt('${p.id}', '${p.nombre}')">
+      onclick="selectPacienteApt('${p.id}')">
       <div style="font-weight:500;font-size:14px">${p.nombre}</div>
       <div style="font-size:12px;color:var(--gray-400)">${p.cedula || 'Sin cédula'} • ${p.edad || '—'} años</div>
     </div>
@@ -8803,14 +8806,18 @@ function filterPacientesApt(search) {
   list.style.display = filtered.length > 0 ? 'block' : 'none';
 }
 
-function selectPacienteApt(id, nombre) {
-  document.getElementById('apt-patient-search').value = nombre;
-  document.getElementById('apt-patient').value = id;
+function selectPacienteApt(id) {
+  const p = (DB.patients || []).find(x => String(x.id) === String(id));
+  if (!p) { notify('No se encontró el paciente seleccionado', 'danger'); return; }
+  document.getElementById('apt-patient-search').value = p.nombre || '';
+  document.getElementById('apt-patient').value = p.id;
   document.getElementById('apt-patient-list').style.display = 'none';
-  refreshAppointmentPatientContext(id);
+  refreshAppointmentPatientContext(p.id);
 }
 
 async function saveAppointment() {
+  const saveBtn = document.getElementById('apt-save-btn');
+  if (saveBtn?.dataset.saving === '1') return;
   const fecha  = document.getElementById('apt-fecha').value;
   const hora   = document.getElementById('apt-hora').value;
   const eid    = document.getElementById('apt-id')?.value || null;
@@ -8839,13 +8846,19 @@ async function saveAppointment() {
     const nombresConflicto = conflictos.map(c => getNombrePacienteCita(c)).join(', ');
     showConfirm(
       `⚠️ <strong>Conflicto de horario detectado</strong><br><br>Ya existe una cita a las ${hora} con: <strong>${nombresConflicto}</strong><br><br>¿Deseas continuar de todas formas?`,
-      () => _guardarCitaSinValidacion(fecha, hora, pid, nombreManual, telefonoManual, emailManual, eid)
+      async () => { const b=document.getElementById('apt-save-btn'); if(b){b.disabled=true;b.textContent='Guardando...';} try{await _guardarCitaSinValidacion(fecha, hora, pid, nombreManual, telefonoManual, emailManual, eid);} finally{const x=document.getElementById('apt-save-btn');if(x){x.disabled=false;x.textContent=eid?'Guardar Cambios':'Agendar Cita';}} }
     );
     return;
   }
 
-  // Si no hay conflictos, guardar directamente
-  _guardarCitaSinValidacion(fecha, hora, pid, nombreManual, telefonoManual, emailManual, eid);
+  // Si no hay conflictos, guardar directamente y evitar dobles clics
+  if (saveBtn) { saveBtn.dataset.saving='1'; saveBtn.disabled=true; saveBtn.textContent='Guardando...'; }
+  try {
+    await _guardarCitaSinValidacion(fecha, hora, pid, nombreManual, telefonoManual, emailManual, eid);
+  } finally {
+    const b=document.getElementById('apt-save-btn');
+    if (b) { b.dataset.saving='0'; b.disabled=false; b.textContent=eid?'Guardar Cambios':'Agendar Cita'; }
+  }
 }
 
 /**
@@ -8948,7 +8961,8 @@ function verificarConflictosHorarios(fecha, hora, duracion = 60, excludeId = nul
     if (a.fecha !== fecha) return false;
     
     // Convertir hora de la cita existente
-    const [ah, am] = a.hora.split(':').map(Number);
+    const [ah, am] = String(a.hora || '').split(':').map(Number);
+    if (!Number.isFinite(ah) || !Number.isFinite(am)) return false;
     const aInicioMinutos = ah * 60 + am;
     const aFinMinutos = aInicioMinutos + 60; // Asume 60 min por defecto
     
@@ -8982,6 +8996,11 @@ function validarFechaHoraFormato(fecha, hora) {
   
   // Validar rango horario (7:00 - 19:00)
   const [h, m] = hora.split(':').map(Number);
+  const ahora = new Date();
+  const hoyISO = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+  if (fecha === hoyISO && (h * 60 + m) < (ahora.getHours() * 60 + ahora.getMinutes())) {
+    return 'No se puede agendar una cita en una hora que ya pasó';
+  }
   if (h < 7 || h >= 19) {
     return 'Las citas deben estar entre las 7:00 y las 19:00';
   }
