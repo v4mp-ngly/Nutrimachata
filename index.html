@@ -2076,6 +2076,49 @@ function restoreEvaluationDraft(){
 function clearEvaluationDraft(){ sessionStorage.removeItem('nutri_eval_draft'); }
 document.addEventListener('input',e=>{ if(e.target.closest?.('#modal-evaluation')) saveEvaluationDraft(); });
 document.addEventListener('change',e=>{ if(e.target.closest?.('#modal-evaluation')) saveEvaluationDraft(); });
+// NutriMachata Runtime: debe inicializarse antes de cualquier uso.
+const NMRuntime = (() => {
+  const intervals = new Map();
+  const timeouts = new Map();
+  let appInitKey = '';
+  let navToken = 0;
+  let delegated = false;
+  const clearTimer = (map,key,clearFn) => { const id=map.get(key); if(id!=null){ clearFn(id); map.delete(key); } };
+  return {
+    nextNavigation(){ navToken += 1; return navToken; },
+    navigationToken(){ return navToken; },
+    timeout(key, fn, ms=0){
+      clearTimer(timeouts,key,clearTimeout);
+      const id=setTimeout(()=>{ timeouts.delete(key); fn(); },ms);
+      timeouts.set(key,id); return id;
+    },
+    interval(key, fn, ms){
+      clearTimer(intervals,key,clearInterval);
+      const id=setInterval(fn,ms); intervals.set(key,id); return id;
+    },
+    clearInterval(key){ clearTimer(intervals,key,clearInterval); },
+    clearTimeout(key){ clearTimer(timeouts,key,clearTimeout); },
+    clearPageTimers(){
+      [...timeouts.keys()].filter(k=>String(k).startsWith('page:')).forEach(k=>clearTimer(timeouts,k,clearTimeout));
+    },
+    shouldInit(key){ if(appInitKey===key) return false; appInitKey=key; return true; },
+    resetInit(){ appInitKey=''; },
+    bindDelegates(){
+      if(delegated) return; delegated=true;
+      document.addEventListener('click', e => {
+        const overlay=e.target?.classList?.contains('modal-overlay') ? e.target : null;
+        if(overlay) closeModal(overlay.id);
+      });
+      document.addEventListener('keydown', e => {
+        if(e.key==='Escape'){
+          const open=[...document.querySelectorAll('.modal-overlay.open')].pop();
+          if(open) closeModal(open.id);
+        }
+      });
+    }
+  };
+})();
+
 NMRuntime.interval('global:auth-refresh',()=>{
   if(SUPA_AUTH_SESSION?.access_token && supaSessionExpiresSoon(180)) refreshSupaSession(true).catch(()=>{});
 },60000);
@@ -3401,47 +3444,7 @@ const PATIENT_NAV = [
 // ═══════════════════════════════════════════════
 //  NUTRIMACHATA JS RUNTIME — ciclo de vida centralizado
 // ═══════════════════════════════════════════════
-const NMRuntime = (() => {
-  const intervals = new Map();
-  const timeouts = new Map();
-  let appInitKey = '';
-  let navToken = 0;
-  let delegated = false;
-  const clearTimer = (map,key,clearFn) => { const id=map.get(key); if(id!=null){ clearFn(id); map.delete(key); } };
-  return {
-    nextNavigation(){ navToken += 1; return navToken; },
-    navigationToken(){ return navToken; },
-    timeout(key, fn, ms=0){
-      clearTimer(timeouts,key,clearTimeout);
-      const id=setTimeout(()=>{ timeouts.delete(key); fn(); },ms);
-      timeouts.set(key,id); return id;
-    },
-    interval(key, fn, ms){
-      clearTimer(intervals,key,clearInterval);
-      const id=setInterval(fn,ms); intervals.set(key,id); return id;
-    },
-    clearInterval(key){ clearTimer(intervals,key,clearInterval); },
-    clearTimeout(key){ clearTimer(timeouts,key,clearTimeout); },
-    clearPageTimers(){
-      [...timeouts.keys()].filter(k=>String(k).startsWith('page:')).forEach(k=>clearTimer(timeouts,k,clearTimeout));
-    },
-    shouldInit(key){ if(appInitKey===key) return false; appInitKey=key; return true; },
-    resetInit(){ appInitKey=''; },
-    bindDelegates(){
-      if(delegated) return; delegated=true;
-      document.addEventListener('click', e => {
-        const overlay=e.target?.classList?.contains('modal-overlay') ? e.target : null;
-        if(overlay) closeModal(overlay.id);
-      });
-      document.addEventListener('keydown', e => {
-        if(e.key==='Escape'){
-          const open=[...document.querySelectorAll('.modal-overlay.open')].pop();
-          if(open) closeModal(open.id);
-        }
-      });
-    }
-  };
-})();
+
 
 // Protección global de Chart.js: un canvas nunca conserva dos instancias.
 (function installChartGuard(){
@@ -13183,7 +13186,7 @@ const oldOpen=window.openAppointmentModal||openAppointmentModal;
 window.openAppointmentModal=function(defaultDate,existingApt){oldOpen(defaultDate,existingApt);if(!existingApt?.id)return;setTimeout(()=>{const modal=document.getElementById('modal-appointment');if(!modal||modal.querySelector('.nm-apt-actions'))return;const bar=document.createElement('div');bar.className='nm-apt-actions';let html='<button class="btn btn-outline btn-sm" onclick="quickAppointmentStatus(\''+existingApt.id+'\',\'confirmada\',\'Confirmada\')">✓ Confirmar</button><button class="btn btn-outline btn-sm" onclick="quickAppointmentStatus(\''+existingApt.id+'\',\'confirmada\',\'Llegada confirmada\')">📍 Confirmar llegada</button><button class="btn btn-outline btn-sm" onclick="quickAppointmentStatus(\''+existingApt.id+'\',\'completada\',\'Completada\')">✓ Completar</button><button class="btn btn-outline btn-sm" onclick="markAppointmentNoShow(\''+existingApt.id+'\')">No asistió</button>';if(existingApt.patientId)html+='<button class="btn btn-olive btn-sm" onclick="closeModal(\'modal-appointment\');navigate(\'patients\');setTimeout(()=>openPatientDetail?.(\''+existingApt.patientId+'\'),120)">Ver paciente</button>';bar.innerHTML=html;const foot=modal.querySelector('.modal-footer');foot?.parentNode?.insertBefore(bar,foot)},0)};
 window.editAppointment=function(id){const a=(DB.appointments||[]).find(x=>String(x.id)===String(id));if(a)window.openAppointmentModal(a.fecha,a)};
 const baseAlerts=window.computeClinicAlerts;
-window.computeClinicAlerts=function(){const out=baseAlerts?baseAlerts():[],now=new Date(),today=now.toISOString().slice(0,10),seen=new Set(out.map(x=>x.key));const add=a=>{if(!seen.has(a.key)){seen.add(a.key);out.push(a)}};(DB.appointments||[]).forEach(a=>{if(!a?.fecha)return;const st=norm(a.estado),p=a.patientId?(DB.patients||[]).find(x=>String(x.id)===String(a.patientId)):null,name=p?.nombre||a.nombreManual||'Paciente',dt=new Date(a.fecha+'T'+String(a.hora||'00:00').slice(0,5)+':00');if(Number.isNaN(dt.getTime()))return;const h=(dt-now)/3600000,act=()=>{navigate('agenda');setTimeout(()=>editAppointment(a.id),120)};if(a.fecha===today&&!['completada','cancelada'].includes(st))add({type:'info',icon:'📅',title:'Cita de hoy',text:name+' · '+(a.hora||''),date:'Hoy',key:'today:'+a.id,action:act});if(st==='pendiente'&&h>=0&&h<=48)add({type:'warning',icon:'!',title:'Cita sin confirmar',text:name+' · '+a.fecha+' '+(a.hora||''),date:h<=24?'Próximas 24 h':'Próximas 48 h',key:'unconfirmed:'+a.id,action:act});if(st==='pendiente'&&h<0&&h>=-24)add({type:'danger',icon:'◷',title:'Cita atrasada',text:name+' tenía cita '+(a.hora||'')+' y sigue pendiente.',date:'Revisar estado',key:'lateappt:'+a.id,action:act})});return out};
+window.computeClinicAlerts=function(){if(typeof DB==='undefined'||!DB)return [];const out=baseAlerts?baseAlerts():[],now=new Date(),today=now.toISOString().slice(0,10),seen=new Set(out.map(x=>x.key));const add=a=>{if(!seen.has(a.key)){seen.add(a.key);out.push(a)}};(DB.appointments||[]).forEach(a=>{if(!a?.fecha)return;const st=norm(a.estado),p=a.patientId?(DB.patients||[]).find(x=>String(x.id)===String(a.patientId)):null,name=p?.nombre||a.nombreManual||'Paciente',dt=new Date(a.fecha+'T'+String(a.hora||'00:00').slice(0,5)+':00');if(Number.isNaN(dt.getTime()))return;const h=(dt-now)/3600000,act=()=>{navigate('agenda');setTimeout(()=>editAppointment(a.id),120)};if(a.fecha===today&&!['completada','cancelada'].includes(st))add({type:'info',icon:'📅',title:'Cita de hoy',text:name+' · '+(a.hora||''),date:'Hoy',key:'today:'+a.id,action:act});if(st==='pendiente'&&h>=0&&h<=48)add({type:'warning',icon:'!',title:'Cita sin confirmar',text:name+' · '+a.fecha+' '+(a.hora||''),date:h<=24?'Próximas 24 h':'Próximas 48 h',key:'unconfirmed:'+a.id,action:act});if(st==='pendiente'&&h<0&&h>=-24)add({type:'danger',icon:'◷',title:'Cita atrasada',text:name+' tenía cita '+(a.hora||'')+' y sigue pendiente.',date:'Revisar estado',key:'lateappt:'+a.id,action:act})});return out};
 setTimeout(()=>{try{refreshClinicAlertBadge?.()}catch(e){}},300);
 })();
 </script>
