@@ -1948,6 +1948,7 @@ function persistSupaSession(data){
   SUPA_AUTH_SESSION = normalizeSupaSession(data);
   if(SUPA_AUTH_SESSION?.access_token){
     sessionStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION));
+    try{ localStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION)); }catch(_){}
   }
   return SUPA_AUTH_SESSION;
 }
@@ -1975,13 +1976,15 @@ async function supaAuthSignUp(email,password,metadata={}){
 }
 function restoreSupaSession(){
   try{
-    const x=JSON.parse(sessionStorage.getItem('nutri_supa_session')||'null');
+    const raw=sessionStorage.getItem('nutri_supa_session') || localStorage.getItem('nutri_supa_session') || 'null';
+    const x=JSON.parse(raw);
     if(x?.access_token) persistSupaSession(x);
   }catch(_){ SUPA_AUTH_SESSION=null; }
 }
 function clearSupaSession(){
   SUPA_AUTH_SESSION=null;
   sessionStorage.removeItem('nutri_supa_session');
+  try{ localStorage.removeItem('nutri_supa_session'); }catch(_){}
 }
 async function refreshSupaSession(force=false){
   if(!force && SUPA_AUTH_SESSION?.access_token && !supaSessionExpiresSoon()) return SUPA_AUTH_SESSION;
@@ -2014,12 +2017,22 @@ async function refreshSupaSession(force=false){
   return SUPA_REFRESH_PROMISE;
 }
 async function ensureSupaSession(){
+  // Recuperación defensiva: un render tardío no debe perder una sesión válida
+  // que ya quedó persistida por Supabase Auth.
+  if(!SUPA_AUTH_SESSION?.access_token){
+    restoreSupaSession();
+  }
   if(!SUPA_AUTH_SESSION?.access_token){
     const err=new Error('No hay una sesión activa. Inicia sesión nuevamente.');
     err.code='AUTH_SESSION_EXPIRED';
     throw err;
   }
   if(supaSessionExpiresSoon()) await refreshSupaSession(true);
+  if(!SUPA_AUTH_SESSION?.access_token){
+    const err=new Error('La sesión no pudo renovarse. Inicia sesión nuevamente.');
+    err.code='AUTH_SESSION_EXPIRED';
+    throw err;
+  }
   return SUPA_AUTH_SESSION;
 }
 function currentAuthUserId(){
@@ -2904,11 +2917,37 @@ async function resumeExistingSession(){
     if(loginPage) loginPage.style.display='none';
     if(app) app.style.display='block';
     try{initApp();}catch(e){console.warn('initApp resume:',e);}
-    Promise.resolve().then(async()=>{try{await loadFromSupabase(); navigate(DB.currentPage || (role==='admin'?'dashboard':'patient-home'));}catch(e){console.error('Carga sesión restaurada:',e); notify('Sesión restaurada, pero hubo un problema cargando datos: '+(e.message||''),'danger');}});
+    // Cargar solo si la misma sesión continúa activa. Evita la carrera que
+    // provocaba supaFetchAll -> "No hay una sesión activa" al restaurar.
+    const resumeUserId=au.id;
+    Promise.resolve().then(async()=>{
+      try{
+        await ensureSupaSession();
+        if(SUPA_AUTH_SESSION?.user?.id !== resumeUserId) return;
+        await loadFromSupabase();
+        if(SUPA_AUTH_SESSION?.user?.id !== resumeUserId) return;
+        navigate(DB.currentPage || (role==='admin'?'dashboard':'patient-home'));
+      }catch(e){
+        console.error('Carga sesión restaurada:',e);
+        showLoadingOverlay(false);
+        if(e?.code==='AUTH_SESSION_EXPIRED'){
+          const lp=document.getElementById('login-page'), ap=document.getElementById('app');
+          if(ap) ap.style.display='none';
+          if(lp) lp.style.display='flex';
+          notify('Tu sesión venció. Inicia sesión nuevamente.','warning');
+        }else{
+          notify('Sesión restaurada, pero hubo un problema cargando datos: '+(e.message||''),'danger');
+        }
+      }
+    });
     return true;
   } catch(e){ console.warn('No se pudo restaurar la sesión:',e); return false; }
 }
-setTimeout(()=>{ resumeExistingSession().catch(()=>{}); },0);
+// Una sola restauración por carga de página.
+if(!window._nmResumeScheduled){
+  window._nmResumeScheduled=true;
+  setTimeout(()=>{ resumeExistingSession().catch(()=>{}); },0);
+}
 
 // ═══════════════════════════════════════════════
 //  REGISTRO PÚBLICO DE PACIENTE (desde login)
