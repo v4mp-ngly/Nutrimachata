@@ -2779,36 +2779,78 @@ function setRole(r) {
 }
 
 async function doLogin() {
-  const email=document.getElementById('login-email').value.trim().toLowerCase();
-  const pass=document.getElementById('login-password').value;
+  if (window._nmLoginBusy) return;
+  const email=document.getElementById('login-email')?.value.trim().toLowerCase()||'';
+  const pass=document.getElementById('login-password')?.value||'';
   if(!email||!pass){notify('Ingrese email y contraseña','danger');return;}
-  const btn=document.getElementById('login-submit'); if(btn){btn.textContent='Verificando...';btn.disabled=true;}
+  const btn=document.getElementById('login-submit');
+  window._nmLoginBusy=true;
+  if(btn){btn.textContent='Verificando...';btn.disabled=true;}
+  // Watchdog visual: nunca dejar el botón bloqueado indefinidamente.
+  const watchdog=setTimeout(()=>{
+    if(window._nmLoginBusy && btn){btn.textContent='Entrando...';btn.disabled=false;}
+  },10000);
   try{
+    // 1) Autenticación. Esto es lo único que debe bloquear la pantalla de login.
     const auth=await supaAuthLogin(email,pass);
-    const au=auth.user||{};
+    const au=auth?.user||{};
+    if(!au.id) throw new Error('Supabase autenticó la sesión pero no devolvió el usuario.');
+
+    // 2) Resolver rol sin depender de public.usuarios para la cuenta administradora.
     let role=(au.user_metadata?.role||au.app_metadata?.role||'').toLowerCase();
     if(email===NUTRI_ADMIN_EMAIL) role='admin';
-    if(!role){
+    if(!role && email!==NUTRI_ADMIN_EMAIL){
       try { const profile=await SB.getUsuario(email); role=String(profile?.rol||'').toLowerCase(); } catch(_) {}
     }
     if(!role) role=DB.loginRole==='patient'?'patient':'admin';
+
+    // 3) Para paciente, resolver solo su expediente antes de entrar.
     let patientId=null;
     if(role==='patient'){
       let pacs=[];
-      // Vinculación segura para cuentas nuevas/migradas. Si la columna aún no existe,
-      // mantenemos compatibilidad temporal por email para pacientes históricos.
-      try { pacs=await supa(`pacientes?auth_user_id=eq.${encodeURIComponent(au.id)}&limit=1&select=*`); } catch(_) { pacs=[]; }
-      if(!pacs?.[0]) pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=*`);
+      try { pacs=await supa(`pacientes?auth_user_id=eq.${encodeURIComponent(au.id)}&limit=1&select=id,email,nombre`); } catch(_) { pacs=[]; }
+      if(!pacs?.[0]){
+        try { pacs=await supa(`pacientes?email=eq.${encodeURIComponent(email)}&limit=1&select=id,email,nombre`); } catch(_) { pacs=[]; }
+      }
       patientId=pacs?.[0]?.id||null;
       if(!patientId) throw new Error('La cuenta existe, pero todavía no está vinculada a un paciente. Contacte a la doctora.');
     }
+
     const name=au.user_metadata?.name||au.user_metadata?.nombre||(email===NUTRI_ADMIN_EMAIL?'Administrador NutriMachata':email.split('@')[0]);
     DB.currentUser={email,name,role,patientId,initials:name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),supabaseId:au.id,id:au.id};
     DB.currentRole=role;
-    document.getElementById('login-page').style.display='none';document.getElementById('app').style.display='block';
-    await loadFromSupabase(); initApp(); notify('¡Bienvenido/a, '+name+'!','success'); if(sessionStorage.getItem('nutri_eval_draft')) notify('Hay una evaluación temporal pendiente. Al volver a abrirla podrás recuperar los campos.', 'warning');
-  }catch(e){console.error('Supabase Auth:',e);notify('No se pudo iniciar sesión: '+(e.message||'credenciales incorrectas'),'danger');}
-  finally{if(btn){btn.textContent='Iniciar sesión';btn.disabled=false;}}
+
+    // 4) Entrar inmediatamente. La carga clínica ocurre después y no puede dejar
+    // el login congelado en "Verificando...".
+    const loginPage=document.getElementById('login-page');
+    const app=document.getElementById('app');
+    if(loginPage) loginPage.style.display='none';
+    if(app) app.style.display='block';
+    try { initApp(); } catch(e) { console.warn('initApp inicial:',e); }
+    notify('¡Bienvenido/a, '+name+'! Cargando información...','success');
+
+    // 5) Carga de Supabase en segundo plano. Si RLS bloquea una tabla, mostramos
+    // el error real sin devolver al usuario a una pantalla congelada.
+    Promise.resolve().then(async()=>{
+      try{
+        await loadFromSupabase();
+        try { initApp(); } catch(e) { console.warn('initApp posterior:',e); }
+        if(sessionStorage.getItem('nutri_eval_draft')) notify('Hay una evaluación temporal pendiente. Al volver a abrirla podrás recuperar los campos.','warning');
+      }catch(e){
+        console.error('Carga posterior al login:',e);
+        showLoadingOverlay(false);
+        notify('Sesión iniciada, pero hubo un problema cargando datos: '+(e.message||'Revisa las políticas RLS.'),'danger');
+      }
+    });
+  }catch(e){
+    console.error('Supabase Auth:',e);
+    showLoadingOverlay(false);
+    notify('No se pudo iniciar sesión: '+(e.message||'credenciales incorrectas'),'danger');
+  }finally{
+    clearTimeout(watchdog);
+    window._nmLoginBusy=false;
+    if(btn){btn.textContent='Iniciar sesión';btn.disabled=false;}
+  }
 }
 
 // Expone las acciones de acceso y evita depender de la resolución de nombres
