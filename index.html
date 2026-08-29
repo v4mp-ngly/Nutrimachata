@@ -8331,6 +8331,11 @@ function renderAgenda() {
             <button class="btn btn-olive btn-sm" onclick="openAppointmentModal(calSelectedDate)">+ Nueva Cita</button>
           </div>
         </div>
+        <div class="nm-agenda-tools" style="display:grid;grid-template-columns:minmax(220px,1fr) 170px 190px;gap:10px;margin:12px 0 14px">
+          <input id="agenda-search" class="form-control" placeholder="Buscar paciente, teléfono o descripción…" value="${window.NM_AGENDA_FILTERS?.q||''}" oninput="setAgendaFilter('q',this.value)">
+          <select id="agenda-status-filter" class="form-select" onchange="setAgendaFilter('status',this.value)"><option value="">Todos los estados</option><option value="pendiente">Pendientes</option><option value="confirmada">Confirmadas</option><option value="completada">Completadas</option><option value="cancelada">Canceladas / No asistió</option></select>
+          <select id="agenda-prof-filter" class="form-select" onchange="setAgendaFilter('professional',this.value)"><option value="">Todos los profesionales</option><option value="actual">Profesional actual</option></select>
+        </div><div id="agenda-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div id="calendar-container"></div>
       </div>
       <div>
@@ -8354,6 +8359,8 @@ function renderAgenda() {
   else if (calView === 'week') renderWeekView();
   else renderDayView();
   renderUpcomingApts();
+  renderAgendaSummary();
+  syncAgendaFilterControls();
 }
 
 function setCalView(v) {
@@ -8438,7 +8445,7 @@ function renderWeekView() {
   weekDays.forEach(d => {
     const ds = d.toISOString().split('T')[0];
     const isToday = ds === todayStr;
-    const dayAptCount = DB.appointments.filter(a => a.fecha === ds).length;
+    const dayAptCount = getAgendaAppointments().filter(a => a.fecha === ds).length;
     headerHtml += `<div onclick="calSelectedDate='${ds}';setCalView('day')"
       style="padding:8px 4px;text-align:center;cursor:pointer;border-left:1px solid var(--gray-200);transition:background 0.15s;${isToday?'background:rgba(94,140,42,0.08)':''}"
       onmouseover="this.style.background='rgba(94,140,42,0.06)'" onmouseout="this.style.background='${isToday?'rgba(94,140,42,0.08)':''}'" >
@@ -8465,7 +8472,7 @@ function renderWeekView() {
     weekDays.forEach(d => {
       const ds = d.toISOString().split('T')[0];
       const isToday = ds === todayStr;
-      const hApts = DB.appointments.filter(a => a.fecha === ds && a.hora.startsWith(String(h).padStart(2,'0')));
+      const hApts = getAgendaAppointments().filter(a => a.fecha === ds && a.hora.startsWith(String(h).padStart(2,'0')));
       const isNowH = isToday && nowH === h;
       rowsHtml += `<div style="border-left:1px solid var(--gray-200);padding:2px 3px;min-height:52px;position:relative;cursor:pointer;${isToday?'background:rgba(94,140,42,0.02)':''}"
         onclick="calSelectedDate='${ds}';openAppointmentModal('${ds}',null)"
@@ -8501,7 +8508,7 @@ function renderDayView() {
   const label  = WDAYS[d.getDay()] + ', ' + d.getDate() + ' de ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
   document.getElementById('cal-month-label').textContent = label;
 
-  const dayApts = DB.appointments.filter(a => a.fecha === calSelectedDate)
+  const dayApts = getAgendaAppointments().filter(a => a.fecha === calSelectedDate)
                     .sort((a,b) => a.hora.localeCompare(b.hora));
 
   // Build hour rows 07:00 – 20:00
@@ -8588,7 +8595,7 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const isToday = d === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
     const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayApts = DB.appointments.filter(a => a.fecha === dateStr);
+    const dayApts = getAgendaAppointments().filter(a => a.fecha === dateStr);
     html += `<div class="cal-day ${isToday ? 'today' : ''}" onclick="calSelectedDate='${dateStr}';calMonth=${calMonth};calYear=${calYear};setCalView('day')">
       <div class="cal-day-num">${d}</div>
       ${dayApts.map(a => {
@@ -8615,7 +8622,7 @@ function renderUpcomingApts() {
   const el = document.getElementById('upcoming-apts');
   if (!el) return;
   const todayStr = new Date().toISOString().split('T')[0];
-  const upcoming = DB.appointments
+  const upcoming = getAgendaAppointments()
     .filter(a => a.fecha >= todayStr)
     .sort((a,b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
     .slice(0, 5);
@@ -13085,6 +13092,28 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     };
     window.__nmDraftRecoveryWrapped=true;
   }
+})();
+</script>
+<style id="nm-agenda-smart-v9-style">
+@media(max-width:900px){.nm-agenda-tools{grid-template-columns:1fr!important}.calendar-header{align-items:flex-start!important;gap:10px!important;flex-direction:column!important}.calendar-header>div:last-child{flex-wrap:wrap}}
+.nm-agenda-kpi{padding:7px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white);font-size:11px;color:var(--gray-500)}.nm-agenda-kpi b{color:var(--black);margin-left:4px}.nm-apt-actions{display:flex;gap:7px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--gray-100);background:var(--gray-50)}
+</style>
+<script id="nm-agenda-smart-v9">
+(function(){
+window.NM_AGENDA_FILTERS=window.NM_AGENDA_FILTERS||{q:'',status:'',professional:''};
+const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+window.getAgendaAppointments=function(){const f=NM_AGENDA_FILTERS,q=norm(f.q);return (DB.appointments||[]).filter(a=>{if(f.status&&norm(a.estado)!==norm(f.status))return false;if(f.professional==='actual'&&a.profesional&&String(a.profesional)!==String(DB.currentUser?.name||''))return false;if(!q)return true;const p=a.patientId?(DB.patients||[]).find(x=>String(x.id)===String(a.patientId)):null;return norm([p?.nombre,p?.telefono,p?.email,a.nombreManual,a.telefonoManual,a.emailManual,a.descripcion,a.notas].join(' ')).includes(q)})};
+window.setAgendaFilter=function(k,v){NM_AGENDA_FILTERS[k]=v;if(currentPage==='agenda')renderAgenda()};
+window.syncAgendaFilterControls=function(){const s=document.getElementById('agenda-status-filter'),p=document.getElementById('agenda-prof-filter');if(s)s.value=NM_AGENDA_FILTERS.status||'';if(p)p.value=NM_AGENDA_FILTERS.professional||''};
+window.renderAgendaSummary=function(){const el=document.getElementById('agenda-summary');if(!el)return;const a=getAgendaAppointments(),today=new Date().toISOString().slice(0,10),n=st=>a.filter(x=>norm(x.estado)===st).length;el.innerHTML='<span class="nm-agenda-kpi">Mostrando <b>'+a.length+'</b></span><span class="nm-agenda-kpi">Hoy <b>'+a.filter(x=>x.fecha===today).length+'</b></span><span class="nm-agenda-kpi">Pendientes <b>'+n('pendiente')+'</b></span><span class="nm-agenda-kpi">Confirmadas <b>'+n('confirmada')+'</b></span>'};
+window.quickAppointmentStatus=async function(id,status,label){const a=(DB.appointments||[]).find(x=>String(x.id)===String(id));if(!a)return;try{await SB.updateCita(id,{estado:status});a.estado=status;notify('Cita marcada como '+(label||status),'success');closeModal('modal-appointment');if(currentPage==='agenda')renderAgenda();refreshClinicAlertBadge?.()}catch(e){notify('No se pudo actualizar la cita: '+(e.message||e),'danger')}};
+window.markAppointmentNoShow=async function(id){const a=(DB.appointments||[]).find(x=>String(x.id)===String(id));if(!a)return;try{const note='[NO ASISTIÓ] '+String(a.notas||'').replace(/^\[NO ASISTIÓ\]\s*/,'');await SB.updateCita(id,{estado:'cancelada',descripcion:encodeCitaDescripcion(a.descripcion||'',note)});a.estado='cancelada';a.notas=note;notify('Cita marcada como No asistió','warning');closeModal('modal-appointment');if(currentPage==='agenda')renderAgenda();refreshClinicAlertBadge?.()}catch(e){notify('No se pudo marcar la inasistencia: '+(e.message||e),'danger')}};
+const oldOpen=window.openAppointmentModal||openAppointmentModal;
+window.openAppointmentModal=function(defaultDate,existingApt){oldOpen(defaultDate,existingApt);if(!existingApt?.id)return;setTimeout(()=>{const modal=document.getElementById('modal-appointment');if(!modal||modal.querySelector('.nm-apt-actions'))return;const bar=document.createElement('div');bar.className='nm-apt-actions';let html='<button class="btn btn-outline btn-sm" onclick="quickAppointmentStatus(\''+existingApt.id+'\',\'confirmada\',\'Confirmada\')">✓ Confirmar</button><button class="btn btn-outline btn-sm" onclick="quickAppointmentStatus(\''+existingApt.id+'\',\'confirmada\',\'Llegada confirmada\')">📍 Confirmar llegada</button><button class="btn btn-outline btn-sm" onclick="quickAppointmentStatus(\''+existingApt.id+'\',\'completada\',\'Completada\')">✓ Completar</button><button class="btn btn-outline btn-sm" onclick="markAppointmentNoShow(\''+existingApt.id+'\')">No asistió</button>';if(existingApt.patientId)html+='<button class="btn btn-olive btn-sm" onclick="closeModal(\'modal-appointment\');navigate(\'patients\');setTimeout(()=>openPatientDetail?.(\''+existingApt.patientId+'\'),120)">Ver paciente</button>';bar.innerHTML=html;const foot=modal.querySelector('.modal-footer');foot?.parentNode?.insertBefore(bar,foot)},0)};
+window.editAppointment=function(id){const a=(DB.appointments||[]).find(x=>String(x.id)===String(id));if(a)window.openAppointmentModal(a.fecha,a)};
+const baseAlerts=window.computeClinicAlerts;
+window.computeClinicAlerts=function(){const out=baseAlerts?baseAlerts():[],now=new Date(),today=now.toISOString().slice(0,10),seen=new Set(out.map(x=>x.key));const add=a=>{if(!seen.has(a.key)){seen.add(a.key);out.push(a)}};(DB.appointments||[]).forEach(a=>{if(!a?.fecha)return;const st=norm(a.estado),p=a.patientId?(DB.patients||[]).find(x=>String(x.id)===String(a.patientId)):null,name=p?.nombre||a.nombreManual||'Paciente',dt=new Date(a.fecha+'T'+String(a.hora||'00:00').slice(0,5)+':00');if(Number.isNaN(dt.getTime()))return;const h=(dt-now)/3600000,act=()=>{navigate('agenda');setTimeout(()=>editAppointment(a.id),120)};if(a.fecha===today&&!['completada','cancelada'].includes(st))add({type:'info',icon:'📅',title:'Cita de hoy',text:name+' · '+(a.hora||''),date:'Hoy',key:'today:'+a.id,action:act});if(st==='pendiente'&&h>=0&&h<=48)add({type:'warning',icon:'!',title:'Cita sin confirmar',text:name+' · '+a.fecha+' '+(a.hora||''),date:h<=24?'Próximas 24 h':'Próximas 48 h',key:'unconfirmed:'+a.id,action:act});if(st==='pendiente'&&h<0&&h>=-24)add({type:'danger',icon:'◷',title:'Cita atrasada',text:name+' tenía cita '+(a.hora||'')+' y sigue pendiente.',date:'Revisar estado',key:'lateappt:'+a.id,action:act})});return out};
+setTimeout(()=>{try{refreshClinicAlertBadge?.()}catch(e){}},300);
 })();
 </script>
 </body>
