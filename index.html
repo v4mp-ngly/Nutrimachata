@@ -2010,7 +2010,10 @@ async function refreshSupaSession(force=false){
       }
       return persistSupaSession(data);
     }catch(e){
+      // fetch() puede fallar por DNS/offline (ERR_NAME_NOT_RESOLVED). Eso no significa que el token sea invalido.
+      // Conservamos la sesion para reintentar cuando vuelva la conexion.
       if(e?.code==='AUTH_SESSION_EXPIRED') clearSupaSession();
+      else { e.code = e.code || 'NETWORK_ERROR'; SUPA_ONLINE = false; }
       throw e;
     }finally{ SUPA_REFRESH_PROMISE=null; }
   })();
@@ -2119,8 +2122,32 @@ const NMRuntime = (() => {
   };
 })();
 
-NMRuntime.interval('global:auth-refresh',()=>{
-  if(SUPA_AUTH_SESSION?.access_token && supaSessionExpiresSoon(180)) refreshSupaSession(true).catch(()=>{});
+// Central Chart.js factory: prevents duplicate-canvas crashes across every module.
+function nmNewChart(target, config){
+  if(typeof window.Chart==='undefined'){
+    console.warn('[NutriMachata] Chart.js aun no esta disponible; grafica pospuesta.');
+    return null;
+  }
+  try{
+    const canvas = target?.canvas || (target?.getContext ? target : null);
+    if(canvas && typeof Chart.getChart==='function'){
+      const previous=Chart.getChart(canvas);
+      if(previous) previous.destroy();
+    }
+    return new Chart(target, config);
+  }catch(e){
+    console.error('[NutriMachata] No se pudo crear la grafica:',e);
+    return null;
+  }
+}
+
+NMRuntime.interval('global:auth-refresh',async()=>{
+  if(!navigator.onLine || !SUPA_AUTH_SESSION?.access_token || !supaSessionExpiresSoon(180)) return;
+  try { await refreshSupaSession(true); }
+  catch(e){
+    // Un fallo DNS/red NO invalida una sesion local valida. Solo Auth 401 real debe expirar la sesion.
+    if(e?.code!=='AUTH_SESSION_EXPIRED') console.warn('[NutriMachata] Renovacion pospuesta por red:', e?.message||e);
+  }
 },60000);
 // Detect if running locally (file://) or online
 const IS_LOCAL = window.location.protocol === 'file:';
@@ -2395,6 +2422,8 @@ const SB = {
 // ── Load all data from Supabase into DB object ──
 async function testSupabaseConnection() {
   try {
+    if(!navigator.onLine) return false;
+    await ensureSupaSession();
     const res = await fetch(SUPA_URL + '/rest/v1/usuarios?limit=1', {
       headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + supaAccessToken() },
       mode: 'cors', credentials: 'omit',
@@ -2536,6 +2565,9 @@ async function loadFromSupabase() {
     if (!window._citasSyncInterval) {
       window._citasSyncInterval = NMRuntime.interval('global:citas-sync', async () => {
         try {
+          // No intentes refrescar citas si el navegador esta offline o no hay sesion.
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+          if (!SUPA_AUTH_SESSION?.access_token) return;
           const citasActuales = await supa('citas?order=fecha.asc,hora.asc&select=*');
           if (citasActuales && Array.isArray(citasActuales)) {
             // Mapear nuevas citas
@@ -2571,6 +2603,11 @@ async function loadFromSupabase() {
             }
           }
         } catch(syncErr) {
+          // Un fallo temporal de red no debe romper ni ensuciar la agenda.
+          if (syncErr?.code === 'NETWORK_ERROR' || syncErr?.name === 'TypeError' || /Failed to fetch|NetworkError|ERR_NAME_NOT_RESOLVED/i.test(String(syncErr?.message||syncErr))) {
+            SUPA_ONLINE = false;
+            return;
+          }
           console.warn('Error sincronizando citas:', syncErr);
         }
       }, 3 * 60 * 1000); // Cada 3 minutos
@@ -5080,6 +5117,11 @@ function downloadHistoriaClinica(patientId) {
   </div>
 
 
+
+
+
+
+
 </body></html>`;
 
   downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -6027,7 +6069,7 @@ function _buildChart(canvasId, config) {
   const el = document.getElementById(canvasId);
   if (!el) return;
   if (_hcCharts[canvasId]) { try { _hcCharts[canvasId].destroy(); } catch(e){} }
-  _hcCharts[canvasId] = new Chart(el.getContext('2d'), config);
+  _hcCharts[canvasId] = nmNewChart(el.getContext('2d'), config);
 }
 
 // ── Gauge (doughnut) chart for single-value metrics ──
@@ -6951,6 +6993,7 @@ ${evals.length ? `<h2>Historial de evaluaciones</h2><table><thead><tr><th>Fecha<
 ${dietas.length ? `<h2>Planes nutricionales</h2>${dietas.map(d=>`<div class="diet-card"><div class="diet-name">🥗 ${d.nombre}</div><div class="diet-meta">${d.fecha}${d.calorias?' · '+d.calorias+' kcal/día':''}</div>${d.indicaciones?`<div style="font-size:10px;color:#555;margin-top:4px">${d.indicaciones}</div>`:''}</div>`).join('')}` : ''}
 <div class="footer"><span><strong>${clinicName}</strong> · ${doctorName}</span><span>Generado el ${today}</span></div>
 </div>
+
 </body></html>`;
   _printHTML(expHTML_start, `Expediente_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
@@ -7102,7 +7145,8 @@ function downloadEvalReport(patientId, evalId) {
     <div class="section"><div class="section-title">Gráficas de evolución</div><div class="charts">${charts}</div></div>
     ${followItems.length?`<div class="section"><div class="section-title">Seguimiento del paciente</div><div class="follow">${followItems.map(([q,a])=>`<div><b>${q}</b>${a}</div>`).join('')}</div></div>`:''}
     <div class="footer">NutriMachata · Nutrición Conectada · Documento clínico confidencial</div>
-  </div></body></html>`;
+  </div>
+</body></html>`;
   downloadEvaluationPDFMacSafe(pdfHTML, `Evaluacion_${p.nombre.replace(/\s+/g,'_')}_${e.fecha}.pdf`);
 }
 
@@ -7513,6 +7557,7 @@ ${d.indicaciones?`<div class="indicaciones"><div class="ind-title">📋 Indicaci
 </div>
 
 </div>
+
 </body></html>`;
   downloadPDF(dietHTML, `Dieta_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
@@ -9314,7 +9359,8 @@ function printReportPDF() {
     .cr-head,.cr-patient,.cr-metric,.cr-box,.chart-card-pro,.cr-comparison,tr { break-inside:avoid; page-break-inside:avoid; }
     .report-screen-only,.report-actions,button { display:none!important; }
     img { max-width:100%!important; }
-  </style></head><body>${report}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script></body></html>`);
+  </style></head><body>${report}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script>
+</body></html>`);
   popup.document.close();
 }
 
@@ -10037,7 +10083,7 @@ function renderPortal() {
     if (evals.length >= 2) {
       const ctx = document.getElementById('portal-weight-chart');
       if (ctx) {
-        chartInstances.portalWeight = new Chart(ctx.getContext('2d'), {
+        chartInstances.portalWeight = nmNewChart(ctx.getContext('2d'), {
           type: 'line',
           data: {
             labels: evals.map(e => e.fecha),
@@ -10337,7 +10383,7 @@ function renderMyHistory() {
 
       // Peso chart
       const ctx1 = document.getElementById('my-weight-chart');
-      if (ctx1) new Chart(ctx1.getContext('2d'), {
+      if (ctx1) nmNewChart(ctx1.getContext('2d'), {
         type: 'line',
         data: { labels, datasets: [{ label: 'Peso (kg)', data: evals.map(e=>e.peso),
           borderColor: '#5E8C2A', backgroundColor: 'rgba(94,140,42,0.09)',
@@ -10354,7 +10400,7 @@ function renderMyHistory() {
 
       // IMC chart with reference bands
       const ctx2 = document.getElementById('my-imc-chart');
-      if (ctx2) new Chart(ctx2.getContext('2d'), {
+      if (ctx2) nmNewChart(ctx2.getContext('2d'), {
         type: 'line',
         data: { labels, datasets: [
           { label: 'IMC', data: evals.map(e=>parseFloat((e.imc||0).toFixed(1))),
@@ -10973,7 +11019,7 @@ function renderMyMeasures() {
           });
         }
 
-        new Chart(ctx.getContext('2d'), {
+        nmNewChart(ctx.getContext('2d'), {
           type: 'line',
           data: { labels, datasets },
           options: {
@@ -12183,7 +12229,7 @@ function openEvaluationDetail(patientId, evalId) {
     const chartCanvas = document.getElementById('compChart_' + eval_.id);
     if (chartCanvas) {
       const ctx = chartCanvas.getContext('2d');
-      new Chart(ctx, {
+      nmNewChart(ctx, {
         type: 'doughnut',
         data: {
           labels: ['Masa Muscular', 'Masa Grasa', 'Masa Ósea', 'Agua Corporal'],
@@ -13192,6 +13238,72 @@ window.editAppointment=function(id){const a=(DB.appointments||[]).find(x=>String
 const baseAlerts=window.computeClinicAlerts;
 window.computeClinicAlerts=function(){if(typeof DB==='undefined'||!DB)return [];const out=baseAlerts?baseAlerts():[],now=new Date(),today=now.toISOString().slice(0,10),seen=new Set(out.map(x=>x.key));const add=a=>{if(!seen.has(a.key)){seen.add(a.key);out.push(a)}};(DB.appointments||[]).forEach(a=>{if(!a?.fecha)return;const st=norm(a.estado),p=a.patientId?(DB.patients||[]).find(x=>String(x.id)===String(a.patientId)):null,name=p?.nombre||a.nombreManual||'Paciente',dt=new Date(a.fecha+'T'+String(a.hora||'00:00').slice(0,5)+':00');if(Number.isNaN(dt.getTime()))return;const h=(dt-now)/3600000,act=()=>{navigate('agenda');setTimeout(()=>editAppointment(a.id),120)};if(a.fecha===today&&!['completada','cancelada'].includes(st))add({type:'info',icon:'📅',title:'Cita de hoy',text:name+' · '+(a.hora||''),date:'Hoy',key:'today:'+a.id,action:act});if(st==='pendiente'&&h>=0&&h<=48)add({type:'warning',icon:'!',title:'Cita sin confirmar',text:name+' · '+a.fecha+' '+(a.hora||''),date:h<=24?'Próximas 24 h':'Próximas 48 h',key:'unconfirmed:'+a.id,action:act});if(st==='pendiente'&&h<0&&h>=-24)add({type:'danger',icon:'◷',title:'Cita atrasada',text:name+' tenía cita '+(a.hora||'')+' y sigue pendiente.',date:'Revisar estado',key:'lateappt:'+a.id,action:act})});return out};
 setTimeout(()=>{try{refreshClinicAlertBadge?.()}catch(e){}},300);
+})();
+</script>
+
+<script id="nm-v16-stability-guards">
+(function(){
+  'use strict';
+  // Form accessibility: one observer only, never injected inside generated reports/templates.
+  let fieldSeq=0;
+  function fixForms(root){
+    root=root||document;
+    root.querySelectorAll?.('input,select,textarea').forEach(el=>{
+      if(!el.id) el.id='nm-field-'+(++fieldSeq);
+      if(!el.name) el.name=el.id;
+    });
+    root.querySelectorAll?.('label:not([for])').forEach(label=>{
+      if(label.querySelector('input,select,textarea')) return;
+      const box=label.closest('.form-group')||label.parentElement;
+      const field=box?.querySelector?.('input:not([type="hidden"]),select,textarea');
+      if(field?.id) label.setAttribute('for',field.id);
+    });
+    root.querySelectorAll?.('label[for]').forEach(label=>{
+      const id=label.getAttribute('for');
+      if(id && !document.getElementById(id)) label.removeAttribute('for');
+    });
+  }
+  function installFormObserver(){
+    if(window.__nmFormObserverInstalled) return;
+    window.__nmFormObserverInstalled=true;
+    fixForms(document);
+    const obs=new MutationObserver(muts=>{
+      for(const m of muts) for(const n of m.addedNodes) if(n.nodeType===1) fixForms(n);
+    });
+    obs.observe(document.body,{childList:true,subtree:true});
+    window.__nmFormObserver=obs;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',installFormObserver,{once:true});
+  else installFormObserver();
+
+  // New global actions start without the last patient. Explicit patient actions keep their patient.
+  function clearNewActionPatientState(){
+    window.NMNewActionPatientId=null;
+    ['selectedPatientId','currentPatientId','lastPatientId','pacienteSeleccionado','pacienteActual'].forEach(k=>{try{sessionStorage.removeItem(k)}catch(_){}});
+  }
+  function wrapNewAction(name, patientArgIndex){
+    const original=window[name];
+    if(typeof original!=='function'||original.__nmCleanNewAction) return;
+    const wrapped=function(){
+      const args=[...arguments], pid=args[patientArgIndex];
+      const explicit=pid!==null&&pid!==undefined&&String(pid).trim()!=='';
+      if(!explicit) clearNewActionPatientState();
+      return original.apply(this,args);
+    };
+    wrapped.__nmCleanNewAction=true;
+    window[name]=wrapped;
+  }
+  wrapNewAction('openEvalModal',0);
+  wrapNewAction('openAppointmentModal',1); // existing appointment is arg 1; new global appointment has none
+  wrapNewAction('openDietModal',0);
+  wrapNewAction('openInvoiceModal',0);
+
+  // Do not allow alert refresh to crash startup before DB is ready.
+  if(typeof window.computeClinicAlerts==='function'&&!window.computeClinicAlerts.__nmDbGuard){
+    const base=window.computeClinicAlerts;
+    const guarded=function(){ try{return (typeof DB!=='undefined'&&DB)?(base()||[]):[]}catch(e){console.warn('[NutriMachata] Alertas pospuestas:',e);return []} };
+    guarded.__nmDbGuard=true; window.computeClinicAlerts=guarded;
+  }
 })();
 </script>
 </body>
