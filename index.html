@@ -2858,6 +2858,9 @@ const DB = {
     model: 'claude-sonnet-4-20250514'
   }
 };
+// Exponer el store principal a los módulos añadidos fuera de este bloque.
+// DB sigue siendo la única fuente de verdad; window.DB es solo una referencia al mismo objeto.
+window.DB = DB;
 
 // ═══════════════════════════════════════════════
 //  AUTH
