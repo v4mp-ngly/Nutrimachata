@@ -3607,7 +3607,7 @@ function handleTopAction() {
   if (!info.actionPage) return;
   if (info.actionPage === 'modal-appointment') openAppointmentModal();
   else if (info.actionPage === 'new-patient') openWizard();
-  else if (info.actionPage === 'new-eval') openEvalModal(null);
+  else if (info.actionPage === 'new-eval') { clearEvaluationDraft(); openEvalModal(null); }
   else if (info.actionPage === 'new-diet') openDietModal(null);
   else if (info.actionPage === 'new-invoice') openInvoiceModal();
 }
@@ -5299,6 +5299,10 @@ function resolveEvalPatientSearch() {
 }
 
 function openEvalModal(patientId) {
+  // v17: una evaluacion NUEVA global nunca hereda el borrador ni los datos del paciente anterior.
+  if (patientId === null || patientId === undefined || String(patientId).trim() === '') {
+    clearEvaluationDraft();
+  }
   const patient = patientId ? DB.patients.find(p => p.id == patientId) : null;
   document.getElementById('eval-patient-name').textContent = patient ? patient.nombre : 'Seleccione paciente';
   document.getElementById('eval-modal-body').innerHTML = `
@@ -5760,6 +5764,7 @@ async function saveEvaluation() {
       }
     }
     
+    clearEvaluationDraft();
     closeModal('modal-evaluation');
     if (currentPage === 'evaluations') renderEvaluations();
     if (currentPage === 'patients') renderPatients();
@@ -13204,7 +13209,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 // Recuperación transparente del borrador de evaluación después de volver a iniciar sesión.
 (function(){
   const originalOpenEvalModal = window.openEvalModal;
-  if(typeof originalOpenEvalModal === 'function' && !window.__nmDraftRecoveryWrapped){
+  if(false && typeof originalOpenEvalModal === 'function' && !window.__nmDraftRecoveryWrapped){
     window.openEvalModal = function(){
       const result = originalOpenEvalModal.apply(this, arguments);
       setTimeout(()=>{
