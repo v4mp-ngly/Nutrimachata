@@ -12620,7 +12620,7 @@ function nmPreviewShell(title,subtitle,pages,printAction,downloadAction){nmClose
 function nmReportPreviewPages(source){const styles=Array.from(document.querySelectorAll('#report-modal-body style')).map(x=>x.outerHTML).join('');const sections=[...source.querySelectorAll(':scope > .cr-page')];return sections.map((section,i)=>`<div class="nm-a4-preview" aria-label="Página ${i+1}">${styles}<div class="clinical-report">${section.outerHTML}</div><div style="position:absolute;bottom:4mm;left:8mm;right:8mm;display:flex;justify-content:space-between;font:9px Arial;color:#7b8576;border-top:1px solid #e3e9df;padding-top:2mm"><span>${nmDocumentIdentity().clinic} · ${nmDocumentIdentity().doctor} · ${nmGenerationStamp()}</span><span>Página ${i+1} de ${sections.length}</span></div></div>`).join('')}
 function previewReportPDF(){const source=document.querySelector('#report-modal-body .clinical-report');if(!source){notify('Genera el reporte primero','warning');return}nmPreviewShell('Vista previa del Reporte Clínico','A4 - la descarga directa usa esta misma estructura',nmReportPreviewPages(source),'nmClosePrintPreview();printReportPDF()','nmClosePrintPreview();downloadReportPDF()')}
 
-function nmInvoiceDocumentHTML(x,b){const logo=(typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'');const items=(x.items||[]).map(i=>`<tr><td>${billingEscape(i.description)}</td><td>${i.qty}</td><td>${moneyRD(i.price)}</td><td>${i.discount||0}%</td><td><b>${moneyRD(billingLineTotal(i))}</b></td></tr>`).join('');return `<div class="invoice-print-doc" data-invoice="${billingEscape(x.number)}"><div class="invoice-print-head">${logo?`<img src="${logo}" alt="NutriMachata">`:'<b class="invoice-brand">NutriMachata</b>'}<div><strong>FACTURA</strong><b>${billingEscape(x.number)}</b><span>${billingEscape(x.date||'')}</span></div></div><div class="invoice-party"><div><small>PACIENTE</small><b>${billingEscape(x.patient)}</b><span>${x.rnc?billingEscape(x.rnc):'Sin RNC / cédula'}</span></div><div><small>NCF</small><b>${billingEscape(x.ncf||'No especificado')}</b><span>Vencimiento: ${billingEscape(x.dueDate||'—')}</span></div></div><table class="invoice-items"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${items||'<tr><td colspan="5">Sin conceptos</td></tr>'}</tbody></table><div class="invoice-print-summary"><div><span>Subtotal</span><b>${moneyRD(x.subtotal)}</b></div><div><span>Descuento general</span><b>${x.discount||0}%</b></div><div><span>ITBIS</span><b>${x.tax||0}%</b></div><div class="grand"><span>Total</span><b>${moneyRD(x.total)}</b></div><div><span>Pagado</span><b>${moneyRD(x.paid)}</b></div><div><span>Saldo</span><b>${moneyRD(billingInvoiceBalance(x))}</b></div></div><div class="invoice-print-note">${billingEscape(x.notes||b.templateNote||'')}</div></div>`}
+function nmInvoiceDocumentHTML(x,b){const logo=(typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'');const items=(x.items||[]).map(i=>`<tr><td>${billingEscape(i.description)}</td><td>${i.qty}</td><td>${moneyRD(i.price)}</td><td>${i.discount||0}%</td><td><b>${moneyRD(billingLineTotal(i))}</b></td></tr>`).join('');return `<div class="invoice-print-doc" data-invoice="${billingEscape(x.number)}"><div class="invoice-print-head">${logo?`<img src="${logo}" alt="NutriMachata">`:'<b class="invoice-brand">NutriMachata</b>'}<div><strong>FACTURA</strong><b>${billingEscape(x.number)}</b><span>${billingEscape(x.date||'')}</span></div></div><div class="invoice-party"><div><small>PACIENTE</small><b>${billingEscape(x.patient)}</b><span>RNC / Cédula: ${x.rnc?billingEscape(x.rnc):'No especificado'}</span></div><div><small>NCF</small><b>${billingEscape(x.ncf||'No especificado')}</b><span>Vencimiento: ${billingEscape(x.dueDate||'—')}</span></div></div><table class="invoice-items"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${items||'<tr><td colspan="5">Sin conceptos</td></tr>'}</tbody></table><div class="invoice-print-summary"><div><span>Subtotal</span><b>${moneyRD(x.subtotal)}</b></div><div><span>Descuento general</span><b>${x.discount||0}%</b></div><div><span>ITBIS</span><b>${x.tax||0}%</b></div><div class="grand"><span>Total</span><b>${moneyRD(x.total)}</b></div><div><span>Pagado</span><b>${moneyRD(x.paid)}</b></div><div><span>Saldo</span><b>${moneyRD(billingInvoiceBalance(x))}</b></div></div><div class="invoice-print-note">${billingEscape(x.notes||b.templateNote||'')}</div></div>`}
 function nmInvoicePrintStyles(){return `<style>.invoice-print-doc{font-family:Arial,sans-serif;color:#263126;background:#fff;width:100%;box-sizing:border-box}.invoice-print-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #5E8C2A;padding:0 0 16px}.invoice-print-head img{height:58px;max-width:240px;object-fit:contain}.invoice-brand{font-size:25px;color:#355e20}.invoice-print-head>div{text-align:right;display:flex;flex-direction:column;gap:3px}.invoice-print-head strong{font-size:24px}.invoice-party{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0}.invoice-party small,.invoice-party b,.invoice-party span{display:block}.invoice-items{width:100%;border-collapse:collapse}.invoice-items thead{display:table-header-group}.invoice-items th{background:#355E3B;color:#fff;padding:10px;text-align:left;font-size:11px}.invoice-items th:nth-child(n+2),.invoice-items td:nth-child(n+2){text-align:right}.invoice-items td{padding:9px;border-bottom:1px solid #e5e9e2;font-size:11px}.invoice-print-summary{margin-left:auto;width:320px;margin-top:18px;break-inside:avoid;page-break-inside:avoid}.invoice-print-summary>div{display:flex;justify-content:space-between;padding:5px}.invoice-print-summary .grand{padding:10px 5px;border-top:2px solid #5E8C2A;font-size:19px;color:#355E3B}.invoice-print-note{margin-top:30px;padding:13px;background:#f3f7ef;border-radius:9px;font-size:11px;break-inside:avoid;page-break-inside:avoid}.invoice-items tr{break-inside:avoid;page-break-inside:avoid}@media print{@page{size:A4 portrait;margin:10mm 8mm 13mm}.invoice-print-doc{width:auto!important}.invoice-items thead{display:table-header-group!important}}</style>`}
 function previewInvoicePDF(id){const b=getBillingData(),x=b.invoices.find(i=>i.id===id);if(!x){notify('La factura ya no existe','danger');return}const page=`<div class="nm-a4-preview">${nmInvoicePrintStyles()}${nmInvoiceDocumentHTML(x,b)}<div style="position:absolute;bottom:4mm;left:8mm;right:8mm;display:flex;justify-content:space-between;font:9px Arial;color:#7b8576;border-top:1px solid #e3e9df;padding-top:2mm"><span>${nmDocumentIdentity().clinic} · ${nmDocumentIdentity().doctor} · ${nmGenerationStamp()}</span><span>Vista A4</span></div></div>`;nmPreviewShell(`Vista previa - ${billingEscape(x.number)}`,'A4 - confirme el contenido antes de descargar',page,'','nmClosePrintPreview();downloadInvoicePDF(\''+x.id+'\')')}
 
@@ -12812,7 +12812,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
           const its=(details||[]).filter(d=>d.factura_id===f.id).map(detailDbToUi);
           const pays=(payments||[]).filter(p=>p.factura_id===f.id);
           const inv=normalizeBillingInvoice({
-            id:f.id,number:f.numero_factura,date:f.fecha,dueDate:f.fecha_vencimiento||'',patientId:f.paciente_id||'',patient:f.paciente_nombre||'',rnc:'',ncf:f.ncf||'',notes:f.notas||'',items:its,
+            id:f.id,number:f.numero_factura,date:f.fecha,dueDate:f.fecha_vencimiento||'',patientId:f.paciente_id||'',patient:f.paciente_nombre||'',rnc:(()=>{const bp=billingPatients();const px=bp.find(p=>String(p.id)===String(f.paciente_id))||bp.find(p=>String(p.nombre||'').trim().toLowerCase()===String(f.paciente_nombre||'').trim().toLowerCase());return String(px?.cedula||px?.rnc||'')})(),ncf:f.ncf||'',notes:f.notas||'',items:its,
             discount:num(f.descuento),tax:num(f.subtotal)>0?num(f.impuestos)/Math.max(.01,(num(f.subtotal)-num(f.descuento)))*100:0,
             paid:num(f.total_pagado),paymentHistory:[],status:mapStatusFromDb(f.estado)
           });
@@ -13309,6 +13309,79 @@ setTimeout(()=>{try{refreshClinicAlertBadge?.()}catch(e){}},300);
     const guarded=function(){ try{return (typeof DB!=='undefined'&&DB)?(base()||[]):[]}catch(e){console.warn('[NutriMachata] Alertas pospuestas:',e);return []} };
     guarded.__nmDbGuard=true; window.computeClinicAlerts=guarded;
   }
+})();
+</script>
+
+<script id="nm-billing-accounting-report-v18">
+(function(){
+  'use strict';
+  function esc(v){return typeof billingEscape==='function'?billingEscape(v):String(v??'');}
+  function taxId(inv){
+    if(inv?.rnc) return String(inv.rnc);
+    const pts=typeof billingPatients==='function'?billingPatients():[];
+    const p=pts.find(x=>String(x.id)===String(inv?.patientId))||pts.find(x=>String(x.nombre||'').trim().toLowerCase()===String(inv?.patient||'').trim().toLowerCase());
+    return String(p?.cedula||p?.rnc||'');
+  }
+  function concept(inv){return (inv?.items||[]).map(i=>i.description).filter(Boolean).join(' / ')||'—';}
+  function methods(inv){return [...new Set((inv?.paymentHistory||[]).map(p=>p.method).filter(Boolean))].join(' / ')||'—';}
+  function reportRange(){
+    const from=document.getElementById('acct-from')?.value||'';
+    const to=document.getElementById('acct-to')?.value||'';
+    return {from,to};
+  }
+  function reportRows(){
+    const {from,to}=reportRange();
+    const inv=(getBillingData()?.invoices||[]).filter(x=>(!from||String(x.date||'')>=from)&&(!to||String(x.date||'')<=to));
+    return inv.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  }
+  function accountingTotals(rows){
+    const active=rows.filter(x=>billingInvoiceStatus(x)!=='Archivada');
+    return {
+      billed:active.reduce((a,x)=>a+Number(x.total||0),0),
+      paid:active.reduce((a,x)=>a+Number(x.paid||0),0),
+      due:active.reduce((a,x)=>a+billingInvoiceBalance(x),0)
+    };
+  }
+  window.renderAccountingReport=function(){
+    const box=document.getElementById('accounting-report-results');if(!box)return;
+    const rows=reportRows(),t=accountingTotals(rows);
+    box.innerHTML=`<div class="bill-stats" style="margin:16px 0"><div class="card" style="padding:15px"><small>FACTURADO</small><h3>${moneyRD(t.billed)}</h3></div><div class="card" style="padding:15px"><small>COBRADO</small><h3>${moneyRD(t.paid)}</h3></div><div class="card" style="padding:15px"><small>PENDIENTE</small><h3>${moneyRD(t.due)}</h3></div><div class="card" style="padding:15px"><small>FACTURAS</small><h3>${rows.length}</h3></div></div>${rows.length?`<div class="table-responsive"><table class="table"><thead><tr><th>Fecha</th><th>Factura</th><th>Paciente / Cliente</th><th>RNC / Cédula</th><th>Concepto</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>Estado</th><th>Método</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.date||'—')}</td><td><b>${esc(x.number)}</b></td><td>${esc(x.patient)}</td><td>${esc(taxId(x)||'—')}</td><td>${esc(concept(x))}</td><td>${moneyRD(x.total)}</td><td>${moneyRD(x.paid)}</td><td><b>${moneyRD(billingInvoiceBalance(x))}</b></td><td>${esc(billingInvoiceStatus(x))}</td><td>${esc(methods(x))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty-state"><div class="empty-title">No hay facturas en este período</div></div>'}`;
+  };
+  function accountingPanel(){
+    const now=new Date(),first=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10),today=now.toISOString().slice(0,10);
+    return `<div class="card mt-4"><div class="card-header"><div><div class="card-title">Reporte para contabilidad</div><div class="card-subtitle">Facturas, cobros y cuentas por cobrar con RNC / Cédula del paciente.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="downloadAccountingCSV()">CSV / Excel</button><button class="btn btn-olive btn-sm" onclick="downloadAccountingPDF()">PDF</button></div></div><div class="card-body"><div class="form-row"><div class="form-group"><label for="acct-from">Desde</label><input id="acct-from" class="form-control" type="date" value="${first}" onchange="renderAccountingReport()"></div><div class="form-group"><label for="acct-to">Hasta</label><input id="acct-to" class="form-control" type="date" value="${today}" onchange="renderAccountingReport()"></div></div><div id="accounting-report-results"></div></div></div>`;
+  }
+  const oldRenderTab=window.renderBillingTab;
+  window.renderBillingTab=function(tab,btn){
+    oldRenderTab(tab,btn);
+    if(tab==='financial'){
+      const el=document.getElementById('billing-tab-content');
+      if(el&&!document.getElementById('accounting-report-results')){el.insertAdjacentHTML('beforeend',accountingPanel());renderAccountingReport();}
+    }
+  };
+  window.downloadAccountingCSV=function(){
+    const rows=reportRows();if(!rows.length){notify('No hay facturas en el período seleccionado.','warning');return;}
+    const data=[['Fecha','No. factura','Paciente / Cliente','RNC / Cédula','Concepto','Total facturado','Pagado','Pendiente','Estado','Método de pago']];
+    rows.forEach(x=>data.push([x.date||'',x.number||'',x.patient||'',taxId(x),concept(x),Number(x.total||0).toFixed(2),Number(x.paid||0).toFixed(2),billingInvoiceBalance(x).toFixed(2),billingInvoiceStatus(x),methods(x)]));
+    const csv='\\ufeff'+data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\r\
+');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`Reporte_Contabilidad_${reportRange().from||'inicio'}_${reportRange().to||'hoy'}.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+  };
+  window.downloadAccountingPDF=function(){
+    const rows=reportRows();if(!rows.length){notify('No hay facturas en el período seleccionado.','warning');return;}if(typeof html2pdf!=='function'){notify('El generador de PDF no está disponible.','danger');return;}
+    const t=accountingTotals(rows),r=reportRange(),logo=(typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'');
+    const wrap=document.createElement('div');wrap.style.cssText='position:fixed;left:-12000px;top:0;width:1050px;background:#fff';
+    wrap.innerHTML=`<div style="font-family:Arial,sans-serif;color:#253126;padding:28px;background:white"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #5E8C2A;padding-bottom:14px">${logo?`<img src="${logo}" style="height:52px;max-width:220px;object-fit:contain">`:'<b style="font-size:24px;color:#355e20">NutriMachata</b>'}<div style="text-align:right"><h2 style="margin:0">REPORTE PARA CONTABILIDAD</h2><div>${esc(r.from||'Inicio')} — ${esc(r.to||'Hoy')}</div></div></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0"><div><small>FACTURADO</small><b style="display:block;font-size:18px">${moneyRD(t.billed)}</b></div><div><small>COBRADO</small><b style="display:block;font-size:18px">${moneyRD(t.paid)}</b></div><div><small>PENDIENTE</small><b style="display:block;font-size:18px">${moneyRD(t.due)}</b></div></div><table style="width:100%;border-collapse:collapse;font-size:9px"><thead><tr style="background:#355E3B;color:white"><th style="padding:7px">Fecha</th><th>Factura</th><th>Paciente</th><th>RNC / Cédula</th><th>Concepto</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>Estado</th><th>Método</th></tr></thead><tbody>${rows.map(x=>`<tr>${[x.date,x.number,x.patient,taxId(x),concept(x),moneyRD(x.total),moneyRD(x.paid),moneyRD(billingInvoiceBalance(x)),billingInvoiceStatus(x),methods(x)].map(v=>`<td style="padding:7px 5px;border-bottom:1px solid #e5e9e2">${esc(v||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table><div style="margin-top:18px;font-size:9px;color:#667">Facturas anuladas se muestran para trazabilidad, pero no se incluyen en los totales facturados/cobrados/pendientes.</div></div>`;
+    document.body.appendChild(wrap);
+    html2pdf().set({margin:[7,7,9,7],filename:`Reporte_Contabilidad_${r.from||'inicio'}_${r.to||'hoy'}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},pagebreak:{mode:['css','legacy'],avoid:['tr']}}).from(wrap.firstElementChild).save().finally(()=>wrap.remove());
+  };
+  // Fill fiscal ID from the selected patient's cédula/RNC.
+  const oldFill=window.billingFillPatient;
+  window.billingFillPatient=function(sel){
+    if(typeof oldFill==='function')oldFill(sel);
+    const p=(typeof billingPatients==='function'?billingPatients():[]).find(x=>String(x.id)===String(sel?.value));
+    const input=document.getElementById('inv-rnc');if(input&&p)input.value=String(p.cedula||p.rnc||'');
+  };
 })();
 </script>
 </body>
