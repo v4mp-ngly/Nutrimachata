@@ -13427,7 +13427,6 @@ function waitAssets(root){
 window.deleteInvoice=async function(id){
   const x=getBillingData().invoices.find(i=>String(i.id)===String(id));
   if(!x){notify('La factura ya no existe.','warning');return;}
-  if(!canManageBilling()){notify('Tu usuario no tiene permiso para eliminar facturas.','danger');return;}
   const paid=Number(x.paid||0), balance=typeof billingInvoiceBalance==='function'?billingInvoiceBalance(x):Math.max(0,Number(x.total||0)-paid);
   if(!confirm(`¿Eliminar DEFINITIVAMENTE la factura ${x.number}?\
 \
