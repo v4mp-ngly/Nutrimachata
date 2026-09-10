@@ -13703,5 +13703,30 @@ const observer=new MutationObserver(()=>{
 observer.observe(target,{childList:true,subtree:true});
 window.NMBillingTabStateV29={get:()=>activeBillingTab,set:v=>{activeBillingTab=v||'invoices'}};
 })();
+</script>\n\n<script id="nm-gastos-visible-v30">
+(function(){
+'use strict';
+function ensureExpensesUI(){
+  const tabs=document.querySelector('.bill-tabs');
+  if(tabs&&!tabs.querySelector('[data-btab="expenses"]')){
+    const b=document.createElement('button');
+    b.className='bill-tab'; b.dataset.btab='expenses'; b.type='button'; b.textContent='Gastos';
+    b.addEventListener('click',()=>{ if(window.NMBillingTabStateV29) window.NMBillingTabStateV29.set('expenses'); if(typeof window.renderBillingTab==='function') window.renderBillingTab('expenses',b); else if(typeof window.renderExpenses==='function') window.renderExpenses(); });
+    tabs.appendChild(b);
+  }
+  const quick=document.querySelector('.bill-quick');
+  if(quick&&!quick.querySelector('[data-expense-link]')){
+    const a=document.createElement('a'); a.dataset.expenseLink='1'; a.href='javascript:void(0)'; a.innerHTML='<span>＋ Añadir gasto</span><b>›</b>';
+    a.addEventListener('click',()=>{ if(window.NMBillingTabStateV29) window.NMBillingTabStateV29.set('expenses'); if(typeof window.renderBillingTab==='function') window.renderBillingTab('expenses'); setTimeout(()=>window.openExpenseModal&&window.openExpenseModal(),80); });
+    quick.appendChild(a);
+  }
+}
+const obs=new MutationObserver(()=>ensureExpensesUI());
+obs.observe(document.body,{childList:true,subtree:true});
+document.addEventListener('click',e=>{ if(e.target.closest?.('[data-nav="billing"], [onclick*="billing"]')) setTimeout(ensureExpensesUI,0); });
+setInterval(()=>{ if(document.querySelector('.bill-tabs')) ensureExpensesUI(); },500);
+window.NMEnsureExpensesV30=ensureExpensesUI;
+ensureExpensesUI();
+})();
 </script>\n</body>
 </html>
