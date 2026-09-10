@@ -12731,7 +12731,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   'use strict';
 
   const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const BILLING_DB_TABLES={products:'productos_servicios',invoices:'facturas',details:'factura_detalles',payments:'pagos',inventory:'movimientos_inventario'};
+  const BILLING_DB_TABLES={products:'productos_servicios',invoices:'facturas',details:'factura_detalles',payments:'pagos',inventory:'movimientos_inventario',clients:'clientes'};
+  let billingClients=[];
   let billingDbLoaded=false;
   let billingDbLoading=null;
   let billingBusy=false;
@@ -12826,18 +12827,21 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     if(billingDbLoading&&!force)return billingDbLoading;
     billingDbLoading=(async()=>{
       try{
-        const [products,invoices,details,payments]=await Promise.all([
+        const [products,invoices,details,payments,clients]=await Promise.all([
           billingFetch(`${BILLING_DB_TABLES.products}?select=*&order=created_at.desc`),
           billingFetch(`${BILLING_DB_TABLES.invoices}?select=*&order=fecha.desc,created_at.desc`),
           billingFetch(`${BILLING_DB_TABLES.details}?select=*&order=created_at.asc`),
-          billingFetch(`${BILLING_DB_TABLES.payments}?select=*&order=fecha_pago.asc`)
+          billingFetch(`${BILLING_DB_TABLES.payments}?select=*&order=fecha_pago.asc`),
+          billingFetch(`${BILLING_DB_TABLES.clients}?select=*&activo=eq.true&order=nombre.asc`)
         ]);
+        billingClients=(clients||[]).map(c=>({id:c.id,type:'client',nombre:[c.nombre,c.apellido].filter(Boolean).join(' ').trim(),cedula:c.cedula_rnc||'',telefono:c.telefono||'',email:c.correo||'',direccion:c.direccion||'',tipo:c.tipo||'persona'}));
+        window.NMBillingClients=billingClients;
         const uiProducts=(products||[]).map(productDbToUi);
         const uiInvoices=(invoices||[]).map(f=>{
           const its=(details||[]).filter(d=>d.factura_id===f.id).map(detailDbToUi);
           const pays=(payments||[]).filter(p=>p.factura_id===f.id);
           const inv=normalizeBillingInvoice({
-            id:f.id,number:f.numero_factura,date:f.fecha,dueDate:f.fecha_vencimiento||'',patientId:f.paciente_id||'',patient:f.paciente_nombre||'',rnc:(()=>{const bp=billingPatients();const px=bp.find(p=>String(p.id)===String(f.paciente_id))||bp.find(p=>String(p.nombre||'').trim().toLowerCase()===String(f.paciente_nombre||'').trim().toLowerCase());return String(px?.cedula||px?.rnc||'')})(),ncf:f.ncf||'',notes:f.notas||'',items:its,
+            id:f.id,number:f.numero_factura,date:f.fecha,dueDate:f.fecha_vencimiento||'',patientId:f.paciente_id||'',clientId:f.cliente_id||'',partyType:f.cliente_id?'client':'patient',patient:f.paciente_nombre||'',rnc:(()=>{const bp=billingPatients();const px=f.cliente_id?billingClients.find(c=>String(c.id)===String(f.cliente_id)):(bp.find(p=>String(p.id)===String(f.paciente_id))||bp.find(p=>String(p.nombre||'').trim().toLowerCase()===String(f.paciente_nombre||'').trim().toLowerCase()));return String(px?.cedula||px?.rnc||'')})(),ncf:f.ncf||'',notes:f.notas||'',items:its,
             discount:num(f.descuento),tax:num(f.subtotal)>0?num(f.impuestos)/Math.max(.01,(num(f.subtotal)-num(f.descuento)))*100:0,
             paid:num(f.total_pagado),paymentHistory:[],status:mapStatusFromDb(f.estado)
           });
@@ -12888,13 +12892,15 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   };
 
   function invoiceDbPayload(p,items,totals,old){
-    const patientRawId=p?.id;
+    const partyRawId=p?.id;
+    const isClient=p?.type==='client';
     const discountAmount=totals.sub*totals.disc/100;
     const taxable=Math.max(0,totals.sub-discountAmount);
     const taxAmount=taxable*totals.tax/100;
     return {
       numero_factura:document.getElementById('inv-number').value,
-      paciente_id:isUuid(patientRawId)?patientRawId:null,
+      paciente_id:!isClient&&isUuid(partyRawId)?partyRawId:null,
+      cliente_id:isClient&&isUuid(partyRawId)?partyRawId:null,
       paciente_nombre:p.nombre,
       fecha:document.getElementById('inv-date').value||billingToday(),
       fecha_vencimiento:document.getElementById('inv-due').value||null,
@@ -12951,10 +12957,12 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     return withBillingLock(btn,async()=>{
       if(!canManageBilling()){notify('Tu usuario no tiene permiso para modificar Facturación.','danger');return false;}
       const id=document.getElementById('inv-id')?.value||'';
-      const patientId=document.getElementById('inv-patient')?.value||'';
-      const p=billingPatients().find(x=>String(x.id)===String(patientId));
+      const partyId=document.getElementById('inv-party-id')?.value||document.getElementById('inv-patient')?.value||'';
+      const partyType=document.getElementById('inv-party-type')?.value||'patient';
+      const p=partyType==='client'?billingClients.find(x=>String(x.id)===String(partyId)):billingPatients().find(x=>String(x.id)===String(partyId));
       const items=collectInvoiceLines();
-      if(!p){notify('Selecciona un paciente.','warning');return false;}
+      if(!p){notify('Busca y selecciona un cliente o paciente.','warning');return false;}
+      p.type=partyType;
       if(!items.length){notify('Agrega al menos un producto o servicio.','warning');return false;}
       if(items.some(i=>!Number.isFinite(i.qty)||i.qty<=0||!Number.isFinite(i.price)||i.price<0)){notify('Revisa cantidades y precios.','warning');return false;}
       const totals=recalcInvoiceEditor();
@@ -13073,6 +13081,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 
   // Asegurar que los onclick inline apunten a las versiones Supabase.
   Object.assign(window,{saveInvoice:window.saveInvoice,saveInvoicePayment:window.saveInvoicePayment,saveBillingProduct:window.saveBillingProduct,deleteBillingProduct:window.deleteBillingProduct,deleteInvoice:window.deleteInvoice,archiveInvoice:window.archiveInvoice,renderBilling:window.renderBilling});
+  window.NMBillingClientAPI={billingFetch,loadBillingFromSupabase,getClients:()=>billingClients};
 
   // Aviso de RLS/auth. El HTML actual usa la anon key; si Supabase Auth no está activo, las policies "to authenticated" bloquearán escrituras.
   window.billingSupabasePreflight=async function(){
@@ -13527,5 +13536,55 @@ window.openSearchPatientV20=id=>{document.getElementById('nm-global-results')?.c
 const oldAlerts=window.computeClinicAlerts;window.computeClinicAlerts=function(){const arr=oldAlerts?oldAlerts():[],keys=new Set(arr.map(a=>a.key));const push=a=>{if(!keys.has(a.key)){keys.add(a.key);arr.push(a)}};const today=new Date();today.setHours(12,0,0,0);(window.DB?.patients||[]).filter(p=>p&&p.activo!==false).forEach(p=>{const ev=(p.evaluaciones||[]).filter(Boolean).map(e=>e.fecha).filter(Boolean);const ap=(window.DB?.appointments||[]).filter(a=>String(a.patientId)===String(p.id)&&a.fecha&&String(a.estado||'').toLowerCase()==='completada').map(a=>a.fecha);const dates=ev.concat(ap).sort();const last=dates[dates.length-1];if(last){const d=days20(last);if(d>=30)push({type:'warning',icon:'◷',title:'Seguimiento pendiente',text:`${p.nombre}: lleva ${d} días sin seguimiento.`,date:last,key:`follow30:${p.id}:${last}`,action:()=>openSearchPatientV20(p.id)})}});pending20().forEach(x=>push({type:'warning',icon:'$',title:'Saldo pendiente',text:`${x.patient} · ${x.number} · pendiente ${moneyRD(billingInvoiceBalance(x))}`,date:x.dueDate||x.date,key:`due20:${x.id}:${billingInvoiceBalance(x).toFixed(2)}`,action:()=>openSearchInvoiceV20(x.id)}));const tom=new Date();tom.setDate(tom.getDate()+1);const t=tom.toISOString().slice(0,10);(window.DB?.appointments||[]).filter(a=>a.fecha===t&&!['confirmada','completada','cancelada'].includes(String(a.estado||'').toLowerCase())).forEach(a=>push({type:'info',icon:'◷',title:'Cita mañana sin confirmar',text:`${patient20(a.patientId)?.nombre||a.nombreManual||'Paciente'} · ${a.hora||''}`,date:'Mañana',key:`tomorrow20:${a.id}`,action:()=>openSearchAppointmentV20(a.id)}));return arr;};
 setTimeout(()=>{installSearchV20();if(typeof refreshClinicAlertBadge==='function')refreshClinicAlertBadge();},400);
 })();
-</script>\n</body>
+</script>\n
+<script id="nm-billing-clientes-v1">
+(function(){
+'use strict';
+const esc=window.billingEscape||((v)=>String(v??'').replace(/[&<>"']/g,''));
+function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function patients(){try{return billingPatients()}catch(_){return []}}
+function clients(){return Array.isArray(window.NMBillingClients)?window.NMBillingClients:[]}
+function allParties(){
+ return [
+  ...patients().map(p=>({id:p.id,type:'patient',nombre:p.nombre||[p.nombres,p.apellidos].filter(Boolean).join(' '),cedula:p.cedula||p.rnc||'',telefono:p.telefono||'',email:p.email||p.correo||''})),
+  ...clients().map(c=>({...c,type:'client'}))
+ ];
+}
+function selectedInvoice(id){return id?getBillingData().invoices.find(x=>String(x.id)===String(id)):null}
+window.nmBillingPartySearch=function(){
+ const q=document.getElementById('inv-party-search')?.value||'', box=document.getElementById('inv-party-results'); if(!box)return;
+ const nq=norm(q); if(!nq){box.innerHTML='<div style="padding:12px;color:#7a8277">Escribe nombre, cédula/RNC, teléfono o correo.</div>';return;}
+ const rows=allParties().filter(x=>[x.nombre,x.cedula,x.telefono,x.email].some(v=>norm(v).includes(nq))).slice(0,12);
+ box.innerHTML=rows.length?rows.map(x=>`<button type="button" onclick="nmSelectBillingParty('${x.type}','${x.id}')" style="width:100%;text-align:left;border:0;border-bottom:1px solid #edf0ea;background:#fff;padding:11px 12px;cursor:pointer"><b>${esc(x.nombre||'Sin nombre')}</b><div style="font-size:12px;color:#66705f;margin-top:3px">${x.type==='patient'?'Paciente':'Cliente'}${x.cedula?' · '+esc(x.cedula):''}${x.telefono?' · '+esc(x.telefono):''}</div></button>`).join(''):`<div style="padding:12px"><div style="color:#7a8277;margin-bottom:8px">No encontramos “${esc(q)}”.</div><button type="button" class="btn btn-olive btn-sm" onclick="openBillingClientModal()">+ Añadir nuevo cliente</button></div>`;
+};
+window.nmSelectBillingParty=function(type,id){
+ const x=allParties().find(z=>z.type===type&&String(z.id)===String(id)); if(!x)return;
+ document.getElementById('inv-party-id').value=x.id; document.getElementById('inv-party-type').value=x.type;
+ document.getElementById('inv-party-search').value=x.nombre||''; document.getElementById('inv-rnc').value=x.cedula||'';
+ const chip=document.getElementById('inv-party-selected'); chip.innerHTML=`<span style="display:inline-flex;gap:7px;align-items:center;padding:7px 10px;background:#f3f8ef;border:1px solid #d7e7cf;border-radius:999px;font-size:12px"><b>${x.type==='patient'?'Paciente':'Cliente'}</b> ${esc(x.nombre)} <button type="button" onclick="nmClearBillingParty()" style="border:0;background:transparent;cursor:pointer">×</button></span>`;
+ document.getElementById('inv-party-results').innerHTML='';
+};
+window.nmClearBillingParty=function(){document.getElementById('inv-party-id').value='';document.getElementById('inv-party-type').value='';document.getElementById('inv-party-search').value='';document.getElementById('inv-rnc').value='';document.getElementById('inv-party-selected').innerHTML='';};
+window.openBillingClientModal=function(){
+ document.getElementById('billing-client-modal')?.remove();
+ document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="billing-client-modal" style="z-index:10020"><div class="modal" style="max-width:650px"><div class="modal-header"><div><div class="modal-title">Nuevo cliente</div><div style="font-size:12px;color:#6d7569;margin-top:3px">Solo para facturación. No crea historia clínica.</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><div class="form-row"><div class="form-group"><label for="bc-type">Tipo</label><select id="bc-type" class="form-select"><option value="persona">Persona</option><option value="empresa">Empresa</option></select></div><div class="form-group"><label for="bc-name">Nombre / Razón social *</label><input id="bc-name" class="form-control"></div><div class="form-group"><label for="bc-last">Apellido</label><input id="bc-last" class="form-control"></div></div><div class="form-row"><div class="form-group"><label for="bc-tax">Cédula / RNC</label><input id="bc-tax" class="form-control"></div><div class="form-group"><label for="bc-phone">Teléfono</label><input id="bc-phone" class="form-control"></div><div class="form-group"><label for="bc-email">Correo</label><input id="bc-email" type="email" class="form-control"></div></div><div class="form-group"><label for="bc-address">Dirección</label><input id="bc-address" class="form-control"></div><div class="form-group"><label for="bc-notes">Notas</label><textarea id="bc-notes" class="form-control" rows="2"></textarea></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" onclick="saveBillingClient()">Guardar y seleccionar</button></div></div></div>`);
+};
+window.saveBillingClient=async function(){
+ const api=window.NMBillingClientAPI,name=document.getElementById('bc-name')?.value.trim(); if(!name){notify('Escribe el nombre o razón social.','warning');return;}
+ const btn=document.querySelector('#billing-client-modal .btn-olive'); if(btn){btn.disabled=true;btn.textContent='Guardando...';}
+ try{
+  const payload={tipo:document.getElementById('bc-type').value,nombre:name,apellido:document.getElementById('bc-last').value.trim()||null,cedula_rnc:document.getElementById('bc-tax').value.trim()||null,telefono:document.getElementById('bc-phone').value.trim()||null,correo:document.getElementById('bc-email').value.trim()||null,direccion:document.getElementById('bc-address').value.trim()||null,notas:document.getElementById('bc-notes').value.trim()||null,activo:true};
+  const r=await api.billingFetch('clientes','POST',payload); await api.loadBillingFromSupabase(true); document.getElementById('billing-client-modal')?.remove();
+  const c=(r&&r[0])||clients().find(x=>x.nombre===name); if(c)nmSelectBillingParty('client',c.id); notify('Cliente creado y seleccionado.','success');
+ }catch(e){console.error(e);notify('No se pudo guardar el cliente: '+(e.message||e),'danger');}finally{if(btn){btn.disabled=false;btn.textContent='Guardar y seleccionar';}}
+};
+window.openInvoiceModal=function(id=null){
+ document.getElementById('invoice-modal')?.remove(); const b=getBillingData(),x=selectedInvoice(id),defaultItems=x?.items?.length?x.items:[{}];
+ document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="invoice-modal" style="z-index:9999"><div class="modal" style="max-width:1050px"><div class="modal-header"><div class="modal-title">${x?'Editar':'Nueva'} Factura</div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><input type="hidden" id="inv-id" value="${x?.id||''}"><input type="hidden" id="inv-party-id" value=""><input type="hidden" id="inv-party-type" value=""><div class="form-row"><div class="form-group"><label for="inv-number">Número</label><input id="inv-number" class="form-control" value="${esc(x?.number||billingNextNumber())}" readonly></div><div class="form-group"><label for="inv-date">Fecha</label><input id="inv-date" type="date" class="form-control" value="${x?.date||billingToday()}"></div><div class="form-group"><label for="inv-due">Vencimiento</label><input id="inv-due" type="date" class="form-control" value="${x?.dueDate||''}"></div></div><div class="form-row"><div class="form-group" style="position:relative"><label for="inv-party-search">Cliente / Paciente *</label><div style="display:flex;gap:7px"><input id="inv-party-search" class="form-control" autocomplete="off" placeholder="Buscar nombre, cédula, teléfono o correo..." oninput="nmBillingPartySearch()"><button type="button" class="btn btn-outline" onclick="openBillingClientModal()" style="white-space:nowrap">+ Cliente</button></div><div id="inv-party-results" style="position:absolute;left:0;right:0;top:72px;background:#fff;border:1px solid #dfe5da;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:20;max-height:280px;overflow:auto"></div><div id="inv-party-selected" style="margin-top:7px"></div></div><div class="form-group"><label for="inv-rnc">RNC / Cédula</label><input id="inv-rnc" class="form-control" value="${esc(x?.rnc||'')}"></div><div class="form-group"><label for="inv-ncf">NCF</label><input id="inv-ncf" class="form-control" value="${esc(x?.ncf||'')}" placeholder="B01..."></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px"><b>Productos / servicios</b><button class="btn btn-outline btn-sm" type="button" onclick="addInvoiceLine()">+ Agregar línea</button></div><div id="invoice-lines">${defaultItems.map(invoiceLineHTML).join('')}</div><div class="form-row"><div class="form-group"><label for="inv-discount">Descuento general (%)</label><input id="inv-discount" class="form-control" type="number" min="0" max="100" step="0.01" value="${x?.discount||0}" oninput="recalcInvoiceEditor()"></div><div class="form-group"><label for="inv-tax">ITBIS (%)</label><input id="inv-tax" class="form-control" type="number" min="0" step="0.01" value="${x?.tax??b.settings.defaultTax}" oninput="recalcInvoiceEditor()"></div><div class="form-group"><label for="inv-notes">Notas</label><input id="inv-notes" class="form-control" value="${esc(x?.notes||'')}"></div></div><div class="bill-totals"><div><span>Subtotal</span><b id="inv-subtotal-view">RD$ 0.00</b></div><div><span>Descuento</span><b id="inv-discount-view">RD$ 0.00</b></div><div><span>ITBIS</span><b id="inv-tax-view">RD$ 0.00</b></div><div class="grand"><span>Total</span><b id="inv-total-view">RD$ 0.00</b></div></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" onclick="saveInvoice()">${x?'Guardar cambios':'Crear factura'}</button></div></div></div>`);
+ setTimeout(()=>{if(x){document.querySelectorAll('#invoice-lines .bill-line-row').forEach((r,idx)=>r.dataset.productId=x.items[idx]?.productId||'');const type=x.partyType||x.clientId?'client':'patient',pid=x.clientId||x.patientId;if(pid)nmSelectBillingParty(type,pid);else{document.getElementById('inv-party-search').value=x.patient||'';}}recalcInvoiceEditor();},0);
+};
+window.editInvoice=function(id){openInvoiceModal(id)};
+})();
+</script>
+</body>
 </html>
