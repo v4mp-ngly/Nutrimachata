@@ -13653,5 +13653,55 @@ window.renderBillingTab=function(tab,btn){
 };
 window.NMBillingV28={renderPayments:renderPayments28};
 })();
+</script>\n\n<script id="nm-billing-tab-persistence-v29">
+(function(){
+'use strict';
+let activeBillingTab='invoices';
+let restoring=false;
+const prevTab=window.renderBillingTab;
+const prevBilling=window.renderBilling;
+
+window.renderBillingTab=function(tab,btn){
+  activeBillingTab=tab||'invoices';
+  return prevTab.apply(this,arguments);
+};
+
+function restoreActiveBillingTab(){
+  if(restoring||activeBillingTab==='invoices') return;
+  const content=document.getElementById('billing-tab-content');
+  if(!content) return;
+  restoring=true;
+  try{
+    const btn=document.querySelector(`[data-btab="${activeBillingTab}"]`);
+    window.renderBillingTab(activeBillingTab,btn||null);
+  } finally {
+    setTimeout(()=>{restoring=false},0);
+  }
+}
+
+window.renderBilling=function(){
+  const keep=activeBillingTab;
+  const result=prevBilling.apply(this,arguments);
+  activeBillingTab=keep;
+  if(keep!=='invoices'){
+    setTimeout(restoreActiveBillingTab,0);
+    setTimeout(restoreActiveBillingTab,80);
+    setTimeout(restoreActiveBillingTab,250);
+  }
+  return result;
+};
+
+// Si una sincronizacion vuelve a pintar Facturas mientras el usuario esta en otra pestaña, la restaura.
+const target=document.getElementById('main-content')||document.body;
+const observer=new MutationObserver(()=>{
+  if(activeBillingTab==='invoices'||restoring) return;
+  const billingContent=document.getElementById('billing-tab-content');
+  if(!billingContent) return;
+  const active=document.querySelector('[data-btab].active');
+  if(!active||active.dataset.btab!==activeBillingTab) setTimeout(restoreActiveBillingTab,0);
+});
+observer.observe(target,{childList:true,subtree:true});
+window.NMBillingTabStateV29={get:()=>activeBillingTab,set:v=>{activeBillingTab=v||'invoices'}};
+})();
 </script>\n</body>
 </html>
