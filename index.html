@@ -13427,8 +13427,7 @@ setTimeout(()=>{try{refreshClinicAlertBadge?.()}catch(e){}},300);
     const rows=reportRows();if(!rows.length){notify('No hay facturas en el período seleccionado.','warning');return;}
     const data=[['Fecha','No. factura','Paciente / Cliente','RNC / Cédula','Concepto','Total facturado','Pagado','Pendiente','Estado','Método de pago']];
     rows.forEach(x=>data.push([x.date||'',x.number||'',x.patient||'',taxId(x),concept(x),Number(x.total||0).toFixed(2),Number(x.paid||0).toFixed(2),billingInvoiceBalance(x).toFixed(2),billingInvoiceStatus(x),methods(x)]));
-    const csv='\\ufeff'+data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\r\
-');
+    const csv='\\ufeff'+data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`Reporte_Contabilidad_${reportRange().from||'inicio'}_${reportRange().to||'hoy'}.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
   };
   window.downloadAccountingPDF=function(){
@@ -13570,7 +13569,8 @@ window.openSearchPatientV20=id=>{document.getElementById('nm-global-results')?.c
 const oldAlerts=window.computeClinicAlerts;window.computeClinicAlerts=function(){const arr=oldAlerts?oldAlerts():[],keys=new Set(arr.map(a=>a.key));const push=a=>{if(!keys.has(a.key)){keys.add(a.key);arr.push(a)}};const today=new Date();today.setHours(12,0,0,0);(window.DB?.patients||[]).filter(p=>p&&p.activo!==false).forEach(p=>{const ev=(p.evaluaciones||[]).filter(Boolean).map(e=>e.fecha).filter(Boolean);const ap=(window.DB?.appointments||[]).filter(a=>String(a.patientId)===String(p.id)&&a.fecha&&String(a.estado||'').toLowerCase()==='completada').map(a=>a.fecha);const dates=ev.concat(ap).sort();const last=dates[dates.length-1];if(last){const d=days20(last);if(d>=30)push({type:'warning',icon:'◷',title:'Seguimiento pendiente',text:`${p.nombre}: lleva ${d} días sin seguimiento.`,date:last,key:`follow30:${p.id}:${last}`,action:()=>openSearchPatientV20(p.id)})}});pending20().forEach(x=>push({type:'warning',icon:'$',title:'Saldo pendiente',text:`${x.patient} · ${x.number} · pendiente ${moneyRD(billingInvoiceBalance(x))}`,date:x.dueDate||x.date,key:`due20:${x.id}:${billingInvoiceBalance(x).toFixed(2)}`,action:()=>openSearchInvoiceV20(x.id)}));const tom=new Date();tom.setDate(tom.getDate()+1);const t=tom.toISOString().slice(0,10);(window.DB?.appointments||[]).filter(a=>a.fecha===t&&!['confirmada','completada','cancelada'].includes(String(a.estado||'').toLowerCase())).forEach(a=>push({type:'info',icon:'◷',title:'Cita mañana sin confirmar',text:`${patient20(a.patientId)?.nombre||a.nombreManual||'Paciente'} · ${a.hora||''}`,date:'Mañana',key:`tomorrow20:${a.id}`,action:()=>openSearchAppointmentV20(a.id)}));return arr;};
 setTimeout(()=>{installSearchV20();if(typeof refreshClinicAlertBadge==='function')refreshClinicAlertBadge();},400);
 })();
-</script>\n
+</script>
+
 <script id="nm-billing-clientes-v1">
 (function(){
 'use strict';
@@ -13662,7 +13662,8 @@ const oldTab=window.renderBillingTab||renderBillingTab;window.renderBillingTab=f
 const oldBilling26=window.renderBilling||renderBilling;window.renderBilling=function(){const r=oldBilling26.apply(this,arguments);setTimeout(()=>{const tabs=document.querySelector('.bill-tabs');if(tabs&&!tabs.querySelector('[data-btab="expenses"]')){const b=document.createElement('button');b.className='bill-tab';b.dataset.btab='expenses';b.textContent='Gastos';b.onclick=()=>window.renderBillingTab('expenses',b);tabs.appendChild(b)}const quick=document.querySelector('.bill-quick');if(quick&&!quick.querySelector('[data-expense-link]')){const a=document.createElement('a');a.dataset.expenseLink='1';a.innerHTML='<span>＋ Añadir gasto</span><b>›</b>';a.onclick=()=>{window.renderBillingTab('expenses');setTimeout(()=>openExpenseModal(),80)};quick.appendChild(a)}},0);return r};
 })();
 </script>
-\n<script id="nm-final-billing-stability-v28">
+
+<script id="nm-final-billing-stability-v28">
 (function(){
 'use strict';
 function esc28(v){return typeof billingEscape==='function'?billingEscape(v):String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));}
@@ -13680,7 +13681,9 @@ window.renderBillingTab=function(tab,btn){
 };
 window.NMBillingV28={renderPayments:renderPayments28};
 })();
-</script>\n\n<script id="nm-billing-tab-persistence-v29">
+</script>
+
+<script id="nm-billing-tab-persistence-v29">
 (function(){
 'use strict';
 let activeBillingTab='invoices';
@@ -13730,7 +13733,9 @@ const observer=new MutationObserver(()=>{
 observer.observe(target,{childList:true,subtree:true});
 window.NMBillingTabStateV29={get:()=>activeBillingTab,set:v=>{activeBillingTab=v||'invoices'}};
 })();
-</script>\n\n<script id="nm-gastos-visible-v30">
+</script>
+
+<script id="nm-gastos-visible-v30">
 (function(){
 'use strict';
 function ensureExpensesUI(){
@@ -13755,7 +13760,9 @@ setInterval(()=>{ if(document.querySelector('.bill-tabs')) ensureExpensesUI(); }
 window.NMEnsureExpensesV30=ensureExpensesUI;
 ensureExpensesUI();
 })();
-</script>\n\n<script id="nm-cotizaciones-v31">
+</script>
+
+<script id="nm-cotizaciones-v31">
 (function(){
 'use strict';
 let QUOTES=[];
@@ -13783,7 +13790,9 @@ window.convertQuoteToInvoice=async function(id){const q=QUOTES.find(x=>String(x.
 const prev=window.renderBillingTab;window.renderBillingTab=function(tab,btn){if(tab==='quotes')return renderQuotes();return prev.apply(this,arguments)};
 const ob=new MutationObserver(ensureQuoteUI);ob.observe(document.body,{childList:true,subtree:true});setInterval(()=>document.querySelector('.bill-tabs')&&ensureQuoteUI(),700);ensureQuoteUI();
 })();
-</script>\n\n<script id="nm-recibos-completos-v32">
+</script>
+
+<script id="nm-recibos-completos-v32">
 (function(){
 'use strict';
 const esc32=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
@@ -13836,7 +13845,8 @@ const obs=new MutationObserver(()=>{
 });
 obs.observe(document.documentElement,{subtree:true,childList:true});
 })();
-</script>\n<style id="nm-finanzas-clientes-v33-style">
+</script>
+<style id="nm-finanzas-clientes-v33-style">
 .nm-aging-grid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:10px;margin:14px 0}.nm-aging-card{border:1px solid #e2e8df;border-radius:13px;padding:13px;background:#fff}.nm-aging-card b{display:block;font-size:18px;margin-top:4px}.nm-aging-card small{font-weight:800;color:#6f7b6c}.nm-aging-danger{border-color:#efc7c3;background:#fff8f7}.nm-aging-warn{border-color:#efd7ad;background:#fffaf2}.nm-account-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.nm-account-summary>div{padding:17px;border:1px solid #e1e7de;border-radius:14px;background:#fff}.nm-account-summary small{font-weight:800;color:#748071}.nm-account-summary strong{display:block;font-size:22px;margin-top:5px}.nm-cxc-tools{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:12px 0}.nm-cxc-tools input,.nm-cxc-tools select{height:38px;border:1px solid #dfe5dc;border-radius:9px;padding:0 10px;background:#fff}.nm-whatsapp{background:#eef8ef;border-color:#b9d8bc}.nm-statement-modal{max-width:1000px;width:min(96vw,1000px)}
 @media(max-width:850px){.nm-aging-grid{grid-template-columns:1fr 1fr}.nm-account-summary{grid-template-columns:1fr}.nm-cxc-tools>*{flex:1 1 150px}}
 </style>
@@ -13915,7 +13925,8 @@ new MutationObserver(()=>ensureTabs()).observe(document.documentElement,{childLi
 })();
 </script>
 
-\n<script id="nm-cotizacion-simple-v35">
+
+<script id="nm-cotizacion-simple-v35">
 (function(){
 'use strict';
 const oldOpen=window.openQuoteModal;
@@ -13954,7 +13965,8 @@ function enhanceQuote35(){
  const footer=m.querySelector('.modal-footer');if(footer){const save=footer.querySelector('.btn-olive');if(save)save.textContent='Guardar cotización';const pdf=document.createElement('button');pdf.className='btn btn-outline';pdf.type='button';pdf.textContent='Guardar y generar PDF';pdf.onclick=async()=>{const before=[...document.querySelectorAll('.modal-overlay')];await window.saveQuote();setTimeout(async()=>{try{if(typeof window.renderQuotes==='function')await window.renderQuotes();const rows=[...document.querySelectorAll('#billing-tab-content tbody tr')];const first=rows[0]?.querySelector('button[title="PDF"]');if(first)first.click();}catch(e){}},700)};footer.insertBefore(pdf,save);}}
 window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanceQuote35,0)};
 })();
-</script>\n
+</script>
+
 <script id="nm-native-print-v38">
 (function(){
   const PRINTABLES=['downloadInvoicePDF','downloadPaymentReceiptV20','downloadQuotePDF','NMDownloadStatement'];
@@ -14022,7 +14034,8 @@ window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanc
   window.NMNativePrintV38={install,openPrintDocument};
 })();
 </script>
-\n<script id="nm-factura-oficial-v39">
+
+<script id="nm-factura-oficial-v39">
 (function(){
   function E(v){return typeof billingEscape==='function'?billingEscape(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function M(v){return typeof moneyRD==='function'?moneyRD(Number(v||0)):`RD$ ${Number(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;}
@@ -14131,7 +14144,8 @@ window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanc
   window.NMSupabaseStabilityV41={showOffline,hideOffline};
 })();
 </script>
-\n<script id="nm-quote-external-clients-v42">
+
+<script id="nm-quote-external-clients-v42">
 (function(){
 'use strict';
 const previousOpenQuote=window.openQuoteModal;
@@ -14204,5 +14218,103 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.NMConnectionV43={retry:retryCurrentView};
 })();
 </script>
-\n<script id="nm-invoice-native-print-v44">\n(function(){\n'use strict';\nfunction esc44(v){return String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));}\nfunction invoiceById44(id){const b=typeof getBillingData==='function'?getBillingData():null;return {b,x:b?.invoices?.find(i=>String(i.id)===String(id))};}\nfunction buildPrintable44(x,b){\n  const styles=typeof nmInvoicePrintStyles==='function'?nmInvoicePrintStyles():'';\n  const html=typeof nmInvoiceDocumentHTML==='function'?nmInvoiceDocumentHTML(x,b):'';\n  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc44(x.number||'Factura')}</title>${styles}<style>\n  html,body{margin:0!important;padding:0!important;background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}\n  body{font-family:Arial,sans-serif!important}\n  .invoice-print-doc{width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;overflow:visible!important}\n  .invoice-items{width:100%!important;table-layout:auto!important}\n  .invoice-items thead{display:table-header-group!important}\n  .invoice-items tr,.invoice-party,.invoice-print-summary,.invoice-print-note{break-inside:avoid!important;page-break-inside:avoid!important}\n  .invoice-print-summary{max-width:100%!important}\n  @page{size:A4 portrait;margin:10mm 10mm 12mm!important}\n  @media print{html,body{width:auto!important;height:auto!important}.no-print{display:none!important}}\n  </style></head><body>${html}<script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),250)});<\/script></body></html>`;\n}\nwindow.printInvoice=function(id){\n  const {b,x}=invoiceById44(id);\n  if(!x){window.notify?.('La factura ya no existe.','danger');return;}\n  const w=window.open('','_blank','noopener,noreferrer');\n  if(!w){window.notify?.('Permite las ventanas emergentes para imprimir la factura.','warning');return;}\n  w.document.open();w.document.write(buildPrintable44(x,b));w.document.close();\n};\n// Compatibilidad: cualquier botón antiguo que llamaba a descargar ahora abre impresión.\nwindow.downloadInvoicePDF=function(id){window.printInvoice(id);};\nwindow.previewInvoicePDF=function(id){window.printInvoice(id);};\nfunction relabel44(){\n document.querySelectorAll('button[onclick*="downloadInvoicePDF"],button[onclick*="previewInvoicePDF"]').forEach(btn=>{\n   btn.title='Imprimir factura';\n   const t=(btn.textContent||'').trim();\n   if(/pdf|descargar|📄|⇩/i.test(t)) btn.textContent='🖨️ Imprimir';\n });\n}\nrelabel44();new MutationObserver(relabel44).observe(document.body,{childList:true,subtree:true});\nwindow.NMInvoiceNativePrintV44=true;\n})();\n</script>\n</body>
+
+<script id="nm-invoice-native-print-v44">
+(function(){
+'use strict';
+function esc44(v){return String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));}
+function invoiceById44(id){const b=typeof getBillingData==='function'?getBillingData():null;return {b,x:b?.invoices?.find(i=>String(i.id)===String(id))};}
+function buildPrintable44(x,b){
+  const styles=typeof nmInvoicePrintStyles==='function'?nmInvoicePrintStyles():'';
+  const html=typeof nmInvoiceDocumentHTML==='function'?nmInvoiceDocumentHTML(x,b):'';
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc44(x.number||'Factura')}</title>${styles}<style>
+  html,body{margin:0!important;padding:0!important;background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{font-family:Arial,sans-serif!important}
+  .invoice-print-doc{width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;overflow:visible!important}
+  .invoice-items{width:100%!important;table-layout:auto!important}
+  .invoice-items thead{display:table-header-group!important}
+  .invoice-items tr,.invoice-party,.invoice-print-summary,.invoice-print-note{break-inside:avoid!important;page-break-inside:avoid!important}
+  .invoice-print-summary{max-width:100%!important}
+  @page{size:A4 portrait;margin:10mm 10mm 12mm!important}
+  @media print{html,body{width:auto!important;height:auto!important}.no-print{display:none!important}}
+  </style></head><body>${html}<script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),250)});<\/script></body></html>`;
+}
+window.printInvoice=function(id){
+  const {b,x}=invoiceById44(id);
+  if(!x){window.notify?.('La factura ya no existe.','danger');return;}
+  const w=window.open('','_blank','noopener,noreferrer');
+  if(!w){window.notify?.('Permite las ventanas emergentes para imprimir la factura.','warning');return;}
+  w.document.open();w.document.write(buildPrintable44(x,b));w.document.close();
+};
+// Compatibilidad: cualquier botón antiguo que llamaba a descargar ahora abre impresión.
+window.downloadInvoicePDF=function(id){window.printInvoice(id);};
+window.previewInvoicePDF=function(id){window.printInvoice(id);};
+function relabel44(){
+ document.querySelectorAll('button[onclick*="downloadInvoicePDF"],button[onclick*="previewInvoicePDF"]').forEach(btn=>{
+   btn.title='Imprimir factura';
+   const t=(btn.textContent||'').trim();
+   if(/pdf|descargar|📄|⇩/i.test(t)) btn.textContent='🖨️ Imprimir';
+ });
+}
+relabel44();new MutationObserver(relabel44).observe(document.body,{childList:true,subtree:true});
+window.NMInvoiceNativePrintV44=true;
+})();
+</script>
+
+<script id="nm-accounting-excel-v46">
+(function(){
+'use strict';
+function escX(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function rangeX(){return {from:document.getElementById('acct-from')?.value||'',to:document.getElementById('acct-to')?.value||''};}
+function rowsX(){
+  const r=rangeX();
+  return (typeof getBillingData==='function'?(getBillingData().invoices||[]):[])
+    .filter(x=>(!r.from||String(x.date||'')>=r.from)&&(!r.to||String(x.date||'')<=r.to))
+    .slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+}
+function taxX(x){
+  if(x?.rnc)return String(x.rnc);
+  const pts=typeof billingPatients==='function'?billingPatients():[];
+  const p=pts.find(q=>String(q.id)===String(x?.patientId))||pts.find(q=>String(q.nombre||'').trim().toLowerCase()===String(x?.patient||'').trim().toLowerCase());
+  return String(p?.cedula||p?.rnc||'');
+}
+function conceptX(x){return (x?.items||[]).map(i=>i.description||i.nombre||'').filter(Boolean).join(' / ')||'—';}
+function methodX(x){return [...new Set((x?.paymentHistory||[]).map(p=>p.method).filter(Boolean))].join(' / ')||'—';}
+function statusX(x){return typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):(x.status||'');}
+function balanceX(x){return typeof billingInvoiceBalance==='function'?billingInvoiceBalance(x):Math.max(0,Number(x.total||0)-Number(x.paid||0));}
+function activeX(rows){return rows.filter(x=>statusX(x)!=='Archivada');}
+function downloadBlobX(name,content,type){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},800);}
+function excelCell(v,kind){
+  if(kind==='n')return `<td class="num" x:num="${Number(v||0)}">${Number(v||0).toFixed(2)}</td>`;
+  return `<td>${escX(v)}</td>`;
+}
+window.downloadAccountingExcel=function(){
+ const rows=rowsX(); if(!rows.length){window.notify?.('No hay facturas en el período seleccionado.','warning');return;}
+ const active=activeX(rows), billed=active.reduce((n,x)=>n+Number(x.total||0),0), paid=active.reduce((n,x)=>n+Number(x.paid||0),0), due=active.reduce((n,x)=>n+balanceX(x),0), r=rangeX();
+ const body=rows.map(x=>`<tr>${excelCell(x.date||'')}${excelCell(x.number||'')}${excelCell(x.patient||'')}${excelCell(taxX(x))}${excelCell(conceptX(x))}${excelCell(Number(x.total||0),'n')}${excelCell(Number(x.paid||0),'n')}${excelCell(balanceX(x),'n')}${excelCell(statusX(x))}${excelCell(methodX(x))}</tr>`).join('');
+ const html=`<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>
+ body{font-family:Montserrat,Arial,sans-serif;color:#243126}.title{font-size:20pt;font-weight:800;color:#355e3b}.period{color:#65705f}.kpis td{background:#f3f7ef;border:1px solid #dce6d6;padding:10px}.kpis b{font-size:14pt;color:#355e3b}.data{border-collapse:collapse;margin-top:16px}.data th{background:#355e3b;color:#fff;font-weight:700;padding:8px;border:1px solid #355e3b}.data td{padding:7px;border-bottom:1px solid #e4e9e1;vertical-align:top}.data .num{mso-number-format:'RD$ #,##0.00';text-align:right}.note{font-size:9pt;color:#6c7568;margin-top:12px}</style></head><body>
+ <div class="title">REPORTE PARA CONTABILIDAD</div><div class="period">Período: ${escX(r.from||'Inicio')} — ${escX(r.to||'Hoy')}</div>
+ <table class="kpis"><tr><td>TOTAL FACTURADO<br><b>RD$ ${billed.toLocaleString('en-US',{minimumFractionDigits:2})}</b></td><td>TOTAL COBRADO<br><b>RD$ ${paid.toLocaleString('en-US',{minimumFractionDigits:2})}</b></td><td>CUENTAS POR COBRAR<br><b>RD$ ${due.toLocaleString('en-US',{minimumFractionDigits:2})}</b></td><td>FACTURAS DEL PERÍODO<br><b>${rows.length}</b></td></tr></table>
+ <table class="data"><thead><tr><th>FECHA</th><th>FACTURA</th><th>PACIENTE / CLIENTE</th><th>RNC / CÉDULA</th><th>CONCEPTO</th><th>TOTAL</th><th>PAGADO</th><th>PENDIENTE</th><th>ESTADO</th><th>MÉTODO</th></tr></thead><tbody>${body}</tbody></table>
+ <div class="note">Las facturas anuladas se conservan para trazabilidad y no se incluyen en los totales contables.</div></body></html>`;
+ downloadBlobX(`Reporte_Contabilidad_${r.from||'inicio'}_${r.to||'hoy'}.xls`,'\ufeff'+html,'application/vnd.ms-excel;charset=utf-8;');
+ window.notify?.('Reporte de Excel generado correctamente.','success');
+};
+// Keep CSV available, but generate valid CRLF rows so Excel does not put everything in one line.
+window.downloadAccountingCSV=function(){
+ const rows=rowsX();if(!rows.length){window.notify?.('No hay facturas en el período seleccionado.','warning');return;}
+ const data=[['Fecha','No. factura','Paciente / Cliente','RNC / Cédula','Concepto','Total facturado','Pagado','Pendiente','Estado','Método de pago']];
+ rows.forEach(x=>data.push([x.date||'',x.number||'',x.patient||'',taxX(x),conceptX(x),Number(x.total||0).toFixed(2),Number(x.paid||0).toFixed(2),balanceX(x).toFixed(2),statusX(x),methodX(x)]));
+ const csv='\ufeff'+data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const r=rangeX();downloadBlobX(`Reporte_Contabilidad_${r.from||'inicio'}_${r.to||'hoy'}.csv`,csv,'text/csv;charset=utf-8;');
+};
+function upgradeButtons(){
+ document.querySelectorAll('button[onclick="downloadAccountingCSV()"],button[onclick="downloadAccountingCSV();"]').forEach(btn=>{btn.setAttribute('onclick','downloadAccountingExcel()');btn.textContent='📊 Excel';btn.title='Descargar reporte organizado para Excel';});
+}
+upgradeButtons();new MutationObserver(upgradeButtons).observe(document.body,{childList:true,subtree:true});
+window.NMAccountingExcelV46=true;
+})();
+</script>
+</body>
 </html>
