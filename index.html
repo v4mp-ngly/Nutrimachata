@@ -2153,64 +2153,77 @@ NMRuntime.interval('global:auth-refresh',async()=>{
 const IS_LOCAL = window.location.protocol === 'file:';
 let SUPA_ONLINE = !IS_LOCAL; // will be set false if connection fails
 
+const NM_SUPA_TIMEOUT_MS = 18000;
+const NM_SUPA_MAX_GET_RETRIES = 2;
+function nmNetworkError(err){
+  const m=String(err?.message||err||'');
+  return err?.name==='AbortError' || /Failed to fetch|NetworkError|Load failed|timed out|timeout|ERR_TIMED_OUT|ERR_INTERNET|ERR_NAME_NOT_RESOLVED/i.test(m);
+}
+function nmDelay(ms){return new Promise(r=>setTimeout(r,ms));}
+async function nmFetchTimeout(url,opts={},timeout=NM_SUPA_TIMEOUT_MS){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{return await fetch(url,{...opts,signal:controller.signal});}
+  finally{clearTimeout(timer);}
+}
+function nmConnectionBanner(show=true,msg='Problemas de conexión con Supabase. Reintentando…'){
+  try{
+    if(show){
+      window.NMSupabaseStabilityV41?.showOffline?.();
+      const b=document.getElementById('nm-offline-banner'); if(b)b.textContent=msg;
+    }else window.NMSupabaseStabilityV41?.hideOffline?.();
+  }catch(_){}
+}
 async function supa(path, method='GET', body=null) {
   method = String(method || 'GET').toUpperCase();
   if (IS_LOCAL) {
     if (method === 'GET') return [];
     throw new Error('Supabase no está disponible desde archivo local. Abre NutriMachata desde su sitio para guardar datos.');
   }
-
-  const execute = async (attempt=0) => {
+  const maxNetworkRetries=method==='GET'?NM_SUPA_MAX_GET_RETRIES:0; // nunca repetir escrituras automáticamente
+  const execute = async (authAttempt=0,networkAttempt=0) => {
     await ensureSupaSession();
     try {
       const token = supaAccessToken();
       const wantsRepresentation = ['POST','PATCH','DELETE'].includes(method);
-      const opts = {
-        method,
-        headers: {
-          'apikey': SUPA_ANON,
-          'Authorization': 'Bearer ' + token,
-          'Content-Type': 'application/json',
-          'Prefer': wantsRepresentation ? 'return=representation' : '',
-          'X-Client-Info': 'nutrimachata/1.0'
-        },
-        mode: 'cors', credentials: 'omit'
-      };
+      const opts = {method,headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':wantsRepresentation?'return=representation':'','X-Client-Info':'nutrimachata/1.0'},mode:'cors',credentials:'omit'};
       if (body !== null && body !== undefined) opts.body = JSON.stringify(body);
-      const url = SUPA_URL.endsWith('/') ? SUPA_URL + 'rest/v1/' + path : SUPA_URL + '/rest/v1/' + path;
-      const res = await fetch(url, opts);
+      const url = SUPA_URL.replace(/\/$/,'') + '/rest/v1/' + path;
+      const res = await nmFetchTimeout(url,opts);
       const text = await res.text();
       let parsed = null;
       if (text) { try { parsed = JSON.parse(text); } catch (_) { parsed = text; } }
-
       const detail = typeof parsed === 'string' ? parsed : (parsed?.message || parsed?.details || parsed?.hint || JSON.stringify(parsed || {}));
       const jwtExpired = res.status===401 || /jwt.*expired|token.*expired|invalid.*jwt/i.test(detail || '');
-      if (jwtExpired && attempt===0) {
+      if (jwtExpired && authAttempt===0) {
         saveEvaluationDraft();
         await refreshSupaSession(true);
-        return execute(1);
+        return execute(1,networkAttempt);
       }
       if (!res.ok) {
         const err = new Error(`Supabase HTTP ${res.status}: ${detail || 'operación rechazada'}`);
-        err.status = res.status; err.path = path; err.method = method;
-        console.error('[supa]', err, body || '');
-        throw err;
+        err.status=res.status; err.path=path; err.method=method; console.error('[supa]',err,body||''); throw err;
       }
-      if (wantsRepresentation && (!Array.isArray(parsed) || parsed.length === 0)) {
-        throw new Error(`Supabase no confirmó ningún registro para ${method} ${path}. Revisa RLS, ID o filtros.`);
-      }
-      SUPA_ONLINE = true;
-      return parsed;
+      if (wantsRepresentation && (!Array.isArray(parsed) || parsed.length === 0)) throw new Error(`Supabase no confirmó ningún registro para ${method} ${path}. Revisa RLS, ID o filtros.`);
+      SUPA_ONLINE=true; nmConnectionBanner(false); return parsed;
     } catch(e) {
-      if (/Failed to fetch|NetworkError|Load failed/i.test(e.message || '')) { SUPA_ONLINE=false; throw new Error('No hay conexión con Supabase. No se guardó ningún cambio.'); }
+      if(nmNetworkError(e)){
+        SUPA_ONLINE=false; nmConnectionBanner(true);
+        if(networkAttempt<maxNetworkRetries && navigator.onLine!==false){
+          await nmDelay(900*(networkAttempt+1));
+          return execute(authAttempt,networkAttempt+1);
+        }
+        const err=new Error('Supabase tardó demasiado en responder. Conservamos la pantalla actual; vuelve a intentar cuando la conexión se estabilice.');
+        err.code='NETWORK_TIMEOUT'; err.cause=e; throw err;
+      }
       if(e?.code==='AUTH_SESSION_EXPIRED'){
         saveEvaluationDraft();
-        notify?.('Tu sesión venció. Tus datos de la evaluación quedaron guardados temporalmente en esta pestaña. Inicia sesión nuevamente.', 'danger');
+        notify?.('Tu sesión venció. Tus datos temporales se conservaron. Inicia sesión nuevamente.','danger');
       }
       throw e;
     }
   };
-  return execute(0);
+  return execute(0,0);
 }
 
 
@@ -14160,6 +14173,35 @@ window.NMOpenQuoteClient42=function(){
  },50);
 };
 window.openQuoteModal=function(){const r=previousOpenQuote?.apply(this,arguments);setTimeout(enhanceQuoteParty42,30);return r};
+})();
+</script>
+
+<script id="nm-global-connection-v43">
+(function(){
+'use strict';
+let reconnectTimer=null;
+function retryCurrentView(){
+  clearTimeout(reconnectTimer);
+  reconnectTimer=setTimeout(async()=>{
+    if(!navigator.onLine)return;
+    try{
+      restoreSupaSession?.();
+      if(SUPA_AUTH_SESSION?.access_token && supaSessionExpiresSoon?.(30)) await refreshSupaSession(true);
+      // Rehidrata datos globales sin recargar la página completa.
+      if(typeof loadAllData==='function') await loadAllData();
+      else {
+        try{ if(typeof loadPatients==='function') await loadPatients(); }catch(_){}
+        try{ if(typeof loadAppointments==='function') await loadAppointments(); }catch(_){}
+      }
+      if(document.querySelector('.bill-tabs') && typeof window.renderBilling==='function') window.renderBilling();
+      window.NMSupabaseStabilityV41?.hideOffline?.();
+      notify?.('Conexión restablecida. Datos sincronizados.','success');
+    }catch(e){ console.warn('[NutriMachata] Reintento de sincronización pendiente:',e?.message||e); }
+  },700);
+}
+window.addEventListener('online',retryCurrentView);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)retryCurrentView();});
+window.NMConnectionV43={retry:retryCurrentView};
 })();
 </script>
 </body>
