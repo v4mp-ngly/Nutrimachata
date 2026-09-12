@@ -12851,16 +12851,19 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   function paymentDbToUi(p,inv){return {id:p.id,date:String(p.fecha_pago||'').slice(0,10),datetime:String(p.fecha_pago||''),amount:num(p.monto),method:mapMethodFromDb(p.metodo_pago),reference:p.referencia||'',invoice:inv?.number||'',patient:inv?.patient||''};}
 
   async function loadBillingFromSupabase(force=false){
-    if(billingDbLoading&&!force)return billingDbLoading;
+    if(billingDbLoading)return billingDbLoading;
     billingDbLoading=(async()=>{
       try{
-        const [products,invoices,details,payments,clients]=await Promise.all([
+        const core=await Promise.all([
           billingFetch(`${BILLING_DB_TABLES.products}?select=*&order=created_at.desc`),
           billingFetch(`${BILLING_DB_TABLES.invoices}?select=*&order=fecha.desc,created_at.desc`),
           billingFetch(`${BILLING_DB_TABLES.details}?select=*&order=created_at.asc`),
-          billingFetch(`${BILLING_DB_TABLES.payments}?select=*&order=fecha_pago.asc`),
-          billingFetch(`${BILLING_DB_TABLES.clients}?select=*&activo=eq.true&order=nombre.asc`)
+          billingFetch(`${BILLING_DB_TABLES.payments}?select=*&order=fecha_pago.asc`)
         ]);
+        const [products,invoices,details,payments]=core;
+        let clients=[];
+        try{clients=await billingFetch(`${BILLING_DB_TABLES.clients}?select=*&activo=eq.true&order=nombre.asc`)||[];}
+        catch(clientErr){console.warn('[Facturacion Supabase] No se pudo cargar clientes; se mantienen pacientes y facturas.',clientErr);}
         billingClients=(clients||[]).map(c=>({id:c.id,type:'client',nombre:[c.nombre,c.apellido].filter(Boolean).join(' ').trim(),cedula:c.cedula_rnc||'',telefono:c.telefono||'',email:c.correo||'',direccion:c.direccion||'',tipo:c.tipo||'persona'}));
         window.NMBillingClients=billingClients;
         const uiProducts=(products||[]).map(productDbToUi);
@@ -13008,7 +13011,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
           delete payload.total_pagado;
           delete payload.saldo;
           await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'PATCH',payload);
-          await bi.billingFetch(`${bi.BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
+          await billingFetch(`${BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
         }else{
           const created=await billingFetch(BILLING_DB_TABLES.invoices,'POST',payload);
           if(!created?.[0]?.id)throw new Error('Supabase no devolvió el ID de la factura creada.');
@@ -13041,7 +13044,14 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
         await billingFetch(BILLING_DB_TABLES.payments,'POST',{
           factura_id:id,monto:Number(amount.toFixed(2)),metodo_pago:mapMethodToDb(document.getElementById('pay-method')?.value),referencia:document.getElementById('pay-reference')?.value.trim()||null,notas:null,created_by:currentCreatorId()
         });
-        // El trigger recalcular_pago_factura actualiza total_pagado, saldo y estado.
+        // Reconciliacion defensiva: el trigger puede existir, pero la UI no depende exclusivamente de el.
+        // Volvemos a leer los pagos persistidos y dejamos factura.total_pagado/saldo/estado coherentes.
+        const persistedPayments=await billingFetch(`${BILLING_DB_TABLES.payments}?factura_id=eq.${encodeURIComponent(id)}&select=monto`);
+        const paidNow=(persistedPayments||[]).reduce((sum,p)=>sum+num(p.monto),0);
+        const totalNow=num(x.total);
+        const saldoNow=Math.max(0,totalNow-paidNow);
+        const estadoNow=saldoNow<=0.009?'pagada':(paidNow>0?'parcial':'pendiente');
+        await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'PATCH',{total_pagado:Number(paidNow.toFixed(2)),saldo:Number(saldoNow.toFixed(2)),estado:estadoNow});
         await loadBillingFromSupabase(true);
         document.getElementById('invoice-payment-modal')?.remove();legacyRenderBilling();
         const refreshed=getBillingData().invoices.find(i=>i.id===id);
@@ -14314,6 +14324,35 @@ function upgradeButtons(){
 }
 upgradeButtons();new MutationObserver(upgradeButtons).observe(document.body,{childList:true,subtree:true});
 window.NMAccountingExcelV46=true;
+})();
+</script>
+
+<script id="nm-billing-sync-stability-v47">
+(function(){
+'use strict';
+let syncTimer=null;
+async function syncBilling47(showMessage=false){
+  const api=window.NMBillingInternal;
+  if(!api?.loadBillingFromSupabase)return false;
+  try{
+    const data=await api.loadBillingFromSupabase(true);
+    if(!data)return false;
+    if(typeof window.renderBilling==='function' && document.querySelector('.billing-hero')){
+      // renderBilling itself syncs; use legacy visual refresh indirectly only after data is ready.
+      const st=document.getElementById('billing-db-status');
+      if(st){st.textContent='✓ Facturación sincronizada con Supabase';st.style.background='#f5fbf2';st.style.borderColor='#d4ead0';st.style.color='#315c2b';}
+    }
+    if(showMessage)window.notify?.('Facturación actualizada desde Supabase.','success');
+    return true;
+  }catch(e){console.error('[Facturacion Sync v47]',e);if(showMessage)window.notify?.('No se pudo sincronizar Facturación: '+(e.message||e),'danger');return false;}
+}
+function queueSync47(delay=250){clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncBilling47(false),delay);}
+window.syncBillingNow=()=>syncBilling47(true);
+window.addEventListener('online',()=>queueSync47(300));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync47(350)});
+// No polling agresivo: solo refresco periódico mientras la pestaña está visible.
+setInterval(()=>{if(!document.hidden && navigator.onLine!==false && document.querySelector('.billing-hero'))syncBilling47(false)},60000);
+window.NMBillingSyncV47=true;
 })();
 </script>
 </body>
