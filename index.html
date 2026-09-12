@@ -12767,26 +12767,40 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 
   async function billingFetch(path,method='GET',body=null,extraHeaders={}){
     if(IS_LOCAL) throw new Error('Abre NutriMachata desde una URL web (http/https). Supabase no se usa en modo file://.');
-    const headers={
-      apikey:SUPA_ANON,
-      Authorization:'Bearer '+supaAccessToken(),
-      'Content-Type':'application/json',
-      ...extraHeaders
-    };
-    if(method==='POST'||method==='PATCH')headers.Prefer='return=representation';
-    try{
-      const url=SUPA_URL.replace(/\/$/,'')+'/rest/v1/'+path;
-      const res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'});
-      const raw=await res.text();
-      let data=null; try{data=raw?JSON.parse(raw):null}catch(_){data=raw;}
-      if(!res.ok){
-        const msg=(data&&typeof data==='object'&&(data.message||data.hint||data.details))||raw||`HTTP ${res.status}`;
-        const e=new Error(msg); e.status=res.status; e.payload=data; throw e;
-      }
-      return data;
-    }catch(e){
-      throw e;
+    if(typeof navigator!=='undefined' && navigator.onLine===false){
+      const e=new Error('Sin conexión a Internet. Vuelve a intentarlo cuando se restablezca la conexión.');
+      e.code='NETWORK_OFFLINE'; throw e;
     }
+    // Toda Facturación usa una sesión Supabase válida. Evita enviar "Bearer null"
+    // y renueva el token antes de cargar gastos, cotizaciones o configuración.
+    await ensureSupaSession();
+    const url=SUPA_URL.replace(/\/$/,'')+'/rest/v1/'+path;
+    const request=async()=>{
+      const token=supaAccessToken();
+      if(!token){const e=new Error('No hay una sesión activa. Inicia sesión nuevamente.');e.code='AUTH_SESSION_EXPIRED';throw e;}
+      const headers={apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json',...extraHeaders};
+      if((method==='POST'||method==='PATCH')&&!Object.keys(extraHeaders||{}).some(k=>k.toLowerCase()==='prefer')) headers.Prefer='return=representation';
+      let res;
+      try{res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'});}
+      catch(err){
+        const e=new Error('No se pudo conectar con Supabase. Revisa tu conexión a Internet e inténtalo nuevamente.');
+        e.code='NETWORK_ERROR';e.cause=err;throw e;
+      }
+      const raw=await res.text();
+      let data=null;try{data=raw?JSON.parse(raw):null}catch(_){data=raw;}
+      return {res,raw,data};
+    };
+    let out=await request();
+    // Un 401 suele ser token vencido. Renovamos una sola vez y repetimos la petición.
+    if(out.res.status===401){
+      await refreshSupaSession(true);
+      out=await request();
+    }
+    if(!out.res.ok){
+      const msg=(out.data&&typeof out.data==='object'&&(out.data.message||out.data.hint||out.data.details))||out.raw||`HTTP ${out.res.status}`;
+      const e=new Error(msg);e.status=out.res.status;e.payload=out.data;throw e;
+    }
+    return out.data;
   }
 
   function humanDbError(e,action='guardar'){
@@ -14020,6 +14034,88 @@ window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanc
 <div class="v39-bottom"><div><div class="label">INFORMACIÓN DE PAGO</div><b>Método: ${E(pay.method)}</b>${pay.reference?`<p>Referencia: ${E(pay.reference)}</p>`:''}<p><b>Balance:</b> ${balance<=0.009?'Sin saldo pendiente':M(balance)}</p></div><div><div class="label">NOTA</div><p>${E(x.notes||b.templateNote||'Gracias por confiar en NutriMachata. Conserva esta factura como comprobante de tu servicio.')}</p></div></div>
 <div class="v39-footer">Documento generado por NutriMachata · ${E(x.number||'')} · ${new Date().toLocaleDateString('es-DO',{day:'2-digit',month:'short',year:'numeric'})}</div><div class="v39-footline"></div></div>`;
   };
+})();
+</script>
+
+<script id="nm-factura-pdf-directo-v40">
+(function(){
+  function safeName(v){return String(v||'Factura').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');}
+  async function waitImages(root){
+    const imgs=[...root.querySelectorAll('img')];
+    await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r;})));
+  }
+  window.downloadInvoicePDF=async function(id){
+    const b=typeof getBillingData==='function'?getBillingData():null;
+    const x=b?.invoices?.find(i=>String(i.id)===String(id));
+    if(!x){notify?.('La factura ya no existe','danger');return;}
+    if(typeof html2pdf!=='function'){notify?.('El generador de PDF no está disponible','danger');return;}
+    const host=document.createElement('div');
+    host.id='nm-direct-pdf-v40';
+    host.style.cssText='position:fixed;left:-10000px;top:0;width:180mm;background:#fff;z-index:-1;overflow:visible;';
+    host.innerHTML=(typeof nmInvoicePrintStyles==='function'?nmInvoicePrintStyles():'')+nmInvoiceDocumentHTML(x,b);
+    document.body.appendChild(host);
+    const doc=host.querySelector('.invoice-print-doc')||host.firstElementChild;
+    doc.style.setProperty('width','180mm','important');
+    doc.style.setProperty('max-width','180mm','important');
+    doc.style.setProperty('min-width','0','important');
+    doc.style.setProperty('margin','0','important');
+    doc.style.setProperty('overflow','visible','important');
+    doc.querySelectorAll('*').forEach(el=>{el.style.setProperty('box-sizing','border-box','important');el.style.setProperty('max-width','100%');});
+    const title=doc.querySelector('.v39-title'); if(title){title.style.setProperty('padding-right','3mm','important');title.style.setProperty('min-width','0','important');}
+    const head=doc.querySelector('.v39-head'); if(head){head.style.setProperty('grid-template-columns','minmax(0,1fr) minmax(0,1fr)','important');head.style.setProperty('gap','8mm','important');}
+    const party=doc.querySelector('.v39-party'); if(party){party.style.setProperty('grid-template-columns','minmax(0,1fr) minmax(0,1fr)','important');}
+    await waitImages(doc);
+    const filename=`${safeName(x.number)}_${safeName(x.patient)}.pdf`;
+    try{
+      await html2pdf().set({
+        margin:[10,10,10,10], filename,
+        image:{type:'jpeg',quality:0.98},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0,windowWidth:1024,logging:false},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true},
+        pagebreak:{mode:['css','legacy'],avoid:['tr','.v39-head','.v39-party','.v39-summary','.v39-bottom']}
+      }).from(doc).save();
+    }catch(err){console.error('[NutriMachata] PDF factura v40',err);notify?.('No se pudo descargar la factura PDF.','danger');}
+    finally{host.remove();}
+  };
+  window.previewInvoicePDF=function(id){
+    const b=getBillingData(),x=b.invoices.find(i=>String(i.id)===String(id));if(!x)return notify?.('La factura ya no existe','danger');
+    const page=`<div class="nm-a4-preview">${typeof nmInvoicePrintStyles==='function'?nmInvoicePrintStyles():''}${nmInvoiceDocumentHTML(x,b)}</div>`;
+    nmPreviewShell?.(`Vista previa - ${x.number}`,'Factura oficial NutriMachata',page,'',`nmClosePrintPreview();downloadInvoicePDF('${x.id}')`);
+  };
+  function labels(){
+    document.querySelectorAll('button[onclick*="downloadInvoicePDF"]').forEach(btn=>{
+      btn.title='Descargar factura PDF';
+      const t=(btn.textContent||'').trim();
+      if(t==='🖨️'||t==='⇩'||t==='PDF'||t==='🖨️ Imprimir') btn.textContent='📄';
+    });
+  }
+  labels();
+  new MutationObserver(()=>labels()).observe(document.body,{childList:true,subtree:true});
+  window.NMInvoicePDFDirectV40=true;
+})();
+</script>
+
+<script id="nm-supabase-stability-v41">
+(function(){
+  let banner=null;
+  function showOffline(){
+    if(banner&&document.body.contains(banner))return;
+    banner=document.createElement('div');
+    banner.id='nm-offline-banner';
+    banner.textContent='Sin conexión. NutriMachata conservará la pantalla actual y volverá a sincronizar cuando regrese Internet.';
+    banner.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:999999;background:#5b2b2b;color:#fff;padding:11px 18px;border-radius:12px;font:600 13px Montserrat,Arial,sans-serif;box-shadow:0 8px 28px #0003;max-width:min(92vw,720px);text-align:center';
+    document.body.appendChild(banner);
+  }
+  function hideOffline(){if(banner){banner.remove();banner=null;} if(typeof restoreSupaSession==='function')restoreSupaSession();}
+  window.addEventListener('offline',showOffline);
+  window.addEventListener('online',()=>{hideOffline();setTimeout(()=>{try{if(document.querySelector('.bill-tabs')&&typeof window.renderBilling==='function')window.renderBilling();}catch(_){}},350);});
+  if(typeof navigator!=='undefined'&&!navigator.onLine)setTimeout(showOffline,0);
+  // Evita ruido de promesas de red no controladas en módulos tardíos; no oculta errores reales.
+  window.addEventListener('unhandledrejection',ev=>{
+    const m=String(ev.reason?.message||ev.reason||'');
+    if(/Failed to fetch|NetworkError|Internet|ERR_INTERNET|ERR_NAME_NOT_RESOLVED/i.test(m)){showOffline();}
+  });
+  window.NMSupabaseStabilityV41={showOffline,hideOffline};
 })();
 </script>
 </body>
