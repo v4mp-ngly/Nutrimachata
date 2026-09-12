@@ -12794,9 +12794,9 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       const headers={apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json',...extraHeaders};
       if((method==='POST'||method==='PATCH')&&!Object.keys(extraHeaders||{}).some(k=>k.toLowerCase()==='prefer')) headers.Prefer='return=representation';
       let res;
-      try{res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'});}
+      try{const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),12000);try{res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit',signal:ctl.signal});}finally{clearTimeout(tm);}}
       catch(err){
-        const e=new Error('No se pudo conectar con Supabase. Revisa tu conexión a Internet e inténtalo nuevamente.');
+        const e=new Error(err?.name==='AbortError'?'Supabase tardó demasiado en responder. Inténtalo nuevamente.':'No se pudo conectar con Supabase. Revisa tu conexión a Internet e inténtalo nuevamente.');
         e.code='NETWORK_ERROR';e.cause=err;throw e;
       }
       const raw=await res.text();
@@ -14144,7 +14144,7 @@ window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanc
   }
   function hideOffline(){if(banner){banner.remove();banner=null;} if(typeof restoreSupaSession==='function')restoreSupaSession();}
   window.addEventListener('offline',showOffline);
-  window.addEventListener('online',()=>{hideOffline();setTimeout(()=>{try{if(document.querySelector('.bill-tabs')&&typeof window.renderBilling==='function')window.renderBilling();}catch(_){}},350);});
+  window.addEventListener('online',()=>{hideOffline();});
   if(typeof navigator!=='undefined'&&!navigator.onLine)setTimeout(showOffline,0);
   // Evita ruido de promesas de red no controladas en módulos tardíos; no oculta errores reales.
   window.addEventListener('unhandledrejection',ev=>{
@@ -14223,8 +14223,8 @@ function retryCurrentView(){
     }catch(e){ console.warn('[NutriMachata] Reintento de sincronización pendiente:',e?.message||e); }
   },700);
 }
-window.addEventListener('online',retryCurrentView);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)retryCurrentView();});
+// v48: evitamos resincronizaciones globales automáticas al cambiar de pestaña/recuperar foco.
+// La sincronización se hace al entrar a cada módulo o mediante acción explícita.
 window.NMConnectionV43={retry:retryCurrentView};
 })();
 </script>
@@ -14327,32 +14327,36 @@ window.NMAccountingExcelV46=true;
 })();
 </script>
 
-<script id="nm-billing-sync-stability-v47">
+<script id="nm-billing-sync-stability-v48">
 (function(){
 'use strict';
-let syncTimer=null;
-async function syncBilling47(showMessage=false){
+let running=false, queued=false;
+async function syncBilling48(showMessage=false){
+  if(running){queued=true;return false;}
   const api=window.NMBillingInternal;
-  if(!api?.loadBillingFromSupabase)return false;
+  if(!api?.loadBillingFromSupabase||navigator.onLine===false)return false;
+  running=true;
   try{
-    const data=await api.loadBillingFromSupabase(true);
+    const data=await api.loadBillingFromSupabase(false);
     if(!data)return false;
-    if(typeof window.renderBilling==='function' && document.querySelector('.billing-hero')){
-      // renderBilling itself syncs; use legacy visual refresh indirectly only after data is ready.
-      const st=document.getElementById('billing-db-status');
-      if(st){st.textContent='✓ Facturación sincronizada con Supabase';st.style.background='#f5fbf2';st.style.borderColor='#d4ead0';st.style.color='#315c2b';}
-    }
+    const st=document.getElementById('billing-db-status');
+    if(st){st.textContent='✓ Facturación sincronizada con Supabase';st.style.background='#f5fbf2';st.style.borderColor='#d4ead0';st.style.color='#315c2b';}
     if(showMessage)window.notify?.('Facturación actualizada desde Supabase.','success');
     return true;
-  }catch(e){console.error('[Facturacion Sync v47]',e);if(showMessage)window.notify?.('No se pudo sincronizar Facturación: '+(e.message||e),'danger');return false;}
+  }catch(e){
+    console.error('[Facturacion Sync v48]',e);
+    const st=document.getElementById('billing-db-status');
+    if(st){st.textContent='⚠️ No se pudo sincronizar. Pulsa para reintentar.';st.style.cursor='pointer';st.onclick=()=>syncBilling48(true);}
+    return false;
+  }finally{
+    running=false;
+    if(queued){queued=false;setTimeout(()=>syncBilling48(false),500);}
+  }
 }
-function queueSync47(delay=250){clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncBilling47(false),delay);}
-window.syncBillingNow=()=>syncBilling47(true);
-window.addEventListener('online',()=>queueSync47(300));
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync47(350)});
-// No polling agresivo: solo refresco periódico mientras la pestaña está visible.
-setInterval(()=>{if(!document.hidden && navigator.onLine!==false && document.querySelector('.billing-hero'))syncBilling47(false)},60000);
-window.NMBillingSyncV47=true;
+window.syncBillingNow=()=>syncBilling48(true);
+// Solo un reintento al recuperar Internet. Sin polling ni visibilitychange.
+window.addEventListener('online',()=>setTimeout(()=>{if(document.querySelector('.billing-hero'))syncBilling48(false)},1200));
+window.NMBillingSyncV48=true;
 })();
 </script>
 </body>
