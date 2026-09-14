@@ -5138,7 +5138,7 @@ function downloadHistoriaClinica(patientId) {
 
 
 
-<script id="nm-v57-supabase-only">window.NMV57SupabaseOnly=true;</script>
+window.NMV57SupabaseOnly = true;
 </body></html>`;
 
   downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
