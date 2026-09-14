@@ -5138,7 +5138,6 @@ function downloadHistoriaClinica(patientId) {
 
 
 
-<script id="nm-freeze-fix-v52">window.NMBillingFreezeFixV52=true;</script>
 </body></html>`;
 
   downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -14267,5 +14266,7 @@ document.addEventListener('click',e=>{if(e.target.closest?.('[data-nav="billing"
 window.NMBillingStableV51=true;
 })();
 </script>
+
+<script id="nm-structural-fix-v53">window.NMStructuralFixV53=true;</script>
 </body>
 </html>
