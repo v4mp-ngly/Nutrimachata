@@ -14318,6 +14318,10 @@ window.saveCashCloseV54=function(){const x=window.NMCashCloseCurrent54;if(!x)ret
 window.printCashCloseV54=function(){const el=document.getElementById('billing-tab-content');if(!el)return;const w=window.open('','_blank');if(!w)return notify?.('Permite ventanas emergentes para imprimir.','warning');w.document.write(`<html><head><title>Cierre de caja</title><style>body{font-family:Arial;padding:28px;color:#233}button,input{display:none}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}.bill-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}</style></head><body><h2>NutriMachata · Cierre de caja</h2>${el.innerHTML}</body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print()},250)};
 const prevTab54=window.renderBillingTab;
 window.renderBillingTab=function(tab,btn){
+ // Mantener la pestaña seleccionada durante cualquier re-render/sincronización de Facturación.
+ // v54 enrutaba Gastos/Cotizaciones directamente y saltaba el estado persistente de v29,
+ // por eso la pestaña aparecía y volvía inmediatamente a Facturas al terminar Supabase.
+ try{window.NMBillingTabStateV29?.set(tab||'invoices')}catch(e){}
  if(tab==='cashclose')return window.renderCashCloseV54();
  if(tab==='quotes'&&typeof window.renderQuotes==='function')return window.renderQuotes();
  if(tab==='expenses'&&typeof window.renderExpenses==='function')return window.renderExpenses();
@@ -14330,6 +14334,7 @@ const prevBilling54=window.renderBilling;
 window.renderBilling=function(){const r=prevBilling54?prevBilling54.apply(this,arguments):undefined;setTimeout(ensureAllBillingTabs54,0);return r};
 window.NMEnsureBillingTabsV54=ensureAllBillingTabs54;
 window.NMEnsureBillingTabsV55=ensureAllBillingTabs54;
+window.NMExpensesPersistentV56=true;
 setTimeout(ensureAllBillingTabs54,0);
 })();
 </script>
