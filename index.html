@@ -5138,6 +5138,7 @@ function downloadHistoriaClinica(patientId) {
 
 
 
+<script id="nm-freeze-fix-v52">window.NMBillingFreezeFixV52=true;</script>
 </body></html>`;
 
   downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -12778,6 +12779,11 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   }
   function mapMethodFromDb(v){return ({efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',deposito:'Depósito',otro:'Otro'})[lower(v)]||'Otro';}
 
+  function billingTimeout(promise,ms,message){
+    let timer;
+    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{const e=new Error(message||'La operación tardó demasiado.');e.code='BILLING_TIMEOUT';reject(e)},ms)});
+    return Promise.race([Promise.resolve(promise).finally(()=>clearTimeout(timer)),timeout]);
+  }
   async function billingFetch(path,method='GET',body=null,extraHeaders={}){
     if(IS_LOCAL) throw new Error('Abre NutriMachata desde una URL web (http/https). Supabase no se usa en modo file://.');
     if(typeof navigator!=='undefined' && navigator.onLine===false){
@@ -12786,7 +12792,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     }
     // Toda Facturación usa una sesión Supabase válida. Evita enviar "Bearer null"
     // y renueva el token antes de cargar gastos, cotizaciones o configuración.
-    await ensureSupaSession();
+    await billingTimeout(ensureSupaSession(),8000,'Supabase tardó demasiado en validar la sesión.');
     const url=SUPA_URL.replace(/\/$/,'')+'/rest/v1/'+path;
     const request=async()=>{
       const token=supaAccessToken();
@@ -12794,7 +12800,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       const headers={apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json',...extraHeaders};
       if((method==='POST'||method==='PATCH')&&!Object.keys(extraHeaders||{}).some(k=>k.toLowerCase()==='prefer')) headers.Prefer='return=representation';
       let res;
-      try{res=await fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'});}
+      try{res=await billingTimeout(fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'}),10000,'Supabase tardó demasiado en responder.');}
       catch(err){
         const e=new Error('No se pudo conectar con Supabase. Revisa tu conexión a Internet e inténtalo nuevamente.');
         e.code='NETWORK_ERROR';e.cause=err;throw e;
@@ -12854,13 +12860,21 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     if(billingDbLoading)return billingDbLoading;
     billingDbLoading=(async()=>{
       try{
-        const [products,invoices,details,payments,clients]=await Promise.all([
+        const results=await Promise.allSettled([
           billingFetch(`${BILLING_DB_TABLES.products}?select=*&order=created_at.desc`),
           billingFetch(`${BILLING_DB_TABLES.invoices}?select=*&order=fecha.desc,created_at.desc`),
           billingFetch(`${BILLING_DB_TABLES.details}?select=*&order=created_at.asc`),
           billingFetch(`${BILLING_DB_TABLES.payments}?select=*&order=fecha_pago.asc`),
           billingFetch(`${BILLING_DB_TABLES.clients}?select=*&activo=eq.true&order=nombre.asc`)
         ]);
+        const val=i=>results[i].status==='fulfilled'?(results[i].value||[]):[];
+        const products=val(0), invoices=val(1), details=val(2), payments=val(3), clients=val(4);
+        // Facturas y pagos son el núcleo. Si fallan, no reemplazamos la memoria por ceros.
+        if(results[1].status!=='fulfilled') throw results[1].reason;
+        if(results[3].status!=='fulfilled') throw results[3].reason;
+        if(results[0].status==='rejected') console.warn('[Facturación] productos no disponibles temporalmente',results[0].reason);
+        if(results[2].status==='rejected') console.warn('[Facturación] detalles no disponibles temporalmente',results[2].reason);
+        if(results[4].status==='rejected') console.warn('[Facturación] clientes no disponibles temporalmente',results[4].reason);
         billingClients=(clients||[]).map(c=>({id:c.id,type:'client',nombre:[c.nombre,c.apellido].filter(Boolean).join(' ').trim(),cedula:c.cedula_rnc||'',telefono:c.telefono||'',email:c.correo||'',direccion:c.direccion||'',tipo:c.tipo||'persona'}));
         window.NMBillingClients=billingClients;
         const uiProducts=(products||[]).map(productDbToUi);
@@ -13086,7 +13100,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     const x=getBillingData().invoices.find(i=>i.id===id);if(!x)return;
     if((x.paymentHistory||[]).length||num(x.paid)>0){notify('Una factura con pagos no se elimina. Anúlala para conservar la trazabilidad.','warning');return;}
     if(!confirm(`¿Eliminar definitivamente la factura ${x.number}? El inventario vendido será devuelto.`))return;
-    try{await applyInvoiceStock(x.items,+1,id,'Reverso por eliminación de factura');await bi.billingFetch(`${bi.BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');await loadBillingFromSupabase(true);document.getElementById('invoice-view-modal')?.remove();legacyRenderBilling();notify('Factura eliminada y stock restaurado.','success');}catch(e){humanDbError(e,'eliminar la factura');await loadBillingFromSupabase(true);}
+    try{await applyInvoiceStock(x.items,+1,id,'Reverso por eliminación de factura');await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');await loadBillingFromSupabase(true);document.getElementById('invoice-view-modal')?.remove();legacyRenderBilling();notify('Factura eliminada y stock restaurado.','success');}catch(e){humanDbError(e,'eliminar la factura');await loadBillingFromSupabase(true);}
   };
 
   window.archiveInvoice=async function(id){
@@ -13484,7 +13498,7 @@ También se eliminarán sus pagos y detalles. Esta acción no se puede deshacer.
     await billingFetch(`${BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
     // Los movimientos se conservan para auditoría, pero se desvinculan si la FK lo exige.
     try{await bi.billingFetch(`${bi.BILLING_DB_TABLES.inventory}?factura_id=eq.${encodeURIComponent(id)}`,'PATCH',{factura_id:null});}catch(_){ }
-    await bi.billingFetch(`${bi.BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');
+    await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');
     await bi.loadBillingFromSupabase(true);
     document.getElementById('invoice-view-modal')?.remove();
     if(typeof legacyRenderBilling==='function')legacyRenderBilling();else if(typeof renderBilling==='function')renderBilling();
@@ -13739,10 +13753,9 @@ function ensureExpensesUI(){
     quick.appendChild(a);
   }
 }
-const obs=new MutationObserver(()=>ensureExpensesUI());
-obs.observe(document.body,{childList:true,subtree:true});
+// v51: sin MutationObserver global; evitamos bucles de renderizado en Facturación.
 document.addEventListener('click',e=>{ if(e.target.closest?.('[data-nav="billing"], [onclick*="billing"]')) setTimeout(ensureExpensesUI,0); });
-setInterval(()=>{ if(document.querySelector('.bill-tabs')) ensureExpensesUI(); },500);
+// v51: sin polling cada 500 ms.
 window.NMEnsureExpensesV30=ensureExpensesUI;
 ensureExpensesUI();
 })();
@@ -13772,7 +13785,8 @@ window.duplicateQuote=id=>{const q=QUOTES.find(x=>String(x.id)===String(id));if(
 window.downloadQuotePDF=function(id){const q=QUOTES.find(x=>String(x.id)===String(id));if(!q||typeof html2pdf!=='function')return notify?.('No se pudo abrir el generador PDF','danger');const rows=q.items.map(i=>`<tr><td>${esc(i.descripcion)}</td><td>${i.cantidad}</td><td style="text-align:right">${money(i.precio_unitario)}</td><td style="text-align:right">${Number(i.descuento||0)}%</td><td style="text-align:right"><b>${money(i.total_linea)}</b></td></tr>`).join('');const w=document.createElement('div');Object.assign(w.style,{position:'fixed',left:'-10000px',width:'194mm',background:'#fff'});w.innerHTML=`<div style="font-family:Arial;color:#263126;padding:28px"><div style="display:flex;justify-content:space-between;border-bottom:3px solid #5E8C2A;padding-bottom:15px"><b style="font-size:26px;color:#355e20">NutriMachata</b><div style="text-align:right"><b style="font-size:24px">COTIZACIÓN</b><br>${esc(q.numero_cotizacion)}<br>${esc(q.fecha)}</div></div><div style="margin:22px 0"><small>CLIENTE / PACIENTE</small><br><b>${esc(q.cliente_nombre)}</b><br>${esc(q.cedula_rnc||'')}<div style="margin-top:8px">Válida hasta: <b>${esc(q.valida_hasta||'—')}</b></div></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#355E3B;color:#fff"><th style="padding:9px;text-align:left">Concepto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-left:auto;width:320px;margin-top:18px"><div>Subtotal: <b style="float:right">${money(q.subtotal)}</b></div><div>Descuento: <b style="float:right">${money(q.descuento)}</b></div><div>ITBIS: <b style="float:right">${money(q.impuestos)}</b></div><div style="font-size:20px;border-top:2px solid #5E8C2A;margin-top:8px;padding-top:8px">Total: <b style="float:right">${money(q.total)}</b></div></div><div style="clear:both;margin-top:35px;padding:12px;background:#f3f7ef;border-radius:8px">${esc(q.notas||'Cotización sujeta a disponibilidad y vigencia indicada.')}</div></div>`;document.body.appendChild(w);html2pdf().set({margin:[8,8,8,8],filename:`${q.numero_cotizacion}_${String(q.cliente_nombre).replace(/\s+/g,'_')}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(w.firstElementChild).save().finally(()=>w.remove())};
 window.convertQuoteToInvoice=async function(id){const q=QUOTES.find(x=>String(x.id)===String(id));if(!q)return;if(!confirm(`Convertir ${q.numero_cotizacion} en factura?`))return;try{if(typeof window.openInvoiceModal!=='function')throw new Error('Módulo de facturas no disponible');window.renderBillingTab('invoices');setTimeout(()=>{window.openInvoiceModal();setTimeout(()=>{const partyType=q.cliente_id?'client':'patient',partyId=q.cliente_id||q.paciente_id;const hid=document.getElementById('inv-party-id'),typ=document.getElementById('inv-party-type'),search=document.getElementById('inv-party-search');if(hid)hid.value=partyId||'';if(typ)typ.value=partyType;if(search)search.value=q.cliente_nombre||'';const lines=document.getElementById('invoice-lines');if(lines&&typeof invoiceLineHTML==='function')lines.innerHTML=q.items.map(i=>invoiceLineHTML({description:i.descripcion,qty:i.cantidad,price:i.precio_unitario,discount:i.descuento})).join('');const dis=document.getElementById('inv-discount'),tax=document.getElementById('inv-tax'),notes=document.getElementById('inv-notes');if(dis)dis.value=q.descuento_porcentaje||0;if(tax)tax.value=q.impuesto_porcentaje||0;if(notes)notes.value=`Cotización ${q.numero_cotizacion}${q.notas?' · '+q.notas:''}`;if(typeof recalcInvoiceEditor==='function')recalcInvoiceEditor();notify?.('Cotización cargada. Revisa y crea la factura.','success')},80)},50)}catch(e){notify?.(e.message,'danger')}};
 const prev=window.renderBillingTab;window.renderBillingTab=function(tab,btn){if(tab==='quotes')return renderQuotes();return prev.apply(this,arguments)};
-const ob=new MutationObserver(ensureQuoteUI);ob.observe(document.body,{childList:true,subtree:true});setInterval(()=>document.querySelector('.bill-tabs')&&ensureQuoteUI(),700);ensureQuoteUI();
+// v51: sin observer/polling global.
+ensureQuoteUI();
 })();
 </script>\n\n<script id="nm-recibos-completos-v32">
 (function(){
@@ -13902,7 +13916,8 @@ function ensureTabs(){const tabs=document.querySelector('.bill-tabs');if(!tabs)r
 const prevTab=window.renderBillingTab;window.renderBillingTab=function(tab,btn){if(tab==='numbering')return renderNumberingV34();if(tab==='exports')return renderExportsV34();return prevTab.apply(this,arguments)};
 // Enhance the existing client statement with a fiscal/financial card and document counts.
 const oldStatement=window.NMOpenClientStatement;window.NMOpenClientStatement=async function(p){await oldStatement?.apply(this,arguments);setTimeout(()=>{const modal=document.getElementById('nm-statement-modal');if(!modal||modal.querySelector('[data-v34-financial]'))return;const key=modal.dataset.party||'', [type,id]=key.split(':');const c=type==='client'?(window.NMBillingClients||[]).find(x=>String(x.id)===id):(typeof billingPatients==='function'?billingPatients():[]).find(x=>String(x.id)===id);if(!c)return;const inv=(getBillingData?.().invoices||[]).filter(x=>(type==='client'?String(x.clientId||'')===id:String(x.patientId||'')===id));const pays=inv.reduce((n,x)=>n+(x.paymentHistory||[]).length,0),pending=inv.reduce((n,x)=>n+Math.max(0,Number(x.total||0)-Number(x.paid||0)),0);const box=document.createElement('div');box.dataset.v34Financial='1';box.innerHTML=`<div class="card-title" style="margin:16px 0 8px">Ficha financiera</div><div class="nm-v34-fiscal"><div><small>RNC / CÉDULA</small><br><b>${esc(c.cedula||c.rnc||c.cedula_rnc||'—')}</b></div><div><small>DIRECCIÓN</small><br><b>${esc(c.direccion||'—')}</b></div><div><small>CORREO</small><br><b>${esc(c.email||c.correo||'—')}</b></div><div><small>TELÉFONO</small><br><b>${esc(c.telefono||'—')}</b></div><div><small>DOCUMENTOS</small><br><b>${inv.length} factura(s) · ${pays} pago(s)</b></div><div><small>BALANCE PENDIENTE</small><br><b>${money(pending)}</b></div></div>`;const body=modal.querySelector('.modal-body');if(body)body.insertBefore(box,body.children[1]||null)},0)};
-new MutationObserver(()=>ensureTabs()).observe(document.documentElement,{childList:true,subtree:true});setInterval(()=>{if(document.querySelector('.bill-tabs'))ensureTabs()},800);loadRemote();
+// v51: sin observer/polling global.
+ensureTabs();loadRemote();
 })();
 </script>
 
@@ -14094,7 +14109,9 @@ window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanc
     });
   }
   labels();
-  new MutationObserver(()=>labels()).observe(document.body,{childList:true,subtree:true});
+  // v52: NO observar cambios globales aqui. Este observer competia con v44:
+  // v40 cambiaba el boton a 📄 y v44 lo devolvia a 🖨️ Imprimir, creando un bucle
+  // infinito de mutaciones que congelaba toda la pagina al entrar a Facturacion.
   window.NMInvoicePDFDirectV40=true;
 })();
 </script>
@@ -14235,6 +14252,19 @@ function relabel44(){
 }
 relabel44();new MutationObserver(relabel44).observe(document.body,{childList:true,subtree:true});
 window.NMInvoiceNativePrintV44=true;
+})();
+</script>
+
+<script id="nm-billing-stable-v51">
+(function(){
+'use strict';
+let scheduled=false;
+function enhance(){
+  if(scheduled)return; scheduled=true;
+  setTimeout(()=>{scheduled=false;try{window.NMEnsureExpensesV30?.()}catch(e){};try{document.querySelector('.bill-tabs')&&window.NMBillingTabStateV29}catch(e){}},0);
+}
+document.addEventListener('click',e=>{if(e.target.closest?.('[data-nav="billing"]'))enhance()});
+window.NMBillingStableV51=true;
 })();
 </script>
 </body>
