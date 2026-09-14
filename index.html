@@ -1948,7 +1948,7 @@ function persistSupaSession(data){
   SUPA_AUTH_SESSION = normalizeSupaSession(data);
   if(SUPA_AUTH_SESSION?.access_token){
     sessionStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION));
-    try{ localStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION)); }catch(_){}
+    try{ sessionStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION)); }catch(_){}
   }
   return SUPA_AUTH_SESSION;
 }
@@ -1976,7 +1976,7 @@ async function supaAuthSignUp(email,password,metadata={}){
 }
 function restoreSupaSession(){
   try{
-    const raw=sessionStorage.getItem('nutri_supa_session') || localStorage.getItem('nutri_supa_session') || 'null';
+    const raw=sessionStorage.getItem('nutri_supa_session') || sessionStorage.getItem('nutri_supa_session') || 'null';
     const x=JSON.parse(raw);
     if(x?.access_token) persistSupaSession(x);
   }catch(_){ SUPA_AUTH_SESSION=null; }
@@ -1984,7 +1984,7 @@ function restoreSupaSession(){
 function clearSupaSession(){
   SUPA_AUTH_SESSION=null;
   sessionStorage.removeItem('nutri_supa_session');
-  try{ localStorage.removeItem('nutri_supa_session'); }catch(_){}
+  try{ sessionStorage.removeItem('nutri_supa_session'); }catch(_){}
 }
 async function refreshSupaSession(force=false){
   if(!force && SUPA_AUTH_SESSION?.access_token && !supaSessionExpiresSoon()) return SUPA_AUTH_SESSION;
@@ -5138,6 +5138,7 @@ function downloadHistoriaClinica(patientId) {
 
 
 
+<script id="nm-v57-supabase-only">window.NMV57SupabaseOnly=true;</script>
 </body></html>`;
 
   downloadPDF(html, `HC_${p.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -7940,7 +7941,7 @@ function saveDietTemplate(patientId, dietId) {
   };
   
   DB.settings.dietTemplates.push(template);
-  localStorage.setItem('nutrimachata_settings', JSON.stringify(DB.settings));
+  sessionStorage.setItem('nutrimachata_settings', JSON.stringify(DB.settings));
   notify(`✓ "${d.nombre}" guardada como plantilla`, 'success');
   renderDiets();
 }
@@ -7972,7 +7973,7 @@ function deleteDietTemplate(templateIndex) {
   showConfirm('¿Eliminar esta plantilla?', () => {
     if (DB.settings && DB.settings.dietTemplates) {
       DB.settings.dietTemplates.splice(templateIndex, 1);
-      localStorage.setItem('nutrimachata_settings', JSON.stringify(DB.settings));
+      sessionStorage.setItem('nutrimachata_settings', JSON.stringify(DB.settings));
       notify('Plantilla eliminada', 'success');
       renderDiets();
     }
@@ -8216,7 +8217,7 @@ function saveAsDiet() {
 // ═══════════════════════════════════════════════
 // Sistema para cargar PDFs de Canva y convertir cada página en plantilla de dieta
 
-let dietTemplates = JSON.parse(localStorage.getItem('dietTemplates') || '[]');
+let dietTemplates = JSON.parse(sessionStorage.getItem('dietTemplates') || '[]');
 
 function renderDietTemplates() {
   const container = document.getElementById('page-content');
@@ -8364,7 +8365,7 @@ async function processPdf(file) {
       }
       
       dietTemplates = [...dietTemplates, ...newTemplates];
-      localStorage.setItem('dietTemplates', JSON.stringify(dietTemplates));
+      sessionStorage.setItem('dietTemplates', JSON.stringify(dietTemplates));
       
       notify(`✅ ${pageCount} plantillas cargadas exitosamente`, 'success');
       renderDietTemplates();
@@ -8420,7 +8421,7 @@ function usePdfDietTemplate(index) {
 function deleteTemplate(index) {
   showConfirm(`¿Eliminar la plantilla de página ${dietTemplates[index].pageNumber}?`, () => {
     dietTemplates.splice(index, 1);
-    localStorage.setItem('dietTemplates', JSON.stringify(dietTemplates));
+    sessionStorage.setItem('dietTemplates', JSON.stringify(dietTemplates));
     notify('Plantilla eliminada', 'success');
     renderDietTemplates();
   });
@@ -8432,7 +8433,7 @@ function deleteTemplate(index) {
 function clearAllTemplates() {
   showConfirm('¿Eliminar todas las plantillas? Esta acción no se puede deshacer.', () => {
     dietTemplates = [];
-    localStorage.setItem('dietTemplates', JSON.stringify(dietTemplates));
+    sessionStorage.setItem('dietTemplates', JSON.stringify(dietTemplates));
     notify('Todas las plantillas han sido eliminadas', 'success');
     renderDietTemplates();
   });
@@ -9217,13 +9218,13 @@ function normalizeBillingData(raw){
 }
 function getBillingData(){
   try{
-    let stored=localStorage.getItem(BILLING_KEY);
-    if(!stored){stored=localStorage.getItem(BILLING_OLD_KEY);if(stored)localStorage.setItem(BILLING_KEY,stored);}
+    let stored=sessionStorage.getItem(BILLING_KEY);
+    if(!stored){stored=sessionStorage.getItem(BILLING_OLD_KEY);if(stored)sessionStorage.setItem(BILLING_KEY,stored);}
     if(stored){BILLING_MEMORY=normalizeBillingData(JSON.parse(stored));return BILLING_MEMORY;}
   }catch(e){console.warn('Facturación: almacenamiento local no disponible',e);}
   BILLING_MEMORY=normalizeBillingData(BILLING_MEMORY);return BILLING_MEMORY;
 }
-function saveBillingData(data){BILLING_MEMORY=normalizeBillingData(data);try{localStorage.setItem(BILLING_KEY,JSON.stringify(BILLING_MEMORY));return true}catch(e){console.error(e);notify('No se pudo guardar facturación en este navegador','danger');return false}}
+function saveBillingData(data){BILLING_MEMORY=normalizeBillingData(data);try{sessionStorage.setItem(BILLING_KEY,JSON.stringify(BILLING_MEMORY));return true}catch(e){console.error(e);notify('No se pudo guardar facturación en este navegador','danger');return false}}
 function billingInvoiceStatus(x){if(x.status==='Archivada')return'Archivada';if(Number(x.total||0)>0&&Number(x.paid||0)>=Number(x.total||0)-.001)return'Pagada';if(Number(x.paid||0)>0)return'Pago parcial';if(x.dueDate&&x.dueDate<billingToday())return'Vencida';return'Pendiente';}
 function billingNextNumber(){const nums=getBillingData().invoices.map(x=>Number(String(x.number||'').match(/(\d+)$/)?.[1]||0));return 'FAC-'+String((Math.max(0,...nums)+1)).padStart(5,'0');}
 function billingProductById(id){return getBillingData().products.find(p=>p.id===id)||null;}
@@ -12415,7 +12416,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
 
   function logError(scope,error,extra){
     const item={time:new Date().toISOString(),scope,message:String(error?.message||error||'Error desconocido'),extra:extra||null};
-    try{const arr=JSON.parse(localStorage.getItem(ERROR_LOG_KEY)||'[]');arr.unshift(item);localStorage.setItem(ERROR_LOG_KEY,JSON.stringify(arr.slice(0,MAX_ERRORS)))}catch(_e){}
+    try{const arr=JSON.parse(sessionStorage.getItem(ERROR_LOG_KEY)||'[]');arr.unshift(item);sessionStorage.setItem(ERROR_LOG_KEY,JSON.stringify(arr.slice(0,MAX_ERRORS)))}catch(_e){}
     console.error('[NutriMachata]',scope,error,extra||'');
     return item;
   }
@@ -12464,14 +12465,14 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
   function saveSnapshot(reason='auto'){
     try{
       const snap=criticalSnapshot();
-      localStorage.setItem(SNAP_KEY,JSON.stringify(snap));
+      sessionStorage.setItem(SNAP_KEY,JSON.stringify(snap));
       window.__nmLastSnapshot={time:snap.savedAt,reason};
       return true;
     }catch(e){logError('Copia local',e,{reason});showBanner('No se pudo crear la copia local de seguridad.','error');return false}
   }
   function restoreSnapshot(){
     try{
-      const raw=localStorage.getItem(SNAP_KEY);if(!raw)return false;
+      const raw=sessionStorage.getItem(SNAP_KEY);if(!raw)return false;
       const snap=JSON.parse(raw);if(!snap||!Array.isArray(snap.patients))return false;
       DB.patients=snap.patients;
       DB.appointments=Array.isArray(snap.appointments)?snap.appointments:[];
@@ -12506,7 +12507,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
     };
   }
 
-  // Verifica que Facturación realmente se escriba y pueda leerse desde localStorage.
+  // Verifica que Facturación realmente se escriba y pueda leerse desde sessionStorage.
   if(typeof saveBillingData==='function'&&!window.__nmBillingStorageGuarded){
     window.__nmBillingStorageGuarded=true;
     const rawSaveBilling=saveBillingData;
@@ -12514,7 +12515,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
       const ok=rawSaveBilling(data);
       if(!ok)throw new Error('No se pudo guardar la información de facturación.');
       try{
-        const probe=localStorage.getItem(typeof BILLING_KEY!=='undefined'?BILLING_KEY:'nutrimachata_billing_v2');
+        const probe=sessionStorage.getItem(typeof BILLING_KEY!=='undefined'?BILLING_KEY:'nutrimachata_billing_v2');
         if(!probe)throw new Error('El navegador no confirmó el almacenamiento de facturación.');
         JSON.parse(probe);
       }catch(e){logError('Persistencia Facturación',e);throw e}
@@ -12664,8 +12665,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   {id:'consent_informado',name:'Consentimiento informado',url:'https://forms.gle/DGacRNAi2ZY4yfve9',active:true,required:true,version:'v1'},
   {id:'tratamiento_datos',name:'Consentimiento / tratamiento de datos',url:'https://forms.gle/BsaegXduM4KsPEA27',active:true,required:true,version:'v1'}
  ];
- function read(k,f){try{const v=JSON.parse(localStorage.getItem(k)||'null');return v||f}catch(e){return f}}
- function write(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){notify?.('No se pudo guardar la configuración de consentimientos','danger');return false}}
+ function read(k,f){try{const v=JSON.parse(sessionStorage.getItem(k)||'null');return v||f}catch(e){return f}}
+ function write(k,v){try{sessionStorage.setItem(k,JSON.stringify(v));return true}catch(e){notify?.('No se pudo guardar la configuración de consentimientos','danger');return false}}
  window.getConsentConfig=()=>read(CFG,defaults.map(x=>({...x})));
  window.getConsentRecords=()=>consentCache;
  function token(){try{return typeof supaAccessToken==='function'?supaAccessToken():''}catch(e){return ''}}
@@ -12738,7 +12739,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 <script id="nm-billing-supabase-v3">
 /* =========================================================
    NutriMachata Facturacion Supabase v3
-   Fuente principal: Supabase. localStorage queda solo como cache de lectura.
+   Fuente principal: Supabase. sessionStorage queda solo como cache de lectura.
    ========================================================= */
 (function(){
   'use strict';
@@ -12896,7 +12897,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
         });
         BILLING_MEMORY=normalizeBillingData({invoices:uiInvoices,products:uiProducts,templateNote:BILLING_MEMORY?.templateNote||'Gracias por confiar en NutriMachata.',settings:BILLING_MEMORY?.settings||{defaultTax:0,currency:'RD$'}});
         // Cache de emergencia, nunca fuente principal de escritura.
-        try{localStorage.setItem(BILLING_KEY,JSON.stringify(BILLING_MEMORY));}catch(_e){}
+        try{sessionStorage.setItem(BILLING_KEY,JSON.stringify(BILLING_MEMORY));}catch(_e){}
         billingDbLoaded=true;billingLastError='';
         return BILLING_MEMORY;
       }catch(e){humanDbError(e,'cargar Facturación');return null;}
@@ -12907,7 +12908,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 
   // Lectura sincronica para la UI. La fuente se rellena desde Supabase.
   window.getBillingData=function(){return normalizeBillingData(BILLING_MEMORY||{});};
-  window.saveBillingData=function(data){BILLING_MEMORY=normalizeBillingData(data);try{localStorage.setItem(BILLING_KEY,JSON.stringify(BILLING_MEMORY));}catch(_e){}return true;};
+  window.saveBillingData=function(data){BILLING_MEMORY=normalizeBillingData(data);try{sessionStorage.setItem(BILLING_KEY,JSON.stringify(BILLING_MEMORY));}catch(_e){}return true;};
 
   const legacyRenderBilling=window.renderBilling;
   window.renderBilling=function(){
@@ -13173,8 +13174,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
 (function(){
   const ALERT_SEEN_KEY='nutrimachata_alertas_leidas_v2';
   const safeJsonParse=(v,f)=>{try{return JSON.parse(v)}catch(e){return f}};
-  const getSeen=()=>safeJsonParse(localStorage.getItem(ALERT_SEEN_KEY)||'{}',{});
-  const saveSeen=o=>localStorage.setItem(ALERT_SEEN_KEY,JSON.stringify(o));
+  const getSeen=()=>safeJsonParse(sessionStorage.getItem(ALERT_SEEN_KEY)||'{}',{});
+  const saveSeen=o=>sessionStorage.setItem(ALERT_SEEN_KEY,JSON.stringify(o));
   const alertKey=(a)=>String(a.key||[a.title,a.text,a.date].join('|')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').slice(0,260);
   const fmtDate=(d)=>{if(!d)return '—';const dt=new Date(String(d).slice(0,10)+'T12:00:00');return Number.isNaN(dt.getTime())?String(d):dt.toLocaleDateString('es-DO')};
   const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -13889,8 +13890,8 @@ const money=v=>typeof moneyRD==='function'?moneyRD(Number(v||0)):'RD$ '+Number(v
 const LS='nutrimachata_billing_numbering_v34';
 const defaults={FAC:{prefix:'FAC-',next:1,digits:6,label:'Facturas'},COT:{prefix:'COT-',next:1,digits:6,label:'Cotizaciones'},REC:{prefix:'REC-',next:1,digits:6,label:'Recibos'},NC:{prefix:'NC-',next:1,digits:6,label:'Notas de crédito'}};
 let cfg=loadLocal();
-function loadLocal(){try{return Object.assign({},defaults,JSON.parse(localStorage.getItem(LS)||'{}'))}catch(_){return JSON.parse(JSON.stringify(defaults))}}
-function saveLocal(){localStorage.setItem(LS,JSON.stringify(cfg))}
+function loadLocal(){try{return Object.assign({},defaults,JSON.parse(sessionStorage.getItem(LS)||'{}'))}catch(_){return JSON.parse(JSON.stringify(defaults))}}
+function saveLocal(){sessionStorage.setItem(LS,JSON.stringify(cfg))}
 function fmt(type,n){const c=cfg[type]||defaults[type];return String(c.prefix||'')+String(Math.max(1,Number(n||1))).padStart(Math.max(1,Number(c.digits||6)),'0')}
 function maxInvoice(){return Math.max(0,...(getBillingData?.().invoices||[]).map(x=>Number(String(x.number||'').match(/(\d+)$/)?.[1]||0)))}
 function maxQuote(){const rows=window.NMQuotes||[];return Math.max(0,...rows.map(x=>Number(String(x.numero_cotizacion||'').match(/(\d+)$/)?.[1]||0)))}
@@ -14305,16 +14306,37 @@ window.renderCashCloseV54=async function(date=today54()){
  const pays=paymentsForDate54(date), expenses=await getExpenses54(date);
  const income=pays.reduce((n,x)=>n+Number(x.p.amount||0),0), out=expenses.reduce((n,x)=>n+Number(x.monto||x.amount||0),0), net=income-out;
  const methods={};pays.forEach(x=>{const m=x.p.method||'Otro';methods[m]=(methods[m]||0)+Number(x.p.amount||0)});
- const hist=JSON.parse(localStorage.getItem('nm_cash_closures_v54')||'[]');
- const previous=hist.find(x=>x.date===date);
+ let previous=null;
+ try{
+   const f=window.NMBillingClientAPI?.billingFetch;
+   if(f){const rows=await f(`cierres_caja?select=*&fecha=eq.${encodeURIComponent(date)}&estado=eq.cerrado&order=fecha_cierre.desc&limit=1`)||[];previous=rows[0]||null}
+ }catch(e){console.warn('[Cierre caja] cierre previo',e)}
  el.innerHTML=`<div class="card"><div class="card-header"><div><div class="card-title">Cierre de caja</div><div class="card-subtitle">Resumen diario de cobros y gastos registrados.</div></div><div style="display:flex;gap:8px"><input id="cash54-date" class="form-control" type="date" value="${esc54(date)}" onchange="renderCashCloseV54(this.value)"><button class="btn btn-outline" onclick="printCashCloseV54()">Imprimir</button><button class="btn btn-olive" onclick="saveCashCloseV54()">Cerrar caja</button></div></div><div class="card-body">
  <div class="bill-stats" style="margin-bottom:18px"><div class="card" style="padding:16px"><small>COBROS DEL DÍA</small><h3>${money54(income)}</h3></div><div class="card" style="padding:16px"><small>GASTOS DEL DÍA</small><h3>${money54(out)}</h3></div><div class="card" style="padding:16px"><small>NETO DE CAJA</small><h3>${money54(net)}</h3></div><div class="card" style="padding:16px"><small>TRANSACCIONES</small><h3>${pays.length}</h3></div></div>
- ${previous?`<div style="padding:10px 12px;border:1px solid #d5e5cc;background:#f5faf2;border-radius:10px;margin-bottom:14px">✓ Este día tiene un cierre guardado: <b>${esc54(previous.closedAt)}</b></div>`:''}
+ ${previous?`<div style="padding:10px 12px;border:1px solid #d5e5cc;background:#f5faf2;border-radius:10px;margin-bottom:14px">✓ Este día tiene un cierre guardado en Supabase: <b>${esc54(previous.fecha_cierre?new Date(previous.fecha_cierre).toLocaleString('es-DO'):'Registrado')}</b></div>`:''}
  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.55fr);gap:16px"><div class="card"><div class="card-header"><div class="card-title">Cobros</div></div><div class="card-body">${pays.length?`<div class="table-responsive"><table class="table"><thead><tr><th>Factura</th><th>Paciente / cliente</th><th>Método</th><th>Referencia</th><th>Monto</th></tr></thead><tbody>${pays.map(x=>`<tr><td><b>${esc54(x.inv.number||'—')}</b></td><td>${esc54(x.inv.patient||'—')}</td><td>${esc54(x.p.method||'Otro')}</td><td>${esc54(x.p.reference||'—')}</td><td><b>${money54(x.p.amount)}</b></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty-state"><div class="empty-text">No hay cobros registrados en esta fecha.</div></div>'}</div></div><div><div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">Por método de pago</div></div><div class="card-body">${Object.keys(methods).length?Object.entries(methods).map(([m,v])=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #edf0eb"><span>${esc54(m)}</span><b>${money54(v)}</b></div>`).join(''):'Sin cobros.'}</div></div><div class="card"><div class="card-header"><div class="card-title">Gastos</div></div><div class="card-body">${expenses.length?expenses.map(g=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #edf0eb"><span>${esc54(g.descripcion||g.concepto||g.categoria||'Gasto')}</span><b>${money54(g.monto||g.amount)}</b></div>`).join(''):'Sin gastos registrados.'}</div></div></div></div>
  </div></div>`;
  window.NMCashCloseCurrent54={date,income,out,net,count:pays.length,methods,closedAt:new Date().toLocaleString('es-DO')};
 };
-window.saveCashCloseV54=function(){const x=window.NMCashCloseCurrent54;if(!x)return;let h=[];try{h=JSON.parse(localStorage.getItem('nm_cash_closures_v54')||'[]')}catch(e){}h=h.filter(r=>r.date!==x.date);h.unshift({...x,closedAt:new Date().toLocaleString('es-DO')});localStorage.setItem('nm_cash_closures_v54',JSON.stringify(h.slice(0,365)));notify?.('Cierre de caja guardado en este dispositivo.','success');renderCashCloseV54(x.date)};
+window.saveCashCloseV54=async function(){
+ const x=window.NMCashCloseCurrent54;if(!x)return;
+ const f=window.NMBillingClientAPI?.billingFetch;if(!f)return notify?.('No hay conexión con Supabase.','danger');
+ try{
+   const b=typeof getBillingData==='function'?getBillingData():{invoices:[]};
+   const dayInv=(b.invoices||[]).filter(i=>String(i.date||'').slice(0,10)===x.date);
+   const totalFacturado=dayInv.reduce((n,i)=>n+Number(i.total||0),0);
+   const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+   const by=(name)=>Object.entries(x.methods||{}).reduce((n,[k,v])=>norm(k).includes(name)?n+Number(v||0):n,0);
+   const efectivo=by('efectivo'), tarjeta=by('tarjeta'), transferencia=by('transfer'), cheque=by('cheque');
+   const otros=Math.max(0,Number(x.income||0)-efectivo-tarjeta-transferencia-cheque);
+   const expenses=await getExpenses54(x.date);
+   const payload={fecha:x.date,fecha_cierre:new Date().toISOString(),total_facturado:totalFacturado,total_cobrado:Number(x.income||0),total_gastos:Number(x.out||0),efectivo,tarjeta,transferencia,cheque,otros,efectivo_esperado:efectivo,efectivo_contado:efectivo,diferencia:0,neto:Number(x.net||0),cantidad_facturas:dayInv.length,cantidad_pagos:Number(x.count||0),cantidad_gastos:expenses.length,estado:'cerrado'};
+   const old=await f(`cierres_caja?select=id&fecha=eq.${encodeURIComponent(x.date)}&estado=eq.cerrado&limit=1`)||[];
+   if(old[0]?.id)await f(`cierres_caja?id=eq.${encodeURIComponent(old[0].id)}`,'PATCH',payload);else await f('cierres_caja','POST',payload);
+   notify?.('Cierre de caja guardado en Supabase.','success');
+   await renderCashCloseV54(x.date);
+ }catch(e){console.error('[Cierre caja] guardar',e);notify?.('No se pudo guardar el cierre de caja: '+(e.message||'Error'),'danger')}
+};
 window.printCashCloseV54=function(){const el=document.getElementById('billing-tab-content');if(!el)return;const w=window.open('','_blank');if(!w)return notify?.('Permite ventanas emergentes para imprimir.','warning');w.document.write(`<html><head><title>Cierre de caja</title><style>body{font-family:Arial;padding:28px;color:#233}button,input{display:none}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}.bill-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}</style></head><body><h2>NutriMachata · Cierre de caja</h2>${el.innerHTML}</body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print()},250)};
 const prevTab54=window.renderBillingTab;
 window.renderBillingTab=function(tab,btn){
