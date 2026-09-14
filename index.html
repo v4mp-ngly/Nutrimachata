@@ -14268,5 +14268,65 @@ window.NMBillingStableV51=true;
 </script>
 
 <script id="nm-structural-fix-v53">window.NMStructuralFixV53=true;</script>
-</body>
+\n<script id="nm-billing-complete-v54">
+(function(){
+'use strict';
+const esc54=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money54=v=>typeof moneyRD==='function'?moneyRD(Number(v||0)):'RD$ '+Number(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const today54=()=>new Date().toISOString().slice(0,10);
+function ensureAllBillingTabs54(){
+ const tabs=document.querySelector('.bill-tabs'); if(!tabs)return;
+ const wanted=[['invoices','Facturas'],['receivables','Cuentas por cobrar'],['payments','Pagos'],['inventory','Productos y servicios'],['templates','Plantilla'],['financial','Reportes'],['quotes','Cotizaciones'],['expenses','Gastos'],['cashclose','Cierre de caja'],['exports','Exportación'],['numbering','Configuración']];
+ wanted.forEach(([k,label])=>{
+   let b=tabs.querySelector(`[data-btab="${k}"]`);
+   if(!b){b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab=k;b.textContent=label;tabs.appendChild(b)}
+   b.onclick=()=>window.renderBillingTab(k,b);
+ });
+ // Reordenar sin recrear botones ni observers.
+ wanted.forEach(([k])=>{const b=tabs.querySelector(`[data-btab="${k}"]`);if(b)tabs.appendChild(b)});
+ const quick=document.querySelector('.bill-quick');
+ if(quick&&!quick.querySelector('[data-cashclose54]')){const a=document.createElement('a');a.dataset.cashclose54='1';a.innerHTML='<span>Cierre de caja</span><b>›</b>';a.onclick=()=>window.renderBillingTab('cashclose');quick.appendChild(a)}
+}
+async function getExpenses54(date){
+ try{const f=window.NMBillingClientAPI?.billingFetch;if(!f)return [];return await f(`gastos?select=*&fecha=eq.${encodeURIComponent(date)}&order=created_at.asc`)||[]}catch(e){console.warn('[Cierre caja] gastos',e);return []}
+}
+function paymentsForDate54(date){
+ const b=typeof getBillingData==='function'?getBillingData():{invoices:[]};
+ return (b.invoices||[]).flatMap(inv=>(inv.paymentHistory||[]).map(p=>({p,inv}))).filter(x=>String(x.p.date||x.p.datetime||'').slice(0,10)===date);
+}
+window.renderCashCloseV54=async function(date=today54()){
+ ensureAllBillingTabs54();
+ document.querySelectorAll('[data-btab]').forEach(b=>b.classList.toggle('active',b.dataset.btab==='cashclose'));
+ const el=document.getElementById('billing-tab-content');if(!el)return;
+ el.innerHTML='<div class="card"><div class="card-body" style="padding:28px;text-align:center">Calculando cierre de caja...</div></div>';
+ const pays=paymentsForDate54(date), expenses=await getExpenses54(date);
+ const income=pays.reduce((n,x)=>n+Number(x.p.amount||0),0), out=expenses.reduce((n,x)=>n+Number(x.monto||x.amount||0),0), net=income-out;
+ const methods={};pays.forEach(x=>{const m=x.p.method||'Otro';methods[m]=(methods[m]||0)+Number(x.p.amount||0)});
+ const hist=JSON.parse(localStorage.getItem('nm_cash_closures_v54')||'[]');
+ const previous=hist.find(x=>x.date===date);
+ el.innerHTML=`<div class="card"><div class="card-header"><div><div class="card-title">Cierre de caja</div><div class="card-subtitle">Resumen diario de cobros y gastos registrados.</div></div><div style="display:flex;gap:8px"><input id="cash54-date" class="form-control" type="date" value="${esc54(date)}" onchange="renderCashCloseV54(this.value)"><button class="btn btn-outline" onclick="printCashCloseV54()">Imprimir</button><button class="btn btn-olive" onclick="saveCashCloseV54()">Cerrar caja</button></div></div><div class="card-body">
+ <div class="bill-stats" style="margin-bottom:18px"><div class="card" style="padding:16px"><small>COBROS DEL DÍA</small><h3>${money54(income)}</h3></div><div class="card" style="padding:16px"><small>GASTOS DEL DÍA</small><h3>${money54(out)}</h3></div><div class="card" style="padding:16px"><small>NETO DE CAJA</small><h3>${money54(net)}</h3></div><div class="card" style="padding:16px"><small>TRANSACCIONES</small><h3>${pays.length}</h3></div></div>
+ ${previous?`<div style="padding:10px 12px;border:1px solid #d5e5cc;background:#f5faf2;border-radius:10px;margin-bottom:14px">✓ Este día tiene un cierre guardado: <b>${esc54(previous.closedAt)}</b></div>`:''}
+ <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.55fr);gap:16px"><div class="card"><div class="card-header"><div class="card-title">Cobros</div></div><div class="card-body">${pays.length?`<div class="table-responsive"><table class="table"><thead><tr><th>Factura</th><th>Paciente / cliente</th><th>Método</th><th>Referencia</th><th>Monto</th></tr></thead><tbody>${pays.map(x=>`<tr><td><b>${esc54(x.inv.number||'—')}</b></td><td>${esc54(x.inv.patient||'—')}</td><td>${esc54(x.p.method||'Otro')}</td><td>${esc54(x.p.reference||'—')}</td><td><b>${money54(x.p.amount)}</b></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty-state"><div class="empty-text">No hay cobros registrados en esta fecha.</div></div>'}</div></div><div><div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">Por método de pago</div></div><div class="card-body">${Object.keys(methods).length?Object.entries(methods).map(([m,v])=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #edf0eb"><span>${esc54(m)}</span><b>${money54(v)}</b></div>`).join(''):'Sin cobros.'}</div></div><div class="card"><div class="card-header"><div class="card-title">Gastos</div></div><div class="card-body">${expenses.length?expenses.map(g=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #edf0eb"><span>${esc54(g.descripcion||g.concepto||g.categoria||'Gasto')}</span><b>${money54(g.monto||g.amount)}</b></div>`).join(''):'Sin gastos registrados.'}</div></div></div></div>
+ </div></div>`;
+ window.NMCashCloseCurrent54={date,income,out,net,count:pays.length,methods,closedAt:new Date().toLocaleString('es-DO')};
+};
+window.saveCashCloseV54=function(){const x=window.NMCashCloseCurrent54;if(!x)return;let h=[];try{h=JSON.parse(localStorage.getItem('nm_cash_closures_v54')||'[]')}catch(e){}h=h.filter(r=>r.date!==x.date);h.unshift({...x,closedAt:new Date().toLocaleString('es-DO')});localStorage.setItem('nm_cash_closures_v54',JSON.stringify(h.slice(0,365)));notify?.('Cierre de caja guardado en este dispositivo.','success');renderCashCloseV54(x.date)};
+window.printCashCloseV54=function(){const el=document.getElementById('billing-tab-content');if(!el)return;const w=window.open('','_blank');if(!w)return notify?.('Permite ventanas emergentes para imprimir.','warning');w.document.write(`<html><head><title>Cierre de caja</title><style>body{font-family:Arial;padding:28px;color:#233}button,input{display:none}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0}.bill-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}</style></head><body><h2>NutriMachata · Cierre de caja</h2>${el.innerHTML}</body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print()},250)};
+const prevTab54=window.renderBillingTab;
+window.renderBillingTab=function(tab,btn){
+ if(tab==='cashclose')return window.renderCashCloseV54();
+ if(tab==='quotes'&&typeof window.renderQuotes==='function')return window.renderQuotes();
+ if(tab==='expenses'&&typeof window.renderExpenses==='function')return window.renderExpenses();
+ if(tab==='exports'&&typeof window.renderExportsV34==='function')return window.renderExportsV34();
+ if(tab==='numbering'&&typeof window.renderNumberingV34==='function')return window.renderNumberingV34();
+ if(tab==='receivables'&&typeof window.renderReceivablesV33==='function')return window.renderReceivablesV33();
+ return prevTab54?prevTab54.apply(this,arguments):undefined;
+};
+const prevBilling54=window.renderBilling;
+window.renderBilling=function(){const r=prevBilling54?prevBilling54.apply(this,arguments):undefined;setTimeout(ensureAllBillingTabs54,0);return r};
+window.NMEnsureBillingTabsV54=ensureAllBillingTabs54;
+setTimeout(ensureAllBillingTabs54,0);
+})();
+</script>\n</body>
 </html>
