@@ -14588,16 +14588,21 @@ const localDate70=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santo_D
 const api70=()=>window.NMBillingClientAPI?.billingFetch;
 const norm70=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function bounds70(date){const start=new Date(`${date}T00:00:00-04:00`),end=new Date(start.getTime()+86400000);return {start:start.toISOString(),end:end.toISOString()}}
+function paymentDate70(p){
+ const visible=String(p?.date||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(visible))return visible;
+ const raw=p?.datetime||p?.fecha_pago||p?.date||'',d=new Date(raw);if(!Number.isNaN(d.getTime()))return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santo_Domingo',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+ return String(raw).slice(0,10);
+}
 async function cashData70(date){
  const api=api70(),b=typeof getBillingData==='function'?getBillingData():{invoices:[]},map=new Map((b.invoices||[]).map(x=>[String(x.id),x])),{start,end}=bounds70(date);
- let rawPays=[],expenses=[],previous=null;
+ const localPays=(b.invoices||[]).flatMap(i=>(i.paymentHistory||[]).filter(p=>paymentDate70(p)===date).map(p=>({id:p.id,fecha_pago:p.datetime||p.date,monto:p.amount,metodo_pago:p.method,referencia:p.reference,factura_id:i.id,_inv:i})));
+ let remotePays=[],expenses=[],previous=null;
  if(api){
-  [rawPays,expenses]=await Promise.all([api(`pagos?select=*&fecha_pago=gte.${encodeURIComponent(start)}&fecha_pago=lt.${encodeURIComponent(end)}&order=fecha_pago.asc`).catch(()=>[]),api(`gastos?select=*&fecha=eq.${encodeURIComponent(date)}&estado=neq.anulado&order=created_at.asc`).catch(()=>[])]);
+  [remotePays,expenses]=await Promise.all([api(`pagos?select=*&fecha_pago=gte.${encodeURIComponent(start)}&fecha_pago=lt.${encodeURIComponent(end)}&order=fecha_pago.asc`).catch(()=>[]),api(`gastos?select=*&fecha=eq.${encodeURIComponent(date)}&estado=neq.anulado&order=created_at.asc`).catch(()=>[])]);
   const old=await api(`cierres_caja?select=*&fecha=eq.${encodeURIComponent(date)}&estado=eq.cerrado&order=fecha_cierre.desc&limit=1`).catch(()=>[]);previous=old?.[0]||null;
- }else{
-  rawPays=(b.invoices||[]).flatMap(i=>(i.paymentHistory||[]).filter(p=>String(p.datetime||p.date||'').slice(0,10)===date).map(p=>({id:p.id,fecha_pago:p.datetime||p.date,monto:p.amount,metodo_pago:p.method,referencia:p.reference,factura_id:i.id})));
  }
- const pays=(rawPays||[]).map(r=>({raw:r,inv:map.get(String(r.factura_id))||{},amount:Number(r.monto||0),method:typeof mapMethodFromDb==='function'?mapMethodFromDb(r.metodo_pago):(r.metodo_pago||'Otro')}));
+ const seen=new Set(),rawPays=[...(remotePays||[]),...localPays].filter(r=>{const key=r.id?`id:${r.id}`:`p:${r.factura_id||''}|${r.fecha_pago||''}|${Number(r.monto||0)}|${r.referencia||''}`;if(seen.has(key))return false;seen.add(key);return true});
+ const pays=rawPays.map(r=>({raw:r,inv:r._inv||map.get(String(r.factura_id))||{},amount:Number(r.monto||0),method:typeof mapMethodFromDb==='function'?mapMethodFromDb(r.metodo_pago):(r.metodo_pago||'Otro')}));
  const validInvoices=(b.invoices||[]).filter(i=>String(i.date||'').slice(0,10)===date&&!['archivada','anulada'].includes(norm70(typeof billingInvoiceStatus==='function'?billingInvoiceStatus(i):i.status)));
  const billed=validInvoices.reduce((n,i)=>n+Number(i.total||0),0),income=pays.reduce((n,p)=>n+p.amount,0),out=(expenses||[]).reduce((n,g)=>n+Number(g.monto||g.amount||0),0),methods={};pays.forEach(p=>methods[p.method]=(methods[p.method]||0)+p.amount);
  return {date,billed,income,out,net:income-out,pays,expenses:expenses||[],methods,invoiceCount:validInvoices.length,previous};
