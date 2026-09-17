@@ -14459,5 +14459,64 @@ window.NMPDFProfessionalV61=true;
 })();
 </script>
 
+
+<style id="nm-v62-cash-reports-style">
+.nm62-toolbar{display:grid;grid-template-columns:1fr 1fr auto auto;gap:9px;align-items:end;margin-bottom:16px}.nm62-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.nm62-kpi{border:1px solid #dfe7da;border-radius:14px;padding:16px;background:#fff}.nm62-kpi small{display:block;font-size:9px;font-weight:800;letter-spacing:.4px;color:#6f7b6c}.nm62-kpi b{display:block;font-size:21px;color:#355e20;margin-top:5px}.nm62-methods{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:14px 0}.nm62-method{padding:12px;border:1px solid #e4eadf;border-radius:11px;background:#f8faf6}.nm62-method small{display:block;color:#748071;font-size:9px}.nm62-method b{display:block;margin-top:4px}.nm62-status{display:inline-flex;padding:4px 9px;border-radius:999px;background:#eef6e9;color:#355e20;font-size:10px;font-weight:700}@media(max-width:900px){.nm62-toolbar{grid-template-columns:1fr 1fr}.nm62-kpis{grid-template-columns:1fr 1fr}.nm62-methods{grid-template-columns:1fr 1fr}}
+</style>
+<script id="nm-v62-cash-reports">
+(function(){
+'use strict';
+const esc62=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money62=v=>typeof moneyRD==='function'?moneyRD(Number(v||0)):'RD$ '+Number(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const today62=()=>new Date().toISOString().slice(0,10);
+const monthStart62=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`};
+const api62=()=>window.NMBillingClientAPI?.billingFetch;
+window.NMCashReportRangeV62={from:monthStart62(),to:today62(),rows:[]};
+
+async function fetchClosures62(from,to){
+ const f=api62(); if(!f)throw new Error('No hay conexión con Supabase');
+ let q='cierres_caja?select=*&estado=eq.cerrado&order=fecha.desc';
+ if(from)q+='&fecha=gte.'+encodeURIComponent(from);
+ if(to)q+='&fecha=lte.'+encodeURIComponent(to);
+ return await f(q)||[];
+}
+function totals62(rows){return rows.reduce((a,r)=>{a.facturado+=Number(r.total_facturado||0);a.cobrado+=Number(r.total_cobrado||0);a.gastos+=Number(r.total_gastos||0);a.neto+=Number(r.neto??(Number(r.total_cobrado||0)-Number(r.total_gastos||0)));a.efectivo+=Number(r.efectivo||0);a.tarjeta+=Number(r.tarjeta||0);a.transferencia+=Number(r.transferencia||0);a.cheque+=Number(r.cheque||0);a.otros+=Number(r.otros||0);a.pagos+=Number(r.cantidad_pagos||0);a.facturas+=Number(r.cantidad_facturas||0);a.gastosCount+=Number(r.cantidad_gastos||0);return a},{facturado:0,cobrado:0,gastos:0,neto:0,efectivo:0,tarjeta:0,transferencia:0,cheque:0,otros:0,pagos:0,facturas:0,gastosCount:0})}
+function dateLabel62(v){if(!v)return '—';try{return new Date(v+'T12:00:00').toLocaleDateString('es-DO',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return v}}
+
+window.renderCashReportsV62=async function(from=window.NMCashReportRangeV62.from,to=window.NMCashReportRangeV62.to){
+ window.NMCashReportRangeV62.from=from||'';window.NMCashReportRangeV62.to=to||'';
+ document.querySelectorAll('[data-btab]').forEach(b=>b.classList.toggle('active',b.dataset.btab==='financial'));
+ const el=document.getElementById('billing-tab-content');if(!el)return;
+ el.innerHTML='<div class="card"><div class="card-body" style="padding:32px;text-align:center">Cargando cierres de caja desde Supabase...</div></div>';
+ try{
+  const rows=await fetchClosures62(from,to);window.NMCashReportRangeV62.rows=rows;const t=totals62(rows);
+  el.innerHTML=`<div class="card"><div class="card-header"><div><div class="card-title">Reportes de caja</div><div class="card-subtitle">Los ingresos y gastos de este reporte provienen de los cierres de caja guardados en Supabase.</div></div></div><div class="card-body">
+  <div class="nm62-toolbar"><div class="form-group" style="margin:0"><label>Desde</label><input id="nm62-from" class="form-control" type="date" value="${esc62(from)}"></div><div class="form-group" style="margin:0"><label>Hasta</label><input id="nm62-to" class="form-control" type="date" value="${esc62(to)}"></div><button class="btn btn-outline" onclick="renderCashReportsV62(document.getElementById('nm62-from').value,document.getElementById('nm62-to').value)">Actualizar</button><button class="btn btn-olive" ${rows.length?'':'disabled'} onclick="downloadCashPeriodPDFV62()">Descargar PDF del período</button></div>
+  <div class="nm62-kpis"><div class="nm62-kpi"><small>CIERRES GUARDADOS</small><b>${rows.length}</b></div><div class="nm62-kpi"><small>TOTAL COBRADO</small><b>${money62(t.cobrado)}</b></div><div class="nm62-kpi"><small>GASTOS</small><b>${money62(t.gastos)}</b></div><div class="nm62-kpi"><small>NETO DE CAJA</small><b>${money62(t.neto)}</b></div></div>
+  <div class="nm62-methods"><div class="nm62-method"><small>Efectivo</small><b>${money62(t.efectivo)}</b></div><div class="nm62-method"><small>Tarjeta</small><b>${money62(t.tarjeta)}</b></div><div class="nm62-method"><small>Transferencia</small><b>${money62(t.transferencia)}</b></div><div class="nm62-method"><small>Cheque</small><b>${money62(t.cheque)}</b></div><div class="nm62-method"><small>Otros</small><b>${money62(t.otros)}</b></div></div>
+  <div style="display:flex;justify-content:space-between;align-items:end;margin:22px 0 9px"><div><div class="card-title">Historial de cierres</div><div class="card-subtitle">Cada fecha cerrada queda disponible para consulta y descarga.</div></div><div class="text-sm text-muted">${t.facturas} factura(s) · ${t.pagos} pago(s) · ${t.gastosCount} gasto(s)</div></div>
+  ${rows.length?`<div class="table-responsive"><table class="table"><thead><tr><th>Fecha</th><th>Facturado</th><th>Cobrado</th><th>Gastos</th><th>Neto</th><th>Pagos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${dateLabel62(r.fecha)}</b></td><td>${money62(r.total_facturado)}</td><td><b>${money62(r.total_cobrado)}</b></td><td>${money62(r.total_gastos)}</td><td><b style="color:${Number(r.neto||0)<0?'#b42318':'#355e20'}">${money62(r.neto)}</b></td><td>${Number(r.cantidad_pagos||0)}</td><td><span class="nm62-status">Cerrado</span></td><td><div class="bill-actions"><button class="btn btn-outline btn-sm" onclick="renderCashCloseV54('${esc62(r.fecha)}')">Ver</button><button class="btn btn-outline btn-sm" onclick="downloadSingleCashClosePDFV62('${esc62(r.id)}')">PDF</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty-state" style="padding:38px"><div class="empty-title">No hay cierres en este período</div><div class="empty-text">Realiza el cierre de caja de cada día para que aparezca automáticamente en este historial.</div></div>'}
+  </div></div>`;
+ }catch(e){console.error('[Reportes caja v62]',e);el.innerHTML=`<div class="card"><div class="card-body"><div class="empty-title">No se pudieron cargar los cierres</div><div class="empty-text">${esc62(e.message||'Error de conexión con Supabase')}</div></div></div>`}
+};
+
+function pdfShell62(title,subtitle,body){
+ const logo=typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'';
+ return `<div class="nm-pdf-v61" style="width:180mm;padding:4mm"><div class="nm-pdf-top"></div><div class="nm-pdf-head"><div>${logo?`<img src="${logo}" style="max-width:145px;max-height:46px;object-fit:contain">`:'<div class="nm-pdf-brand">NutriMachata</div>'}<div class="nm-pdf-sub">Dra. María Alejandra Chalas</div></div><div class="nm-pdf-title"><strong>${esc62(title)}</strong><div class="nm-pdf-meta">${esc62(subtitle)}</div></div></div>${body}<div class="nm-pdf-footer">Reporte generado por NutriMachata · ${new Date().toLocaleDateString('es-DO')}</div></div>`;
+}
+async function savePdf62(html,filename){
+ if(typeof html2pdf!=='function')throw new Error('El generador PDF no está disponible');const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:180mm;background:#fff;z-index:-1';host.innerHTML=html;document.body.appendChild(host);try{await Promise.all([...host.querySelectorAll('img')].map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=i.onerror=r})));await html2pdf().set({margin:[10,10,10,10],filename,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true},pagebreak:{mode:['css','legacy'],avoid:['tr','.nm-pdf-card','.nm-pdf-kpi']}}).from(host.firstElementChild).save()}finally{host.remove()}
+}
+function closureBody62(rows){const t=totals62(rows);return `<div class="nm-pdf-kpis"><div class="nm-pdf-kpi"><small>COBRADO</small><b>${money62(t.cobrado)}</b></div><div class="nm-pdf-kpi"><small>GASTOS</small><b>${money62(t.gastos)}</b></div><div class="nm-pdf-kpi"><small>NETO</small><b>${money62(t.neto)}</b></div></div><div class="nm-pdf-card"><div class="nm-pdf-label">Desglose por método de pago</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:9px;font-size:9px"><div>Efectivo<br><b>${money62(t.efectivo)}</b></div><div>Tarjeta<br><b>${money62(t.tarjeta)}</b></div><div>Transferencia<br><b>${money62(t.transferencia)}</b></div><div>Cheque<br><b>${money62(t.cheque)}</b></div><div>Otros<br><b>${money62(t.otros)}</b></div></div></div><table><thead><tr><th>Fecha</th><th style="text-align:right">Facturado</th><th style="text-align:right">Cobrado</th><th style="text-align:right">Gastos</th><th style="text-align:right">Neto</th><th style="text-align:center">Pagos</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${dateLabel62(r.fecha)}</b></td><td style="text-align:right">${money62(r.total_facturado)}</td><td style="text-align:right">${money62(r.total_cobrado)}</td><td style="text-align:right">${money62(r.total_gastos)}</td><td style="text-align:right"><b>${money62(r.neto)}</b></td><td style="text-align:center">${Number(r.cantidad_pagos||0)}</td></tr>`).join('')}</tbody></table><div class="nm-pdf-card"><div class="nm-pdf-label">Resumen del período</div><div style="font-size:10px;margin-top:6px">${rows.length} cierre(s) · ${t.facturas} factura(s) · ${t.pagos} pago(s) · ${t.gastosCount} gasto(s)</div></div>`}
+window.downloadCashPeriodPDFV62=async function(){const x=window.NMCashReportRangeV62,rows=x.rows||[];if(!rows.length)return notify?.('No hay cierres para descargar.','warning');try{await savePdf62(pdfShell62('REPORTE DE CAJA',`${dateLabel62(x.from)} - ${dateLabel62(x.to)}`,closureBody62(rows)),`Reporte_Caja_${x.from||'inicio'}_${x.to||'fin'}.pdf`)}catch(e){console.error(e);notify?.('No se pudo generar el PDF: '+(e.message||'Error'),'danger')}};
+window.downloadSingleCashClosePDFV62=async function(id){let r=(window.NMCashReportRangeV62.rows||[]).find(x=>String(x.id)===String(id));try{if(!r){const f=api62(),a=await f(`cierres_caja?select=*&id=eq.${encodeURIComponent(id)}&limit=1`)||[];r=a[0]}if(!r)return notify?.('No se encontró el cierre.','warning');await savePdf62(pdfShell62('CIERRE DE CAJA',dateLabel62(r.fecha),closureBody62([r])),`Cierre_Caja_${r.fecha}.pdf`)}catch(e){console.error(e);notify?.('No se pudo generar el PDF del cierre.','danger')}};
+
+// Mantener Reportes financieros ligado a cierres de caja, incluso después de re-renderizar Facturación.
+const prevTab62=window.renderBillingTab;
+window.renderBillingTab=function(tab,btn){if(tab==='financial'){try{window.NMBillingTabStateV29?.set('financial')}catch(e){}return window.renderCashReportsV62()}return prevTab62?prevTab62.apply(this,arguments):undefined};
+window.NMCashReportsV62=true;
+})();
+</script>
+
 </body>
 </html>
