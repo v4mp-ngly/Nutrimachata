@@ -3731,7 +3731,7 @@ function renderHistoriasList(list) {
           ${lastEval ? `
           <div style="text-align:center;padding:8px 14px;background:var(--beige);border-radius:var(--radius)">
             <div style="font-size:11px;font-weight:600;color:var(--black)">${lastEval.fecha}</div>
-            <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">Última eval.</div>
+            <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">Última evaluation.</div>
           </div>` : ''}
         </div>
 
@@ -5559,13 +5559,13 @@ function openEvaluationDetail(patientId, evalId) {
   const patient = DB.patients.find(p => p.id == patientId);
   if (!patient) return;
   
-  const eval = (patient.evaluaciones || []).find(e => e.id == evalId);
+  const evaluation = (patient.evaluaciones || []).find(e => e.id == evalId);
   if (!eval) return;
   
   currentPage = `eval-detail-${evalId}`;
   
   document.getElementById('page-title').textContent = patient.nombre;
-  document.getElementById('page-subtitle').textContent = `Evaluación del ${eval.fecha}`;
+  document.getElementById('page-subtitle').textContent = `Evaluación del ${evaluation.fecha}`;
   
   document.getElementById('page-content').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
@@ -5584,8 +5584,8 @@ function openEvaluationDetail(patientId, evalId) {
           <div style="font-family:'Playfair Display',serif;font-size:24px;font-weight:500;margin-bottom:4px">${patient.nombre}</div>
           <div style="opacity:0.8;font-size:13px;margin-bottom:10px">${patient.edad} años · ${patient.sexo==='F'?'Femenino':'Masculino'}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <span style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500">${eval.estado || 'N/A'}</span>
-            <span style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:12px">📅 ${eval.fecha}</span>
+            <span style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500">${evaluation.estado || 'N/A'}</span>
+            <span style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:12px">📅 ${evaluation.fecha}</span>
           </div>
         </div>
       </div>
@@ -5595,70 +5595,70 @@ function openEvaluationDetail(patientId, evalId) {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
       <div class="card" style="padding:16px 20px;text-align:center">
         <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">Peso</div>
-        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark);margin-bottom:4px">${eval.peso}</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--olive-dark);margin-bottom:4px">${evaluation.peso}</div>
         <div style="font-size:13px;color:var(--gray-500)">kg</div>
       </div>
       
       <div class="card" style="padding:16px 20px;text-align:center">
         <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">Talla</div>
-        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--info);margin-bottom:4px">${eval.talla}</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--info);margin-bottom:4px">${evaluation.talla}</div>
         <div style="font-size:13px;color:var(--gray-500)">m</div>
       </div>
       
       <div class="card" style="padding:16px 20px;text-align:center">
         <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">IMC</div>
-        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:${getImcColor(eval.imc)};margin-bottom:4px">${(eval.imc||0).toFixed(1)}</div>
-        <div style="font-size:13px"><span class="badge ${getImcBadge(eval.imc)}">${getImcCategory(eval.imc)}</span></div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:${getImcColor(evaluation.imc)};margin-bottom:4px">${(evaluation.imc||0).toFixed(1)}</div>
+        <div style="font-size:13px"><span class="badge ${getImcBadge(evaluation.imc)}">${getImcCategory(evaluation.imc)}</span></div>
       </div>
       
       <div class="card" style="padding:16px 20px;text-align:center">
         <div style="font-size:12px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px">Presión</div>
-        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--warning);margin-bottom:4px">${eval.presion || '—'}</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--warning);margin-bottom:4px">${evaluation.presion || '—'}</div>
         <div style="font-size:13px;color:var(--gray-500)">mmHg</div>
       </div>
     </div>
 
     <!-- MEDIDAS ANTROPOMÉTRICAS -->
-    ${(eval.cintura || eval.cadera || eval.abdomen || eval.muslo || eval.cuello || eval.pecho || eval.muneca) ? `
+    ${(evaluation.cintura || evaluation.cadera || evaluation.abdomen || evaluation.muslo || evaluation.cuello || evaluation.pecho || evaluation.muneca) ? `
     <div class="card mb-4">
       <div class="card-header"><div class="card-title">Medidas Antropométricas</div></div>
       <div class="card-body">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
-          ${eval.cuello ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.cuello ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Cuello</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.cuello} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.cuello} cm</div>
           </div>` : ''}
-          ${eval.pecho ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.pecho ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Pecho</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.pecho} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.pecho} cm</div>
           </div>` : ''}
-          ${eval.muneca ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.muneca ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Muñeca</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.muneca} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.muneca} cm</div>
           </div>` : ''}
-          ${eval.cintura ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.cintura ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Cintura</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.cintura} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.cintura} cm</div>
           </div>` : ''}
-          ${eval.abdomen ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.abdomen ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Abdomen</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.abdomen} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.abdomen} cm</div>
           </div>` : ''}
-          ${eval.cadera ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.cadera ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Cadera</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.cadera} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.cadera} cm</div>
           </div>` : ''}
-          ${eval.muslo ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.muslo ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">Muslo</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.muslo} cm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.muslo} cm</div>
           </div>` : ''}
-          ${eval.porcentaje_grasa ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.porcentaje_grasa ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">% Grasa</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.porcentaje_grasa}%</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.porcentaje_grasa}%</div>
           </div>` : ''}
-          ${eval.frecuencia_cardiaca ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
+          ${evaluation.frecuencia_cardiaca ? `<div style="padding:12px;background:var(--beige);border-radius:var(--radius);border-left:3px solid var(--olive)">
             <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;font-weight:600;margin-bottom:4px">FC</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${eval.frecuencia_cardiaca} lpm</div>
+            <div style="font-size:18px;font-weight:700;font-family:'DM Mono';color:var(--olive-dark)">${evaluation.frecuencia_cardiaca} lpm</div>
           </div>` : ''}
         </div>
       </div>
@@ -5666,12 +5666,12 @@ function openEvaluationDetail(patientId, evalId) {
     ` : ''}
 
     <!-- OBSERVACIONES -->
-    ${eval.obs ? `
+    ${evaluation.obs ? `
     <div class="card">
       <div class="card-header"><div class="card-title">Observaciones y Notas</div></div>
       <div class="card-body">
         <div style="background:var(--beige);border-radius:var(--radius);padding:16px;border-left:4px solid var(--olive);line-height:1.6;color:var(--gray-700)">
-          ${eval.obs}
+          ${evaluation.obs}
         </div>
       </div>
     </div>
@@ -9246,8 +9246,11 @@ function normalizeBillingInvoice(x){
   const subtotal=items.reduce((a,i)=>a+i.qty*i.price*(1-i.discount/100),0);
   const discount=Math.min(100,Math.max(0,Number(x.discount||0)));
   const taxable=subtotal*(1-discount/100), tax=Math.max(0,Number(x.tax||0)), total=taxable*(1+tax/100);
-  const paid=Math.max(0,Math.min(Number(x.paid||0),total));
   const paymentHistory=Array.isArray(x.paymentHistory)?x.paymentHistory:[];
+  // Los recibos son la fuente real del dinero cobrado. Esto evita que un
+  // total_pagado desactualizado marque como saldada una factura con balance.
+  const historyPaid=paymentHistory.reduce((sum,p)=>sum+Math.max(0,Number(p.amount||p.monto||0)),0);
+  const paid=Math.max(0,Math.min(paymentHistory.length?historyPaid:Number(x.paid||0),total));
   return {...x,id:x.id||('inv-'+Date.now()+Math.random()),number:String(x.number||''),date:x.date||billingToday(),dueDate:x.dueDate||'',patientId:x.patientId||'',patient:String(x.patient||''),email:String(x.email||''),rnc:String(x.rnc||''),ncf:String(x.ncf||''),notes:String(x.notes||''),items,subtotal,discount,tax,total,paid,paymentHistory,status:String(x.status||'Pendiente')};
 }
 function normalizeBillingData(raw){
