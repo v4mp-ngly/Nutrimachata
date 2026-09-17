@@ -14456,5 +14456,58 @@ window.NMProPDF64={save:save64,preview:preview64,header:header64,wait:wait64};
 window.NMPDFProfessionalV64=true;
 })();
 </script>
+<script id="nm-invoice-vector-pdf-v65">
+(function(){
+'use strict';
+const E65=v=>String(v??'');
+const N65=v=>Number(v||0);
+const money65=v=>'RD$ '+N65(v).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const safe65=v=>E65(v||'Factura').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
+const date65=v=>{if(!v)return 'No especificada';try{return new Date(E65(v).length<=10?E65(v)+'T12:00:00':v).toLocaleDateString('es-DO',{day:'2-digit',month:'long',year:'numeric'})}catch(_){return E65(v)}};
+function invoice65(id){const b=typeof getBillingData==='function'?getBillingData():null;return {b,x:b?.invoices?.find(i=>String(i.id)===String(id))};}
+function jsPDF65(){return window.jspdf?.jsPDF||window.jsPDF||null;}
+function status65(x){return typeof billingInvoiceStatus==='function'?billingInvoiceStatus(x):(N65(x.paid)>=N65(x.total)?'Pagada':N65(x.paid)>0?'Pago parcial':'Pendiente');}
+function lineTotal65(i){return typeof billingLineTotal==='function'?billingLineTotal(i):N65(i.qty||1)*N65(i.price)*(1-N65(i.discount)/100);}
+function buildInvoicePDF65(x,b){
+ const C=jsPDF65();if(!C)throw new Error('El generador vectorial PDF no está disponible.');
+ const pdf=new C({unit:'mm',format:'a4',orientation:'portrait',compress:true}),W=210,H=297,L=15,R=195,green=[53,94,32],olive=[94,140,42],ink=[35,49,38],muted=[105,116,103],pale=[244,247,241];
+ const logo=typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'';
+ const ident=typeof nmDocumentIdentity==='function'?nmDocumentIdentity():{clinic:'NutriMachata',doctor:'Dra. María Alejandra Chalas'};
+ const setText=(size,color=ink,style='normal')=>{pdf.setFont('helvetica',style);pdf.setFontSize(size);pdf.setTextColor(...color)};
+ const header=()=>{
+  pdf.setFillColor(...olive);pdf.rect(L,12,R-L,1.2,'F');
+  if(logo){try{pdf.addImage(logo,'PNG',L,18,39,13)}catch(_){setText(21,green,'bold');pdf.text(ident.clinic||'NutriMachata',L,27)}}else{setText(21,green,'bold');pdf.text(ident.clinic||'NutriMachata',L,27)}
+  setText(8,muted);pdf.text(ident.doctor||'Dra. María Alejandra Chalas',L,35);pdf.text('Nutrición clínica y seguimiento',L,39);
+  setText(26,ink,'bold');pdf.text('FACTURA',R,24,{align:'right'});setText(11,green,'bold');pdf.text(E65(x.number||'—'),R,31,{align:'right'});setText(8.5,muted);pdf.text('Emisión: '+date65(x.date),R,36,{align:'right'});setText(8.5,muted);pdf.text('Estado: '+E65(status65(x)).toUpperCase(),R,40,{align:'right'});
+  pdf.setDrawColor(220,229,216);pdf.line(L,45,R,45);
+ };
+ const tableHeader=y=>{pdf.setFillColor(...green);pdf.rect(L,y,R-L,9,'F');setText(8,[255,255,255],'bold');pdf.text('CONCEPTO',L+3,y+5.8);pdf.text('CANT.',121,y+5.8,{align:'right'});pdf.text('PRECIO',148,y+5.8,{align:'right'});pdf.text('DESC.',169,y+5.8,{align:'right'});pdf.text('TOTAL',R-3,y+5.8,{align:'right'});return y+9;};
+ header();
+ pdf.setFillColor(...pale);pdf.roundedRect(L,50,R-L,29,2,2,'F');
+ setText(7.5,olive,'bold');pdf.text('FACTURADO A',L+4,56);pdf.text('DATOS FISCALES',111,56);
+ setText(11,ink,'bold');pdf.text(E65(x.patient||'Cliente / paciente'),L+4,62,{maxWidth:82});pdf.text('NCF: '+E65(x.ncf||'No especificado'),111,62,{maxWidth:80});
+ setText(8.5,muted);pdf.text('RNC / Cédula: '+E65(x.rnc||'No especificado'),L+4,68,{maxWidth:82});pdf.text('Vencimiento: '+date65(x.dueDate),111,68,{maxWidth:80});
+ let y=86;y=tableHeader(y);
+ const items=Array.isArray(x.items)?x.items:[];
+ for(const item of items.length?items:[{description:'Sin conceptos registrados',qty:'—',price:0,discount:0}]){
+  const lines=pdf.splitTextToSize(E65(item.description||item.descripcion||'Concepto'),82),rh=Math.max(10,lines.length*4.2+4);
+  if(y+rh>245){pdf.addPage();header();y=52;y=tableHeader(y)}
+  setText(8.7,ink);pdf.text(lines,L+3,y+5);pdf.text(E65(item.qty??item.cantidad??1),121,y+5,{align:'right'});pdf.text(money65(item.price??item.precio_unitario),148,y+5,{align:'right'});pdf.text(N65(item.discount??item.descuento)+'%',169,y+5,{align:'right'});setText(8.7,ink,'bold');pdf.text(money65(lineTotal65(item)),R-3,y+5,{align:'right'});pdf.setDrawColor(230,234,228);pdf.line(L,y+rh,R,y+rh);y+=rh;
+ }
+ if(y>205){pdf.addPage();header();y=53}
+ const balance=typeof billingInvoiceBalance==='function'?billingInvoiceBalance(x):Math.max(0,N65(x.total)-N65(x.paid)),sx=112,sw=83;
+ const summary=[['Subtotal',money65(x.subtotal)],['Descuento general',N65(x.discount)+'%'],['ITBIS',N65(x.tax)+'%']];
+ summary.forEach(([k,v])=>{setText(8.8,muted);pdf.text(k,sx,y+5);setText(8.8,ink,'bold');pdf.text(v,R-3,y+5,{align:'right'});y+=7});
+ pdf.setFillColor(...pale);pdf.setDrawColor(...olive);pdf.roundedRect(sx,y,sw,13,1.5,1.5,'FD');setText(13,green,'bold');pdf.text('TOTAL',sx+4,y+8.7);pdf.text(money65(x.total),R-3,y+8.7,{align:'right'});y+=18;
+ setText(8.8,muted);pdf.text('Pagado',sx,y+4);setText(8.8,ink,'bold');pdf.text(money65(x.paid),R-3,y+4,{align:'right'});y+=7;setText(8.8,muted);pdf.text('Saldo pendiente',sx,y+4);setText(9.5,balance>0?[166,97,22]:green,'bold');pdf.text(money65(balance),R-3,y+4,{align:'right'});y+=12;
+ const note=E65(x.notes||b?.templateNote||'Gracias por confiar en NutriMachata.');const noteLines=pdf.splitTextToSize(note,172),nh=Math.max(18,noteLines.length*4+10);if(y+nh>270){pdf.addPage();header();y=53}pdf.setDrawColor(224,231,220);pdf.roundedRect(L,y,R-L,nh,2,2,'S');setText(7.5,olive,'bold');pdf.text('NOTA',L+4,y+6);setText(8.5,muted);pdf.text(noteLines,L+4,y+12);y+=nh;
+ const pages=pdf.internal.getNumberOfPages(),stamp=new Date().toLocaleString('es-DO',{dateStyle:'medium',timeStyle:'short'});for(let p=1;p<=pages;p++){pdf.setPage(p);pdf.setDrawColor(224,231,220);pdf.line(L,285,R,285);setText(7,muted);pdf.text(`${ident.clinic||'NutriMachata'} · ${ident.doctor||''} · ${E65(x.number)} · ${stamp}`,L,290);pdf.text(`Página ${p} de ${pages}`,R,290,{align:'right'});}
+ return pdf;
+}
+window.downloadInvoicePDF=function(id){const {b,x}=invoice65(id);if(!x)return notify?.('La factura ya no existe.','warning');try{const pdf=buildInvoicePDF65(x,b);pdf.save(`${safe65(x.number)}_${safe65(x.patient)}.pdf`);notify?.('Factura PDF descargada correctamente.','success')}catch(e){console.error('[Factura vectorial v65]',e);notify?.('No se pudo generar la factura: '+(e.message||'Error'),'danger')}};
+window.previewInvoicePDF=function(id){const {b,x}=invoice65(id);if(!x)return notify?.('La factura ya no existe.','warning');try{const pdf=buildInvoicePDF65(x,b),url=URL.createObjectURL(pdf.output('blob'));document.getElementById('nm-invoice65-preview')?.remove();const o=document.createElement('div');o.id='nm-invoice65-preview';o.className='nm-print-preview-overlay';o.innerHTML=`<div class="nm-print-preview-toolbar"><div><div class="nm-print-preview-title">Vista previa - ${E65(x.number)}</div><div class="nm-print-preview-meta">Factura vectorial A4 · sin recortes</div></div><div class="nm-print-preview-actions"><button class="btn btn-outline btn-sm">Cerrar</button><button class="btn btn-olive btn-sm">Descargar PDF</button></div></div><iframe title="Vista previa de factura" style="width:min(100%,900px);height:calc(100vh - 105px);background:#fff;border:0;border-radius:10px" src="${url}"></iframe>`;const close=()=>{URL.revokeObjectURL(url);o.remove()};o.querySelector('.btn-outline').onclick=close;o.querySelector('.btn-olive').onclick=()=>{pdf.save(`${safe65(x.number)}_${safe65(x.patient)}.pdf`);close()};document.body.appendChild(o)}catch(e){console.error(e);notify?.('No se pudo abrir la vista previa.','danger')}};
+window.NMInvoiceVectorPDFV65={build:buildInvoicePDF65};
+})();
+</script>
 </body>
 </html>
