@@ -14428,7 +14428,7 @@ async function wait64(root){await Promise.all([...root.querySelectorAll('img')].
 async function save64(node,filename,options={}){
  if(typeof html2pdf!=='function')throw new Error('El generador PDF no está disponible. Revisa tu conexión.');
  node.classList.add('nm-pdf64');node.style.setProperty('width',options.orientation==='landscape'?'267mm':'180mm','important');node.style.setProperty('max-width',options.orientation==='landscape'?'267mm':'180mm','important');
- const host=document.createElement('div');host.style.cssText=`position:fixed;left:-12000px;top:0;width:${options.orientation==='landscape'?'267mm':'180mm'};background:#fff;z-index:-1;overflow:visible;`;host.appendChild(node);document.body.appendChild(host);
+ const host=document.createElement('div');host.style.cssText=`position:absolute;left:0;top:-12000px;width:${options.orientation==='landscape'?'267mm':'180mm'};background:#fff;z-index:-1;overflow:visible;pointer-events:none;`;host.appendChild(node);document.body.appendChild(host);
  try{await wait64(node);const worker=html2pdf().set({margin:options.orientation==='landscape'?[12,10,14,10]:[12,10,15,10],filename:filename||'NutriMachata.pdf',image:{type:'jpeg',quality:.99},html2canvas:{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',logging:false,scrollX:0,scrollY:0,windowWidth:options.orientation==='landscape'?1120:820},jsPDF:{unit:'mm',format:'a4',orientation:options.orientation||'portrait',compress:true},pagebreak:{mode:['css','legacy'],avoid:['tr','img','.card','.metric-card','.measure-box','.obs-box','.nm-pdf-card','.nm-pdf-kpi','.invoice-party','.invoice-print-summary','.invoice-print-note','.v39-head','.v39-party','.v39-summary','.v39-bottom']}}).from(node).toPdf();const pdf=await worker.get('pdf'),pages=pdf.internal.getNumberOfPages(),land=options.orientation==='landscape',y=land?203:291,right=land?287:200,i=ident64(),logo=logo64();for(let p=1;p<=pages;p++){pdf.setPage(p);if(p>1){try{if(logo)pdf.addImage(logo,'PNG',10,2.5,20,6.5)}catch(_){pdf.setFontSize(9);pdf.setTextColor(53,94,32);pdf.text(i.clinic||'NutriMachata',10,7)}pdf.setDrawColor(94,140,42);pdf.line(10,10,right,10);pdf.setFontSize(7);pdf.setTextColor(105);pdf.text(i.doctor||'',right,7,{align:'right'});}pdf.setDrawColor(220,228,216);pdf.line(10,y-4,right,y-4);pdf.setFontSize(7);pdf.setTextColor(105);pdf.text(`${i.clinic||'NutriMachata'} · ${i.doctor||''} · ${stamp64()}`,10,y);pdf.text(`Página ${p} de ${pages}`,right,y,{align:'right'});}pdf.save(filename||'NutriMachata.pdf');return true;}finally{host.remove();}
 }
 function preview64(node,filename,options={}){
@@ -14460,7 +14460,7 @@ window.NMPDFProfessionalV64=true;
 <script id="nm-invoice-pdf-fix-v66">
 (function(){
 'use strict';
-window.NMInvoicePDFFixV66=true;
+window.NMInvoicePDFFixV66=true;window.NMPDFNoClipV67=true;
 })();
 </script>
 </body>
