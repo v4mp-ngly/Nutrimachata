@@ -12894,7 +12894,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
   function productDbToUi(p){return normalizeBillingProduct({
     id:p.id,name:p.nombre,description:p.descripcion||'',type:lower(p.tipo)==='servicio'?'Servicio':'Producto',category:p.categoria||'',price:num(p.precio),cost:num(p.costo),stock:num(p.stock),min:num(p.stock_minimo),active:p.activo!==false
   });}
-  function detailDbToUi(d){return {id:d.id,productId:d.producto_servicio_id||'',description:d.descripcion||'Concepto',qty:num(d.cantidad,1),price:num(d.precio_unitario),discount:num(d.descuento)};}
+  function detailDbToUi(d){const qty=num(d.cantidad,1),price=num(d.precio_unitario),gross=qty*price,discountAmount=Math.max(0,num(d.descuento));const discount=gross>0?Math.max(0,Math.min(100,discountAmount/gross*100)):0;return {id:d.id,productId:d.producto_servicio_id||'',description:d.descripcion||'Concepto',qty,price,discount,discountAmount};}
   function paymentDbToUi(p,inv){return {id:p.id,date:String(p.fecha_pago||'').slice(0,10),datetime:String(p.fecha_pago||''),amount:num(p.monto),method:mapMethodFromDb(p.metodo_pago),reference:p.referencia||'',invoice:inv?.number||'',patient:inv?.patient||''};}
 
   async function loadBillingFromSupabase(force=false){
@@ -14868,5 +14868,6 @@ window.openEvalModal=async function(patientId){
 try{openEvalModal=window.openEvalModal}catch(_){ }
 })();
 </script>
+<script id="nm-discount-fix-v76">window.NMDiscountFixV76=true;</script>
 </body>
 </html>
