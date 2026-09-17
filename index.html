@@ -14407,5 +14407,57 @@ window.NMExpensesPersistentV56=true;
 setTimeout(ensureAllBillingTabs54,0);
 })();
 </script>
+<style id="nm-pdf-design-v61">
+.nm-pdf-v61{font-family:Montserrat,Arial,sans-serif;color:#243126;background:#fff;line-height:1.45}.nm-pdf-v61 *{box-sizing:border-box}.nm-pdf-v61 .nm-pdf-top{height:3px;background:#5e8c2a;margin-bottom:22px}.nm-pdf-v61 .nm-pdf-head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:1px solid #dfe7da;padding-bottom:16px}.nm-pdf-v61 .nm-pdf-brand{font-size:25px;font-weight:800;color:#355e20}.nm-pdf-v61 .nm-pdf-sub{font-size:10px;color:#778174;margin-top:3px}.nm-pdf-v61 .nm-pdf-title{text-align:right}.nm-pdf-v61 .nm-pdf-title strong{font-size:23px;color:#182016}.nm-pdf-v61 .nm-pdf-meta{font-size:10px;color:#6f786d;margin-top:3px}.nm-pdf-v61 .nm-pdf-card{background:#f4f7f1;border:1px solid #dfe7da;border-radius:10px;padding:14px 16px;margin:18px 0}.nm-pdf-v61 .nm-pdf-label{font-size:8px;font-weight:800;letter-spacing:.6px;color:#5e7e39;text-transform:uppercase}.nm-pdf-v61 table{width:100%;border-collapse:collapse;table-layout:auto}.nm-pdf-v61 thead{display:table-header-group}.nm-pdf-v61 th{background:#355e3b;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.2px;padding:10px 8px;text-align:left}.nm-pdf-v61 td{padding:10px 8px;border-bottom:1px solid #e5eae2;font-size:10px;vertical-align:middle}.nm-pdf-v61 tr{break-inside:avoid;page-break-inside:avoid}.nm-pdf-v61 .nm-pdf-total{margin:18px 0 0 auto;width:310px}.nm-pdf-v61 .nm-pdf-total>div{display:flex;justify-content:space-between;padding:5px 7px;font-size:10px}.nm-pdf-v61 .nm-pdf-total .grand{font-size:17px;font-weight:800;color:#355e20;border-top:2px solid #6d913e;background:#f4f7f1;padding:10px 7px;margin-top:5px}.nm-pdf-v61 .nm-pdf-footer{margin-top:28px;padding-top:12px;border-top:1px solid #e1e6de;text-align:center;font-size:8px;color:#7b8379}.nm-pdf-v61 .nm-pdf-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.nm-pdf-v61 .nm-pdf-kpi{border:1px solid #dfe7da;border-radius:10px;padding:13px;background:#f8faf6}.nm-pdf-v61 .nm-pdf-kpi small{font-size:8px;font-weight:800;color:#6f7b6c}.nm-pdf-v61 .nm-pdf-kpi b{display:block;font-size:18px;color:#355e20;margin-top:4px}@media print{@page{size:A4;margin:10mm}.nm-pdf-v61{max-width:190mm;margin:auto}}
+</style>
+<script id="nm-pdf-profesional-v61">
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const M=v=>typeof moneyRD==='function'?moneyRD(v):'RD$ '+Number(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const logo=()=>typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'';
+const brand=()=>logo()?`<img src="${logo()}" style="max-width:145px;max-height:46px;object-fit:contain">`:`<div class="nm-pdf-brand">NutriMachata</div>`;
+const foot=(label='Documento')=>`<div class="nm-pdf-footer">${E(label)} generado por NutriMachata · Dra. María Alejandra Chalas · ${new Date().toLocaleDateString('es-DO')}</div>`;
+async function save(root,filename,orientation='portrait'){
+ if(typeof html2pdf!=='function')throw new Error('El generador PDF no está disponible');
+ document.body.appendChild(root); const doc=root.firstElementChild||root;
+ await Promise.all([...doc.querySelectorAll('img')].map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=i.onerror=r})));
+ try{return await html2pdf().set({margin:[10,10,10,10],filename,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',logging:false,scrollX:0,scrollY:0},jsPDF:{unit:'mm',format:'a4',orientation,compress:true},pagebreak:{mode:['css','legacy'],avoid:['tr','.nm-pdf-card','.nm-pdf-kpi']}}).from(doc).save()}finally{root.remove()}
+}
+function host(html){const h=document.createElement('div');h.style.cssText='position:fixed;left:-10000px;top:0;width:180mm;background:#fff;z-index:-1';h.innerHTML=html;return h}
+
+// Estilo base para historia clínica, evaluaciones, dietas y documentos que usan downloadPDF.
+const oldDownload=window.downloadPDF;
+window.downloadPDF=function(htmlContent,filename){
+ try{
+  const p=new DOMParser().parseFromString(htmlContent,'text/html');
+  const style=`<style>body{font-family:Montserrat,Arial,sans-serif!important;color:#243126!important}h1,h2,h3{color:#355e20}table{border-collapse:collapse}th{background:#355e3b!important;color:#fff!important}td,th{padding:8px}img{max-width:100%}.card,.measure-box,.obs-box{break-inside:avoid;page-break-inside:avoid}p{line-height:1.5}</style>`;
+  p.head.insertAdjacentHTML('beforeend',style);
+  return oldDownload.call(this,'<!doctype html>'+p.documentElement.outerHTML,filename);
+ }catch(e){console.warn('[PDF v61] estilo base',e);return oldDownload.call(this,htmlContent,filename)}
+};
+
+// Cotización profesional.
+window.downloadQuotePDF=async function(id){
+ const q=(typeof QUOTES!=='undefined'?QUOTES:[]).find(x=>String(x.id)===String(id)); if(!q)return notify?.('No se encontró la cotización.','warning');
+ const rows=(q.items||[]).map(i=>`<tr><td>${E(i.descripcion)}</td><td style="text-align:center">${E(i.cantidad)}</td><td style="text-align:right">${M(i.precio_unitario)}</td><td style="text-align:right">${Number(i.descuento||0)}%</td><td style="text-align:right"><b>${M(i.total_linea??i.subtotal)}</b></td></tr>`).join('');
+ const html=`<div class="nm-pdf-v61" style="width:180mm;padding:4mm"><div class="nm-pdf-top"></div><div class="nm-pdf-head"><div>${brand()}<div class="nm-pdf-sub">Nutrición clínica · Bienestar · Seguimiento<br>Dra. María Alejandra Chalas</div></div><div class="nm-pdf-title"><strong>COTIZACIÓN</strong><div class="nm-pdf-meta">${E(q.numero_cotizacion||q.numero||'')}</div><div class="nm-pdf-meta">Fecha: ${E(q.fecha||'—')}</div></div></div><div class="nm-pdf-card"><div class="nm-pdf-label">Cliente / paciente</div><b style="font-size:15px">${E(q.cliente_nombre||q.paciente_nombre||'—')}</b><div style="font-size:10px;margin-top:3px">Cédula/RNC: ${E(q.cedula_rnc||q.cedula||'—')} · Válida hasta: ${E(q.valida_hasta||q.fecha_vencimiento||'—')}</div></div><table><thead><tr><th>Concepto</th><th>Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">Desc.</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Sin conceptos registrados</td></tr>'}</tbody></table><div class="nm-pdf-total"><div><span>Subtotal</span><b>${M(q.subtotal)}</b></div><div><span>Descuento</span><b>${M(q.descuento)}</b></div><div><span>ITBIS</span><b>${M(q.impuestos)}</b></div><div class="grand"><span>TOTAL</span><b>${M(q.total)}</b></div></div>${q.notas?`<div class="nm-pdf-card"><div class="nm-pdf-label">Notas</div><div style="font-size:10px;margin-top:4px">${E(q.notas)}</div></div>`:''}${foot('Cotización')}</div>`;
+ try{await save(host(html),`${E(q.numero_cotizacion||q.numero||'Cotizacion').replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`)}catch(e){console.error(e);notify?.('No se pudo generar la cotización PDF.','danger')}
+};
+
+// Recibo de pago profesional.
+window.downloadPaymentReceiptV20=async function(invoiceId,paymentId){
+ const x=getBillingData().invoices.find(i=>String(i.id)===String(invoiceId));const p=x?.paymentHistory?.find(q=>String(q.id)===String(paymentId));if(!x||!p)return notify?.('No se encontró el pago.','warning');
+ const hist=x.paymentHistory||[],idx=hist.findIndex(q=>String(q.id)===String(paymentId)),before=hist.slice(0,Math.max(0,idx)).reduce((n,q)=>n+Number(q.amount||0),0),amount=Number(p.amount||0),remaining=Math.max(0,Number(x.total||0)-before-amount);const no=window.NMReceiptNumberConfigured?window.NMReceiptNumberConfigured(p,x):(window.NMReceiptNumber?.(p)||'RECIBO');
+ const html=`<div class="nm-pdf-v61" style="width:180mm;padding:4mm"><div class="nm-pdf-top"></div><div class="nm-pdf-head"><div>${brand()}<div class="nm-pdf-sub">Dra. María Alejandra Chalas</div></div><div class="nm-pdf-title"><strong>RECIBO DE PAGO</strong><div class="nm-pdf-meta">${E(no)}</div><div class="nm-pdf-meta">${E(p.datetime||p.date||'')}</div></div></div><div class="nm-pdf-card"><div class="nm-pdf-label">Recibido de</div><b style="font-size:15px">${E(x.patient||'—')}</b><div style="font-size:10px;margin-top:3px">Factura: <b>${E(x.number||'—')}</b> · Cédula/RNC: ${E(x.rnc||'—')}</div></div><div style="background:#355e3b;color:#fff;border-radius:12px;padding:18px 20px;margin:18px 0"><div style="font-size:9px;letter-spacing:.6px">MONTO RECIBIDO</div><div style="font-size:29px;font-weight:800;margin-top:4px">${M(amount)}</div></div><table><tbody><tr><td>Total factura</td><td style="text-align:right"><b>${M(x.total)}</b></td></tr><tr><td>Balance antes del pago</td><td style="text-align:right"><b>${M(Math.max(0,Number(x.total||0)-before))}</b></td></tr><tr><td>Este pago</td><td style="text-align:right"><b>${M(amount)}</b></td></tr><tr><td style="font-size:12px;font-weight:800">Saldo restante</td><td style="text-align:right;font-size:15px;color:${remaining>0?'#b76812':'#355e20'}"><b>${M(remaining)}</b></td></tr></tbody></table><div class="nm-pdf-card" style="display:grid;grid-template-columns:1fr 1fr;gap:18px"><div><div class="nm-pdf-label">Método</div><b>${E(p.method||'Otro')}</b></div><div><div class="nm-pdf-label">Referencia</div><b>${E(p.reference||'—')}</b></div></div>${foot('Recibo de pago')}</div>`;
+ try{await save(host(html),`${E(no).replace(/[^a-zA-Z0-9_-]/g,'_')}_${E(x.number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`)}catch(e){console.error(e);notify?.('No se pudo generar el recibo PDF.','danger')}
+};
+
+// Impresión del cierre de caja con formato de reporte A4.
+window.printCashCloseV54=function(){const el=document.getElementById('billing-tab-content');if(!el)return;const w=window.open('','_blank');if(!w)return notify?.('Permite ventanas emergentes para imprimir.','warning');const clone=el.cloneNode(true);clone.querySelectorAll('button,input,select').forEach(n=>n.remove());w.document.write(`<!doctype html><html><head><title>Cierre de caja</title><style>@page{size:A4;margin:12mm}body{font-family:Montserrat,Arial,sans-serif;color:#243126;margin:0}.head{border-top:4px solid #5e8c2a;border-bottom:1px solid #dfe7da;padding:18px 0;margin-bottom:18px;display:flex;justify-content:space-between}.head h1{margin:0;color:#355e20;font-size:24px}.head small{color:#748071}.card{border:1px solid #dfe7da!important;border-radius:10px!important;padding:12px!important;margin:10px 0!important;break-inside:avoid}.bill-stats{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:8px!important}.bill-stats h3{color:#355e20;margin:5px 0}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#355e3b;color:#fff;padding:8px;text-align:left}td{padding:8px;border-bottom:1px solid #e5eae2}tr{break-inside:avoid}.footer{text-align:center;border-top:1px solid #e1e6de;margin-top:25px;padding-top:10px;font-size:8px;color:#7b8379}</style></head><body><div class="head"><div><h1>NutriMachata</h1><small>Dra. María Alejandra Chalas</small></div><div style="text-align:right"><b>CIERRE DE CAJA</b><br><small>${new Date().toLocaleDateString('es-DO')}</small></div></div>${clone.innerHTML}<div class="footer">Cierre de caja generado por NutriMachata</div><script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script></body></html>`);w.document.close()};
+window.NMPDFProfessionalV61=true;
+})();
+</script>
+
 </body>
 </html>
