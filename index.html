@@ -14527,7 +14527,10 @@ const S69=v=>String(v||'Documento').normalize('NFD').replace(/[\u0300-\u036f]/g,
 const logo69=()=>typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPORT_LOGO:'';
 const ident69=()=>typeof nmDocumentIdentity==='function'?nmDocumentIdentity():{clinic:'NutriMachata',doctor:'Dra. María Alejandra Chalas'};
 function shell69(title,meta,body,orientation='portrait'){
- const i=ident69(),logo=logo69(),doc=document.createElement('div');doc.className='nm-billing-pdf69';doc.style.width=orientation==='landscape'?'255mm':'176mm';doc.style.padding='0 4mm';
+ const i=ident69(),logo=logo69(),doc=document.createElement('div');doc.className='nm-billing-pdf69';doc.style.width=orientation==='landscape'?'255mm':'176mm';
+ /* Debe ser inline + important: .nm-pdf64 usa padding:0!important al exportar.
+    Sin esta prioridad html2canvas recorta los textos del borde izquierdo. */
+ doc.style.setProperty('padding',orientation==='landscape'?'0 8mm':'0 10mm','important');
  doc.innerHTML=`<div class="p69-line"></div><div class="p69-head"><div>${logo?`<img class="p69-logo" src="${logo}" alt="NutriMachata">`:`<div class="p69-brand">${E69(i.clinic||'NutriMachata')}</div>`}<div class="p69-doctor">${E69(i.doctor||'Dra. María Alejandra Chalas')} · Nutrición clínica y seguimiento</div></div><div class="p69-title"><strong>${E69(title)}</strong><span>${E69(meta||'')}</span></div></div>${body}<div class="p69-footer">${E69(i.clinic||'NutriMachata')} · ${E69(i.doctor||'')} · Generado ${new Date().toLocaleString('es-DO')}</div>`;
  return doc;
 }
