@@ -4254,7 +4254,13 @@ async function savePatient(id) {
       if (!created?.id) throw new Error('Supabase no confirmó la creación del paciente.');
       if (created && created.id) {
         const newP = mapPaciente(created, [], [], null);
-        DB.patients.push(newP);
+        // Supabase devuelve el registro real. Lo incorporamos de inmediato al estado
+        // de la aplicación para que NO sea necesario recargar ni abrir otra pestaña.
+        DB.patients = [newP, ...(DB.patients || []).filter(x => String(x.id) !== String(newP.id))];
+        if ((document.getElementById('page-title')?.textContent || '').trim() === 'Pacientes') {
+          renderPatients();
+        }
+        document.dispatchEvent(new CustomEvent('nm:patients-updated', {detail:{action:'created', patient:newP}}));
         // Create portal account if email provided
         const emailVal = document.getElementById('pm-email')?.value?.trim();
         const passVal  = document.getElementById('pm-pass')?.value?.trim();
@@ -4294,22 +4300,52 @@ async function savePatient(id) {
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';}
     return;
   }
-  // Recarga desde Supabase para que la pantalla refleje la base real y no una copia local.
-  try {
-    const pacientesRaw = await SB.getPacientes();
-    if (Array.isArray(pacientesRaw)) {
-      const current = Array.isArray(DB.patients) ? DB.patients : [];
-      DB.patients = pacientesRaw.map(row => {
-        const existing = current.find(x => String(x.id) === String(row.id));
-        return mapPaciente(row, existing?.evaluations || [], existing?.diets || [], existing?.historiaClinica || null);
-      });
-    }
-  } catch(syncErr) { console.warn('Paciente guardado; no se pudo refrescar el directorio:', syncErr); }
+  // Confirma el directorio contra Supabase sin obligar a recargar la página.
+  await refreshPatientsFromSupabase({render:false});
   NM_PATIENT_SAVE_BUSY=false;
   if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';}
   closeModal('modal-patient');
   renderPatients();
 }
+
+
+// v60 — Directorio de pacientes siempre sincronizado con Supabase.
+// Sin localStorage. Evita depender de recargar/abrir otra pestaña.
+let NM_PATIENT_REFRESH_PROMISE = null;
+async function refreshPatientsFromSupabase(options={}) {
+  if (NM_PATIENT_REFRESH_PROMISE) return NM_PATIENT_REFRESH_PROMISE;
+  NM_PATIENT_REFRESH_PROMISE = (async()=>{
+    try {
+      const rows = await SB.getPacientes();
+      if (!Array.isArray(rows)) return DB.patients || [];
+      const current = Array.isArray(DB.patients) ? DB.patients : [];
+      DB.patients = rows.map(row => {
+        const old = current.find(x => String(x.id) === String(row.id));
+        return mapPaciente(row, old?.evaluations || [], old?.diets || [], old?.historiaClinica || null);
+      });
+      if (options.render !== false && (document.getElementById('page-title')?.textContent || '').trim() === 'Pacientes') {
+        renderPatients();
+      }
+      document.dispatchEvent(new CustomEvent('nm:patients-updated', {detail:{action:'refresh', patients:DB.patients}}));
+      return DB.patients;
+    } catch(err) {
+      console.warn('[NutriMachata] No se pudo refrescar pacientes:', err);
+      return DB.patients || [];
+    } finally {
+      NM_PATIENT_REFRESH_PROMISE = null;
+    }
+  })();
+  return NM_PATIENT_REFRESH_PROMISE;
+}
+window.refreshPatientsFromSupabase = refreshPatientsFromSupabase;
+
+// Al volver a la aplicación, trae cambios realizados desde otra pestaña/dispositivo.
+window.addEventListener('focus', ()=>{
+  if (!document.hidden) refreshPatientsFromSupabase({render:true});
+});
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden) refreshPatientsFromSupabase({render:true});
+});
 
 
 // ═══════════════════════════════════════════════
