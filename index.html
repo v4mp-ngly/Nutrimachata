@@ -14460,7 +14460,44 @@ window.NMPDFProfessionalV64=true;
 <script id="nm-invoice-pdf-fix-v66">
 (function(){
 'use strict';
-window.NMInvoicePDFFixV66=true;window.NMPDFNoClipV67=true;
+/* La factura debe ser A4 horizontal. Esta última sobreescritura es intencional:
+   evita que una definición anterior vuelva a exportarla en vertical. */
+const safe68=v=>String(v||'Factura').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
+const invoiceNode68=(x,b)=>{
+ const wrap=document.createElement('div');
+ wrap.innerHTML=(typeof nmInvoicePrintStyles==='function'?nmInvoicePrintStyles():'')+`<style>
+ .invoice-print-doc{width:267mm!important;max-width:267mm!important;overflow:visible!important}
+ .invoice-print-head{padding-bottom:4mm!important}.invoice-print-head img{max-width:55mm!important;max-height:16mm!important}
+ .invoice-party{margin:5mm 0!important;gap:8mm!important}
+ .invoice-items{width:100%!important;table-layout:fixed!important}
+ .invoice-items th,.invoice-items td{box-sizing:border-box!important;overflow-wrap:anywhere!important}
+ .invoice-items th:nth-child(1),.invoice-items td:nth-child(1){width:54%!important;text-align:left!important}
+ .invoice-items th:nth-child(2),.invoice-items td:nth-child(2){width:9%!important;text-align:center!important;white-space:nowrap!important}
+ .invoice-items th:nth-child(3),.invoice-items td:nth-child(3){width:14%!important;text-align:right!important;white-space:nowrap!important}
+ .invoice-items th:nth-child(4),.invoice-items td:nth-child(4){width:9%!important;text-align:right!important;white-space:nowrap!important}
+ .invoice-items th:nth-child(5),.invoice-items td:nth-child(5){width:14%!important;text-align:right!important;white-space:nowrap!important}
+ .invoice-print-summary{width:86mm!important;max-width:86mm!important;margin-top:5mm!important}
+ .invoice-print-note{margin-top:6mm!important}
+ @media print{@page{size:A4 landscape;margin:12mm 10mm 14mm}}
+ </style>`+(typeof nmInvoiceDocumentHTML==='function'?nmInvoiceDocumentHTML(x,b):'');
+ return wrap.querySelector('.invoice-print-doc')||wrap;
+};
+window.downloadInvoicePDF=async function(id){
+ const b=typeof getBillingData==='function'?getBillingData():null,x=b?.invoices?.find(i=>String(i.id)===String(id));
+ if(!x)return notify?.('La factura ya no existe.','warning');
+ try{
+  if(!window.NMProPDF64?.save)throw new Error('El generador PDF no está disponible');
+  await window.NMProPDF64.save(invoiceNode68(x,b),`${safe68(x.number)}_${safe68(x.patient)}.pdf`,{orientation:'landscape'});
+  notify?.('Factura A4 horizontal descargada correctamente.','success');
+ }catch(e){console.error('[Factura PDF horizontal v68]',e);notify?.('No se pudo generar la factura PDF.','danger');}
+};
+window.previewInvoicePDF=function(id){
+ const b=typeof getBillingData==='function'?getBillingData():null,x=b?.invoices?.find(i=>String(i.id)===String(id));
+ if(!x)return notify?.('La factura ya no existe.','warning');
+ if(!window.NMProPDF64?.preview)return window.downloadInvoicePDF(id);
+ return window.NMProPDF64.preview(invoiceNode68(x,b),`${safe68(x.number)}_${safe68(x.patient)}.pdf`,{orientation:'landscape'});
+};
+window.NMInvoicePDFFixV66=true;window.NMPDFNoClipV67=true;window.NMInvoiceLandscapeV68=true;
 })();
 </script>
 </body>
