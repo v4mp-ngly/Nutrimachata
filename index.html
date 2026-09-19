@@ -4290,6 +4290,7 @@ async function savePatient(id) {
 // Sin localStorage. Evita depender de recargar/abrir otra pestaña.
 let NM_PATIENT_REFRESH_PROMISE = null;
 async function refreshPatientsFromSupabase(options={}) {
+  try { await ensureSupaSession(); } catch(_) { return DB.patients || []; }
   if (NM_PATIENT_REFRESH_PROMISE) return NM_PATIENT_REFRESH_PROMISE;
   NM_PATIENT_REFRESH_PROMISE = (async()=>{
     try {
@@ -13915,7 +13916,7 @@ function allPayments(){return (getBillingData?.().invoices||[]).flatMap(x=>(x.pa
 function nextFor(type){const base=Number(cfg[type]?.next||1);if(type==='FAC')return Math.max(base,maxInvoice()+1);if(type==='COT')return Math.max(base,maxQuote()+1);if(type==='REC')return Math.max(base,allPayments().length+1);return base}
 window.NMReceiptNumberConfigured=function(p){const arr=allPayments(),idx=arr.findIndex(x=>String(x.id)===String(p?.id));return fmt('REC',idx>=0?Math.max(Number(cfg.REC.next||1),idx+1):nextFor('REC'))};
 window.NMNumberingV34={fmt,nextFor,get:()=>cfg};
-async function loadRemote(){const api=window.NMBillingClientAPI?.billingFetch;if(!api)return;try{const rows=await api('configuracion_facturacion?select=tipo,prefijo,siguiente,digitos');if(Array.isArray(rows)&&rows.length){rows.forEach(r=>{if(cfg[r.tipo])cfg[r.tipo]={...cfg[r.tipo],prefix:r.prefijo,next:Number(r.siguiente||1),digits:Number(r.digitos||6)}});saveLocal()}}catch(e){console.info('Configuración de numeración: usando configuración local hasta ejecutar SQL.',e?.message||e)}}
+async function loadRemote(){const api=window.NMBillingClientAPI?.billingFetch;if(!api||!SUPA_AUTH_SESSION?.access_token||!DB.currentUser)return;try{const rows=await api('configuracion_facturacion?select=tipo,prefijo,siguiente,digitos');if(Array.isArray(rows)&&rows.length){rows.forEach(r=>{if(cfg[r.tipo])cfg[r.tipo]={...cfg[r.tipo],prefix:r.prefijo,next:Number(r.siguiente||1),digits:Number(r.digitos||6)}});saveLocal()}}catch(e){console.info('Configuración de numeración: usando configuración local hasta ejecutar SQL.',e?.message||e)}}
 async function saveRemote(){const api=window.NMBillingClientAPI?.billingFetch;if(!api)return false;try{for(const type of Object.keys(defaults)){const c=cfg[type];await api('configuracion_facturacion?on_conflict=tipo','POST',{tipo:type,prefijo:c.prefix,siguiente:Number(c.next),digitos:Number(c.digits)},{Prefer:'resolution=merge-duplicates,return=minimal'})}return true}catch(e){console.warn(e);return false}}
 window.renderNumberingV34=async function(){await loadRemote();const el=document.getElementById('billing-tab-content');if(!el)return;document.querySelectorAll('[data-btab]').forEach(b=>b.classList.toggle('active',b.dataset.btab==='numbering'));el.innerHTML=`<div class="card"><div class="card-header"><div><div class="card-title">Numeración y configuración</div><div class="card-subtitle">Controla prefijos, longitud y próxima secuencia de los documentos.</div></div></div><div class="card-body"><div class="nm-v34-grid">${Object.entries(defaults).map(([k,d])=>{const c=cfg[k];return `<div class="nm-v34-seq"><b>${d.label}</b><div style="margin:7px 0 12px;color:#557047;font-weight:800">${esc(fmt(k,nextFor(k)))}</div><label>Prefijo</label><input id="num-${k}-prefix" value="${esc(c.prefix)}"><label style="margin-top:9px">Próxima secuencia</label><input id="num-${k}-next" type="number" min="1" value="${Number(c.next||1)}"><label style="margin-top:9px">Cantidad de dígitos</label><input id="num-${k}-digits" type="number" min="3" max="10" value="${Number(c.digits||6)}"></div>`}).join('')}</div><div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn btn-olive" onclick="NMSaveNumberingV34()">Guardar configuración</button></div><div style="margin-top:10px;font-size:12px;color:#6c7569">Si la tabla de configuración aún no existe en Supabase, se conserva localmente en este dispositivo. Ejecuta el SQL v34 para sincronizarla entre dispositivos.</div></div></div>`};
 window.NMSaveNumberingV34=async function(){for(const k of Object.keys(defaults)){cfg[k]={...cfg[k],prefix:document.getElementById(`num-${k}-prefix`)?.value.trim()||defaults[k].prefix,next:Math.max(1,Number(document.getElementById(`num-${k}-next`)?.value||1)),digits:Math.min(10,Math.max(3,Number(document.getElementById(`num-${k}-digits`)?.value||6)))}}saveLocal();const ok=await saveRemote();notify?.(ok?'Configuración guardada en Supabase.':'Configuración guardada localmente. Ejecuta el SQL v34 para sincronizarla. ',ok?'success':'warning');renderNumberingV34()};
@@ -14775,6 +14776,7 @@ window.NMEvaluationsV74=true;
 const E=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
 let loading=null;
 async function refreshEvaluationData74(){
+ try { await ensureSupaSession(); } catch(_) { return DB.patients||[]; }
  if(loading)return loading;
  loading=(async()=>{
   try{
@@ -14802,6 +14804,7 @@ window.refreshEvaluationData74=refreshEvaluationData74;
 // Corrige también el refresco general: antes podía perder evaluaciones por usar old.evaluations.
 window.refreshPatientsFromSupabase=async function(options={}){
  try{
+  try { await ensureSupaSession(); } catch(_) { return DB.patients||[]; }
   const pacs=await SB.getPacientes();
   if(!Array.isArray(pacs))return DB.patients||[];
   const old=Array.isArray(DB.patients)?DB.patients:[];
