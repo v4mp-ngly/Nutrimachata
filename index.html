@@ -4318,10 +4318,10 @@ window.refreshPatientsFromSupabase = refreshPatientsFromSupabase;
 
 // Al volver a la aplicación, trae cambios realizados desde otra pestaña/dispositivo.
 window.addEventListener('focus', ()=>{
-  if (!document.hidden) refreshPatientsFromSupabase({render:true});
+  if (!document.hidden && SUPA_AUTH_SESSION?.access_token && DB.currentUser) refreshPatientsFromSupabase({render:true});
 });
 document.addEventListener('visibilitychange', ()=>{
-  if (!document.hidden) refreshPatientsFromSupabase({render:true});
+  if (!document.hidden && SUPA_AUTH_SESSION?.access_token && DB.currentUser) refreshPatientsFromSupabase({render:true});
 });
 
 
