@@ -1949,7 +1949,6 @@ function normalizeSupaSession(data){
 function persistSupaSession(data){
   SUPA_AUTH_SESSION = normalizeSupaSession(data);
   if(SUPA_AUTH_SESSION?.access_token){
-    sessionStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION));
     try{ sessionStorage.setItem('nutri_supa_session', JSON.stringify(SUPA_AUTH_SESSION)); }catch(_){}
   }
   return SUPA_AUTH_SESSION;
@@ -1978,14 +1977,13 @@ async function supaAuthSignUp(email,password,metadata={}){
 }
 function restoreSupaSession(){
   try{
-    const raw=sessionStorage.getItem('nutri_supa_session') || sessionStorage.getItem('nutri_supa_session') || 'null';
+    const raw=sessionStorage.getItem('nutri_supa_session') || 'null';
     const x=JSON.parse(raw);
     if(x?.access_token) persistSupaSession(x);
   }catch(_){ SUPA_AUTH_SESSION=null; }
 }
 function clearSupaSession(){
   SUPA_AUTH_SESSION=null;
-  sessionStorage.removeItem('nutri_supa_session');
   try{ sessionStorage.removeItem('nutri_supa_session'); }catch(_){}
 }
 async function refreshSupaSession(force=false){
@@ -3225,7 +3223,7 @@ function finishPublicReg() {
   // Auto-generate credentials
   const autoEmail = (pubWizData.email||'').trim() ||
     pubWizData.nombre.toLowerCase().replace(/\s+/g,'.').replace(/[^a-z.]/g,'') + '@paciente.com';
-  const autoPass  = generatePassword();
+  const autoPass  = (pubWizData.pass || '').trim() || generatePassword();
   pubWizData.email = autoEmail;
   pubWizData.pass  = autoPass;
 
@@ -3253,11 +3251,26 @@ function finishPublicReg() {
     try {
       // 0. Crear primero la cuenta REAL en Supabase Auth.
       // El login usa Auth, por eso guardar solo en public.usuarios no es suficiente.
-      const signUp = await supaAuthSignUp(autoEmail, autoPass, {
-        role: 'patient', nombre: pubWizData.nombre
-      });
+      let signUp = null;
+      try {
+        signUp = await supaAuthSignUp(autoEmail, autoPass, {
+          role: 'patient', nombre: pubWizData.nombre
+        });
+      } catch (authErr) {
+        const msg = String(authErr?.message || '');
+        if (!/already registered|already exists|user already|registered|exists/i.test(msg)) throw authErr;
+        // La cuenta ya existe: intentar autenticar con la contraseña introducida.
+        try {
+          signUp = await supaAuthLogin(autoEmail, autoPass);
+        } catch (loginErr) {
+          const err = new Error('Este correo ya tiene una cuenta. Inicia sesión con tu contraseña para continuar.');
+          err.code = 'ACCOUNT_EXISTS_LOGIN_REQUIRED';
+          err.email = autoEmail;
+          throw err;
+        }
+      }
       if (!signUp?.access_token) {
-        throw new Error('Supabase creó la cuenta, pero requiere confirmación de correo antes de completar el registro. Desactiva Confirm email para este flujo o confirma el correo y vuelve a intentarlo.');
+        throw new Error('La cuenta necesita confirmación de correo antes de completar el registro. Confirma el correo y vuelve a intentarlo.');
       }
       persistSupaSession(signUp);
 
@@ -3381,7 +3394,17 @@ function finishPublicReg() {
     } catch(e) {
       console.error('Error guardando paciente:', e);
       clearSupaSession();
-      if (loginRight) {
+      if (loginRight && e?.code === 'ACCOUNT_EXISTS_LOGIN_REQUIRED') {
+        const safeEmail = String(e.email || autoEmail).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch] || ch));
+        loginRight.innerHTML = `
+          <div style="width:100%;max-width:420px;text-align:center">
+            <div style="font-size:42px;margin-bottom:14px">🔐</div>
+            <h2 style="font-family:'Playfair Display',serif;font-size:24px;color:var(--black);margin-bottom:8px">Este correo ya tiene una cuenta</h2>
+            <p style="font-size:13px;color:var(--gray-500);line-height:1.6;margin-bottom:18px">No necesitas registrarte otra vez. Inicia sesión con <b>${safeEmail}</b> para continuar.</p>
+            <button class="btn-primary" type="button" onclick="prefillPatientLogin('${safeEmail}','')">Iniciar sesión</button>
+            <button class="btn btn-outline" type="button" style="width:100%;margin-top:10px" onclick="location.reload()">Volver al inicio</button>
+          </div>`;
+      } else if (loginRight) {
         loginRight.innerHTML = `
           <div style="width:100%;max-width:420px;text-align:center">
             <div style="font-size:42px;margin-bottom:14px">⚠️</div>
@@ -4218,6 +4241,7 @@ function calcIMCModal() {
 let NM_PATIENT_SAVE_BUSY = false;
 async function savePatient(id) {
   if (NM_PATIENT_SAVE_BUSY) return;
+  try { await ensureSupaSession(); } catch(e) { notify('Tu sesión administrativa no está activa. Inicia sesión nuevamente antes de guardar el paciente.', 'danger'); return; }
   const saveBtn = document.querySelector('#modal-patient .btn-olive');
   NM_PATIENT_SAVE_BUSY = true;
   if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.nmOldText = saveBtn.textContent; saveBtn.textContent = 'Guardando…'; }
@@ -4826,6 +4850,7 @@ function generatePassword(nombre = '') {
 
 async function finishWizard() {
   if (!wizData.nombre) { notify('El nombre del paciente es requerido', 'danger'); return; }
+  try { await ensureSupaSession(); } catch(e) { notify('Tu sesión administrativa no está activa. Inicia sesión nuevamente antes de guardar la historia clínica.', 'danger'); return; }
   // Ensure edad is calculated from DOB even if field was never changed
   if ((!wizData.edad || wizData.edad === 0) && wizData.dob) {
     wizData.edad = calcAgeFromDobStr(wizData.dob);
@@ -4976,24 +5001,17 @@ async function finishWizard() {
         }); } catch (evalErr) { console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr); }
       }
 
-      // 4. Acceso de portal exclusivamente con Supabase Auth (nunca password_hash).
+      // v84: no crear cuentas Auth desde la sesión administrativa del navegador.
+      // El autorregistro público crea/vincula el acceso sin reemplazar la sesión del staff.
       try {
-        let authCreated = null;
-        try {
-          authCreated = await supaAuthSignUp(autoEmail, autoPass, { role:'patient', nombre:newPatient.nombre });
-        } catch(authErr) {
-          if (!/already|registered|exists|existente/i.test(String(authErr?.message||''))) throw authErr;
-        }
         const existingPortal = await SB.getUsuario(autoEmail);
         if (!existingPortal) {
           await supaWriteAdaptive('usuarios', 'POST', {
-            id: authCreated?.user?.id || undefined,
             email: autoEmail, rol:'patient', nombre:newPatient.nombre,
           });
         }
-        if (authCreated?.user?.id) await SB.linkPacienteAuth(realId, authCreated.user.id);
       } catch (portalErr) {
-        console.warn('Paciente e historia guardados; acceso Auth del portal pendiente:', portalErr);
+        console.warn('Paciente e historia guardados; perfil de portal pendiente:', portalErr);
       }
 
       try { sessionStorage.removeItem('nutri_hc_draft'); } catch (_) {}
@@ -13574,7 +13592,7 @@ window.downloadAccountingPDF=function(){
 })();
 </script>
 
-\n<style id="nm-v20-style">
+<style id="nm-v20-style">
 .nm-global-search-wrap{position:relative;min-width:260px;max-width:420px;width:min(34vw,420px)}
 .nm-global-search{width:100%;height:38px;border:1px solid #dfe5dc;border-radius:10px;padding:0 38px 0 36px;background:#fff;font:inherit;font-size:12px;outline:none}.nm-global-search:focus{border-color:var(--olive);box-shadow:0 0 0 3px rgba(94,140,42,.10)}
 .nm-search-icon{position:absolute;left:12px;top:10px;color:#778274}.nm-search-results{position:absolute;top:44px;right:0;width:min(520px,90vw);max-height:68vh;overflow:auto;background:#fff;border:1px solid #e2e7df;border-radius:14px;box-shadow:0 18px 50px rgba(20,45,22,.18);z-index:9999;display:none;padding:8px}.nm-search-results.open{display:block}.nm-search-group{padding:8px 10px 4px;font-size:10px;font-weight:800;color:#71806d;text-transform:uppercase;letter-spacing:.06em}.nm-search-item{display:flex;justify-content:space-between;gap:12px;padding:10px;border-radius:9px;cursor:pointer}.nm-search-item:hover{background:#f4f8f0}.nm-search-item b{display:block;font-size:12px}.nm-search-item small{color:#778274}.nm-receivable-overdue{color:#b42318;font-weight:700}.nm-receivable-ok{color:#687268}.nm-receipt-btn{white-space:nowrap}
@@ -13604,7 +13622,8 @@ window.openSearchPatientV20=id=>{document.getElementById('nm-global-results')?.c
 const oldAlerts=window.computeClinicAlerts;window.computeClinicAlerts=function(){const arr=oldAlerts?oldAlerts():[],keys=new Set(arr.map(a=>a.key));const push=a=>{if(!keys.has(a.key)){keys.add(a.key);arr.push(a)}};const today=new Date();today.setHours(12,0,0,0);(window.DB?.patients||[]).filter(p=>p&&p.activo!==false).forEach(p=>{const ev=(p.evaluaciones||[]).filter(Boolean).map(e=>e.fecha).filter(Boolean);const ap=(window.DB?.appointments||[]).filter(a=>String(a.patientId)===String(p.id)&&a.fecha&&String(a.estado||'').toLowerCase()==='completada').map(a=>a.fecha);const dates=ev.concat(ap).sort();const last=dates[dates.length-1];if(last){const d=days20(last);if(d>=30)push({type:'warning',icon:'◷',title:'Seguimiento pendiente',text:`${p.nombre}: lleva ${d} días sin seguimiento.`,date:last,key:`follow30:${p.id}:${last}`,action:()=>openSearchPatientV20(p.id)})}});pending20().forEach(x=>push({type:'warning',icon:'$',title:'Saldo pendiente',text:`${x.patient} · ${x.number} · pendiente ${moneyRD(billingInvoiceBalance(x))}`,date:x.dueDate||x.date,key:`due20:${x.id}:${billingInvoiceBalance(x).toFixed(2)}`,action:()=>openSearchInvoiceV20(x.id)}));const tom=new Date();tom.setDate(tom.getDate()+1);const t=tom.toISOString().slice(0,10);(window.DB?.appointments||[]).filter(a=>a.fecha===t&&!['confirmada','completada','cancelada'].includes(String(a.estado||'').toLowerCase())).forEach(a=>push({type:'info',icon:'◷',title:'Cita mañana sin confirmar',text:`${patient20(a.patientId)?.nombre||a.nombreManual||'Paciente'} · ${a.hora||''}`,date:'Mañana',key:`tomorrow20:${a.id}`,action:()=>openSearchAppointmentV20(a.id)}));return arr;};
 setTimeout(()=>{installSearchV20();if(typeof refreshClinicAlertBadge==='function')refreshClinicAlertBadge();},400);
 })();
-</script>\n
+</script>
+
 <script id="nm-billing-clientes-v1">
 (function(){
 'use strict';
@@ -13696,7 +13715,7 @@ const oldTab=window.renderBillingTab||renderBillingTab;window.renderBillingTab=f
 const oldBilling26=window.renderBilling||renderBilling;window.renderBilling=function(){const r=oldBilling26.apply(this,arguments);setTimeout(()=>{const tabs=document.querySelector('.bill-tabs');if(tabs&&!tabs.querySelector('[data-btab="expenses"]')){const b=document.createElement('button');b.className='bill-tab';b.dataset.btab='expenses';b.textContent='Gastos';b.onclick=()=>window.renderBillingTab('expenses',b);tabs.appendChild(b)}const quick=document.querySelector('.bill-quick');if(quick&&!quick.querySelector('[data-expense-link]')){const a=document.createElement('a');a.dataset.expenseLink='1';a.innerHTML='<span>＋ Añadir gasto</span><b>›</b>';a.onclick=()=>{window.renderBillingTab('expenses');setTimeout(()=>openExpenseModal(),80)};quick.appendChild(a)}},0);return r};
 })();
 </script>
-\n<script id="nm-final-billing-stability-v28">
+<script id="nm-final-billing-stability-v28">
 (function(){
 'use strict';
 function esc28(v){return typeof billingEscape==='function'?billingEscape(v):String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));}
@@ -13714,7 +13733,8 @@ window.renderBillingTab=function(tab,btn){
 };
 window.NMBillingV28={renderPayments:renderPayments28};
 })();
-</script>\n\n<script id="nm-billing-tab-persistence-v29">
+</script>
+\n<script id="nm-billing-tab-persistence-v29">
 (function(){
 'use strict';
 let activeBillingTab='invoices';
@@ -13755,7 +13775,8 @@ window.renderBilling=function(){
 // Restauracion por MutationObserver eliminada: podia provocar ciclos de renderizado.
 window.NMBillingTabStateV29={get:()=>activeBillingTab,set:v=>{activeBillingTab=v||'invoices'}};
 })();
-</script>\n\n<script id="nm-gastos-visible-v30">
+</script>
+\n<script id="nm-gastos-visible-v30">
 (function(){
 'use strict';
 function ensureExpensesUI(){
@@ -13779,7 +13800,8 @@ document.addEventListener('click',e=>{ if(e.target.closest?.('[data-nav="billing
 window.NMEnsureExpensesV30=ensureExpensesUI;
 ensureExpensesUI();
 })();
-</script>\n\n<script id="nm-cotizaciones-v31">
+</script>
+\n<script id="nm-cotizaciones-v31">
 (function(){
 'use strict';
 let QUOTES=[];
@@ -13808,7 +13830,8 @@ const prev=window.renderBillingTab;window.renderBillingTab=function(tab,btn){if(
 // v51: sin observer/polling global.
 ensureQuoteUI();
 })();
-</script>\n\n<script id="nm-recibos-completos-v32">
+</script>
+\n<script id="nm-recibos-completos-v32">
 (function(){
 'use strict';
 const esc32=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
@@ -13861,7 +13884,8 @@ const obs=new MutationObserver(()=>{
 });
 obs.observe(document.documentElement,{subtree:true,childList:true});
 })();
-</script>\n<style id="nm-finanzas-clientes-v33-style">
+</script>
+<style id="nm-finanzas-clientes-v33-style">
 .nm-aging-grid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:10px;margin:14px 0}.nm-aging-card{border:1px solid #e2e8df;border-radius:13px;padding:13px;background:#fff}.nm-aging-card b{display:block;font-size:18px;margin-top:4px}.nm-aging-card small{font-weight:800;color:#6f7b6c}.nm-aging-danger{border-color:#efc7c3;background:#fff8f7}.nm-aging-warn{border-color:#efd7ad;background:#fffaf2}.nm-account-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.nm-account-summary>div{padding:17px;border:1px solid #e1e7de;border-radius:14px;background:#fff}.nm-account-summary small{font-weight:800;color:#748071}.nm-account-summary strong{display:block;font-size:22px;margin-top:5px}.nm-cxc-tools{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:12px 0}.nm-cxc-tools input,.nm-cxc-tools select{height:38px;border:1px solid #dfe5dc;border-radius:9px;padding:0 10px;background:#fff}.nm-whatsapp{background:#eef8ef;border-color:#b9d8bc}.nm-statement-modal{max-width:1000px;width:min(96vw,1000px)}
 @media(max-width:850px){.nm-aging-grid{grid-template-columns:1fr 1fr}.nm-account-summary{grid-template-columns:1fr}.nm-cxc-tools>*{flex:1 1 150px}}
 </style>
@@ -13941,7 +13965,7 @@ ensureTabs();loadRemote();
 })();
 </script>
 
-\n<script id="nm-cotizacion-simple-v35">
+<script id="nm-cotizacion-simple-v35">
 (function(){
 'use strict';
 const oldOpen=window.openQuoteModal;
@@ -13980,8 +14004,9 @@ function enhanceQuote35(){
  const footer=m.querySelector('.modal-footer');if(footer){const save=footer.querySelector('.btn-olive');if(save)save.textContent='Guardar cotización';const pdf=document.createElement('button');pdf.className='btn btn-outline';pdf.type='button';pdf.textContent='Guardar y generar PDF';pdf.onclick=async()=>{const before=[...document.querySelectorAll('.modal-overlay')];await window.saveQuote();setTimeout(async()=>{try{if(typeof window.renderQuotes==='function')await window.renderQuotes();const rows=[...document.querySelectorAll('#billing-tab-content tbody tr')];const first=rows[0]?.querySelector('button[title="PDF"]');if(first)first.click();}catch(e){}},700)};footer.insertBefore(pdf,save);}}
 window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanceQuote35,0)};
 })();
-</script>\n
-\n<script id="nm-factura-oficial-v39">
+</script>
+
+<script id="nm-factura-oficial-v39">
 (function(){
   function E(v){return typeof billingEscape==='function'?billingEscape(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function M(v){return typeof moneyRD==='function'?moneyRD(Number(v||0)):`RD$ ${Number(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;}
@@ -14032,7 +14057,7 @@ window.openQuoteModal=function(){oldOpen.apply(this,arguments);setTimeout(enhanc
   window.NMSupabaseStabilityV41={showOffline,hideOffline};
 })();
 </script>
-\n<script id="nm-quote-external-clients-v42">
+<script id="nm-quote-external-clients-v42">
 (function(){
 'use strict';
 const previousOpenQuote=window.openQuoteModal;
@@ -14862,5 +14887,7 @@ try{openEvalModal=window.openEvalModal}catch(_){ }
 <script id="nm-discount-fix-v76">window.NMDiscountFixV76=true;</script>
 
 <script id="nm-v80-patient-session-fix">window.NMV80PatientSessionFix=true;</script>
+<script>window.NMRegistrationFixV83=true;</script>
+<script>window.NMV84IntegralReview=true;</script>
 </body>
 </html>
