@@ -9331,7 +9331,7 @@ function billingStockDelta(invoice,sign,data=null){const b=data||getBillingData(
 function saveInvoice(){
   const id=document.getElementById('inv-id')?.value||'', patientId=document.getElementById('inv-patient')?.value||'',p=billingPatients().find(x=>String(x.id)===String(patientId)),items=collectInvoiceLines();if(!p){notify('Selecciona un paciente','warning');return false}if(!items.length){notify('Agrega al menos un producto o servicio','warning');return false}if(items.some(i=>i.price<0||i.qty<=0)){notify('Revisa cantidades y precios','warning');return false}
   const totals=recalcInvoiceEditor(),b=getBillingData(),old=id?b.invoices.find(x=>x.id===id):null;if(old)billingStockDelta(old,+1,b);
-  for(const i of items){if(i.productId){const prod=b.products.find(z=>z.id===i.productId);if(prod?.type==='Producto'&&Number(prod.stock||0)<Number(i.qty||0)){if(old)billingStockDelta(old,-1,b);notify(`Stock insuficiente para ${prod.name}`,'warning');return false}}}
+  // v85: no bloquear la facturación por stock insuficiente; inventario puede quedar negativo.
   const inv=normalizeBillingInvoice({...(old||{}),id:id||('inv-'+Date.now()),number:document.getElementById('inv-number').value,date:document.getElementById('inv-date').value||billingToday(),dueDate:document.getElementById('inv-due').value||'',patientId:p.id,patient:p.nombre,email:p.email||'',rnc:document.getElementById('inv-rnc').value.trim(),ncf:document.getElementById('inv-ncf').value.trim(),notes:document.getElementById('inv-notes').value.trim(),items,discount:totals.disc,tax:totals.tax,paid:old?.paid||0,paymentHistory:old?.paymentHistory||[],status:old?.status||'Pendiente'});billingStockDelta(inv,-1,b);inv.status=billingInvoiceStatus(inv);if(old)Object.assign(old,inv);else b.invoices.push(inv);if(!saveBillingData(b))return false;document.getElementById('invoice-modal')?.remove();renderBilling();notify(old?'Factura actualizada':'Factura creada correctamente','success');return true;
 }
 
@@ -12827,7 +12827,9 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     }
     // Toda Facturación usa una sesión Supabase válida. Evita enviar "Bearer null"
     // y renueva el token antes de cargar gastos, cotizaciones o configuración.
-    await billingTimeout(ensureSupaSession(),8000,'Supabase tardó demasiado en validar la sesión.');
+    // v85: no bloquear cada consulta esperando una validación redundante de sesión.
+    // Si ya existe token, úsalo directamente; si falta, entonces sí recupera/valida la sesión.
+    if(!supaAccessToken()) await billingTimeout(ensureSupaSession(),18000,'Supabase tardó demasiado en validar la sesión.');
     const url=SUPA_URL.replace(/\/$/,'')+'/rest/v1/'+path;
     const request=async()=>{
       const token=supaAccessToken();
@@ -12835,7 +12837,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       const headers={apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json',...extraHeaders};
       if((method==='POST'||method==='PATCH')&&!Object.keys(extraHeaders||{}).some(k=>k.toLowerCase()==='prefer')) headers.Prefer='return=representation';
       let res;
-      try{res=await billingTimeout(fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'}),10000,'Supabase tardó demasiado en responder.');}
+      try{res=await billingTimeout(fetch(url,{method,headers,body:body==null?undefined:JSON.stringify(body),mode:'cors',credentials:'omit'}),25000,'Supabase tardó demasiado en responder.');}
       catch(err){
         const e=new Error('No se pudo conectar con Supabase. Revisa tu conexión a Internet e inténtalo nuevamente.');
         e.code='NETWORK_ERROR';e.cause=err;throw e;
@@ -13016,7 +13018,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     const p=await productStock(productId);
     if(!p||lower(p.tipo)==='servicio')return;
     const before=num(p.stock),after=before+delta;
-    if(after<0)throw new Error(`Stock insuficiente para ${p.nombre}. Disponible: ${before}.`);
+    // v85: Facturación no se bloquea por inventario. Si no hay existencias suficientes,
+    // el stock puede quedar negativo para reflejar la venta pendiente de reposición.
     await billingFetch(`${BILLING_DB_TABLES.products}?id=eq.${encodeURIComponent(productId)}`,'PATCH',{stock:after});
     await billingFetch(BILLING_DB_TABLES.inventory,'POST',{
       producto_id:productId,tipo:movementType,cantidad:Math.abs(Math.round(delta)),stock_anterior:before,stock_nuevo:after,factura_id:isUuid(invoiceId)?invoiceId:null,motivo:reason,created_by:currentCreatorId()
@@ -13047,9 +13050,8 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
       const totals=recalcInvoiceEditor();
       const old=getBillingData().invoices.find(x=>x.id===id)||null;
       try{
-        // Validar stock contra Supabase considerando que una edicion devuelve primero el stock anterior.
-        const oldQtyByProduct={}; (old?.items||[]).forEach(i=>{if(i.productId)oldQtyByProduct[i.productId]=(oldQtyByProduct[i.productId]||0)+num(i.qty)});
-        for(const i of items){if(!i.productId)continue;const prod=await productStock(i.productId);if(prod&&lower(prod.tipo)!=='servicio'){const available=num(prod.stock)+(oldQtyByProduct[i.productId]||0);if(available<num(i.qty))throw new Error(`Stock insuficiente para ${prod.nombre}. Disponible para esta edición: ${available}.`);}}
+        // v85: el inventario informa existencias, pero no impide emitir una factura.
+        // applyInvoiceStock registrará la salida y permitirá stock negativo si corresponde.
 
         const payload=invoiceDbPayload(p,items,totals,old);
         let invoiceId=id;
@@ -14889,5 +14891,7 @@ try{openEvalModal=window.openEvalModal}catch(_){ }
 <script id="nm-v80-patient-session-fix">window.NMV80PatientSessionFix=true;</script>
 <script>window.NMRegistrationFixV83=true;</script>
 <script>window.NMV84IntegralReview=true;</script>
+
+<script id="nm-v85-facturacion-stock-red">window.NMFacturacionV85={stockNoBloquea:true,fetchTimeoutMs:25000,sessionValidationOnDemand:true};</script>
 </body>
 </html>
