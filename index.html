@@ -13062,7 +13062,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
           delete payload.total_pagado;
           delete payload.saldo;
           await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'PATCH',payload);
-          await billingFetch(`${BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
+          await bi.billingFetch(`${bi.BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
         }else{
           const created=await billingFetch(BILLING_DB_TABLES.invoices,'POST',payload);
           if(!created?.[0]?.id)throw new Error('Supabase no devolvió el ID de la factura creada.');
@@ -13140,7 +13140,7 @@ window.addEventListener('afterprint',()=>{document.documentElement.classList.rem
     const x=getBillingData().invoices.find(i=>i.id===id);if(!x)return;
     if((x.paymentHistory||[]).length||num(x.paid)>0){notify('Una factura con pagos no se elimina. Anúlala para conservar la trazabilidad.','warning');return;}
     if(!confirm(`¿Eliminar definitivamente la factura ${x.number}? El inventario vendido será devuelto.`))return;
-    try{await applyInvoiceStock(x.items,+1,id,'Reverso por eliminación de factura');await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');await loadBillingFromSupabase(true);document.getElementById('invoice-view-modal')?.remove();legacyRenderBilling();notify('Factura eliminada y stock restaurado.','success');}catch(e){humanDbError(e,'eliminar la factura');await loadBillingFromSupabase(true);}
+    try{await applyInvoiceStock(x.items,+1,id,'Reverso por eliminación de factura');await bi.billingFetch(`${bi.BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');await loadBillingFromSupabase(true);document.getElementById('invoice-view-modal')?.remove();legacyRenderBilling();notify('Factura eliminada y stock restaurado.','success');}catch(e){humanDbError(e,'eliminar la factura');await loadBillingFromSupabase(true);}
   };
 
   window.archiveInvoice=async function(id){
@@ -13535,10 +13535,10 @@ También se eliminarán sus pagos y detalles. Esta acción no se puede deshacer.
     await bi.applyInvoiceStock(x.items||[],+1,id,'Reverso por eliminación definitiva de factura');
     // Eliminar dependencias explícitamente para funcionar aunque las FK no tengan ON DELETE CASCADE.
     await bi.billingFetch(`${bi.BILLING_DB_TABLES.payments}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
-    await billingFetch(`${BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
+    await bi.billingFetch(`${bi.BILLING_DB_TABLES.details}?factura_id=eq.${encodeURIComponent(id)}`,'DELETE');
     // Los movimientos se conservan para auditoría, pero se desvinculan si la FK lo exige.
     try{await bi.billingFetch(`${bi.BILLING_DB_TABLES.inventory}?factura_id=eq.${encodeURIComponent(id)}`,'PATCH',{factura_id:null});}catch(_){ }
-    await billingFetch(`${BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');
+    await bi.billingFetch(`${bi.BILLING_DB_TABLES.invoices}?id=eq.${encodeURIComponent(id)}`,'DELETE');
     await bi.loadBillingFromSupabase(true);
     document.getElementById('invoice-view-modal')?.remove();
     if(typeof legacyRenderBilling==='function')legacyRenderBilling();else if(typeof renderBilling==='function')renderBilling();
