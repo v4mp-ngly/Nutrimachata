@@ -4583,11 +4583,13 @@ function getWizHTML(step) {
       <div style="display:flex;flex-direction:column;gap:0">
         ${[
           ['comeEstres','¿Come más cuando está estresado o ansioso?'],
-          ['comeAburrido','¿Come por aburrimiento o emociones, sin tener hambre real?'],
+          ['comeAburrido','¿Come por aburrimiento, sin tener hambre real?'],
+          ['comeEmociones','¿Come por emociones, sin tener hambre real?'],
           ['hambreEmocional','¿Le cuesta identificar si tiene hambre real o hambre emocional?'],
           ['comeRapido','¿Tiende a comer rápido, sin masticar bien?'],
           ['comeLleno','¿Suele comer hasta sentirse demasiado lleno?'],
-          ['culpaComer','¿Siente culpa o ansiedad después de comer en exceso?'],
+          ['culpaComer','¿Siente culpa o ansiedad después de comer?'],
+          ['culpaExceso','¿Siente culpa después de comer en exceso?'],
           ['dietasRepetidas','¿Ha realizado dietas de manera repetida en el pasado?'],
           ['horariosRegulares','¿Tiene horarios de comida regulares?'],
         ].map(([k,q],i) => `
@@ -5077,7 +5079,7 @@ function downloadHistoriaClinica(patientId) {
   const hc = p.historiaClinica || {};
   const logoEl = document.getElementById('sidebar-logo-img');
   const logoSrc = logoEl ? (logoEl.src || '') : '';
-  const yesno = (v) => v==='si'?'<span style="font-weight:600">☑ Sí</span> / ☐ No':'☐ Sí / <span style="font-weight:600">☑ No</span>';
+  const yesno = (v) => { const x=String(v??'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); const yn=(v===true||v===1||['si','yes','true','1'].includes(x))?'si':(v===false||v===0||['no','false','0'].includes(x))?'no':''; return yn==='si'?'<span style="font-weight:600">☑ Sí</span> / ☐ No':yn==='no'?'☐ Sí / <span style="font-weight:600">☑ No</span>':'☐ Sí / ☐ No'; };
   const checkList = (arr, items) => items.map(i=>`<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 8px 3px 0;font-size:12px">${(arr||[]).includes(i)?'☑':'☐'} ${i}</span>`).join('');
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
@@ -5162,7 +5164,7 @@ function downloadHistoriaClinica(patientId) {
   </div>
   <div class="section-header">Cuestionario Rápido de Conducta Alimentaria</div>
   ${[['comeEstres','¿Come más cuando está estresado o ansioso?'],['comeAburrido','¿Come por aburrimiento o emociones?'],['hambreEmocional','¿Dificultad para identificar hambre real/emocional?'],['comeRapido','¿Tiende a comer rápido?'],['comeLleno','¿Come hasta sentirse demasiado lleno?'],['culpaComer','¿Siente culpa/ansiedad después de comer?'],['dietasRepetidas','¿Ha realizado dietas repetidamente?'],['horariosRegulares','¿Tiene horarios de comida regulares?']].map(([k,q])=>`
-  <div class="q-row"><span>${q}</span><span>${hc[k]==='si'?'<b>☑ Sí</b> / ☐ No':hc[k]==='no'?'☐ Sí / <b>☑ No</b>':'☐ Sí / ☐ No'}</span></div>`).join('')}
+  <div class="q-row"><span>${q}</span><span>${(()=>{const x=String(hc[k]??'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return (hc[k]===true||hc[k]===1||['si','yes','true','1'].includes(x))?'<b>☑ Sí</b> / ☐ No':(hc[k]===false||hc[k]===0||['no','false','0'].includes(x))?'☐ Sí / <b>☑ No</b>':'☐ Sí / ☐ No'})()}</span></div>`).join('')}
   <div class="section-header">Evaluación Antropométrica</div>
   <div class="field-row">
     <span class="field-label">Peso:</span><span class="field-line" style="max-width:80px">${p.peso} kg</span>
@@ -5965,10 +5967,21 @@ function renderHCFormView(p) {
   const chkDisp = (arr, val) => (arr||[]).includes(val) ?
     `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--beige);border:1px solid var(--olive-pale);border-radius:20px;font-size:12px;color:var(--olive-dark);font-weight:500">✓ ${val}</span>` :
     `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:20px;font-size:12px;color:var(--gray-400)">${val}</span>`;
-  const yesno = (v, q) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--gray-100);font-size:13px"><span>${q}</span>
-    <span style="font-size:13px;font-weight:600;color:${v==='si'?'var(--olive-dark)':'var(--gray-400)'}">
-      ${v==='si'?'Sí':'No'}
-    </span></div>`;
+  const normalizeYesNo = (v) => {
+    if (v === true || v === 1) return 'si';
+    if (v === false || v === 0) return 'no';
+    const x = String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if (['si','sí','yes','true','1'].includes(x)) return 'si';
+    if (['no','false','0'].includes(x)) return 'no';
+    return '';
+  };
+  const yesno = (v, q) => {
+    const yn = normalizeYesNo(v);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--gray-100);font-size:13px"><span>${q}</span>
+      <span style="font-size:13px;font-weight:600;color:${yn==='si'?'var(--olive-dark)':yn==='no'?'var(--gray-500)':'var(--gray-400)'}">
+        ${yn==='si'?'Sí':yn==='no'?'No':'—'}
+      </span></div>`;
+  };
   const section = (title) => `<div style="background:var(--olive);color:white;border-radius:var(--radius);padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:20px 0 12px">${title}</div>`;
 
   if (!hc.nombre && !p.cedula) return `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Historia Clínica no completada</div><div class="empty-text">Esta historia se registra durante el wizard de admisión</div><button class="btn btn-olive mt-4" onclick="openWizard({nombre:'${p.nombre}',email:'${p.email}'})">Completar HC</button></div>`;
