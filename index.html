@@ -14947,9 +14947,9 @@ const logo92=()=>typeof NUTRIMACHATA_REPORT_LOGO!=='undefined'?NUTRIMACHATA_REPO
 const field92=(label,value,wide=false)=>`<div class="nm92-info ${wide?'wide':''}"><label>${E92(label)}</label><span>${E92(text92(value))}</span></div>`;
 const chips92=(arr,other='')=>{const a=Array.isArray(arr)?arr.filter(Boolean):[];if(other)a.push(other);return a.length?a.map(x=>`<span class="nm92-chip">${E92(x)}</span>`).join(''):'<span class="nm92-chip empty">No informado</span>'};
 const section92=(title,body,subtitle='')=>`<section class="nm92-hc-section"><header><h4>${E92(title)}</h4>${subtitle?`<p>${E92(subtitle)}</p>`:''}</header><div class="nm92-hc-body">${body}</div></section>`;
-const rawKnown92=new Set(['id','paciente_id','motivo','objetivo','plazo','antecedentes','antec_otros','antec_fam','antec_fam_otros','medicamentos','tiene_alergias','alergias','no_consume','actividad','ejercicio','frecuencia','sueno','estres','habitos','habitos_otros','sintomas','metabolicas','come_estres','come_aburrido','come_emociones','hambre_emocional','come_rapido','come_lleno','culpa_comer','culpa_exceso','dietas_repetidas','horarios_regulares','comidas_fuera','rec24_desayuno','rec24_manana','rec24_almuerzo','rec24_merienda','rec24_cena','rec24_snacks','created_at','updated_at']);
+const rawKnown92=new Set(['id','paciente_id','pacienteId','motivo','objetivo','plazo','antecedentes','antec_otros','antecOtros','antec_fam','antecFam','antec_fam_otros','antecFamOtros','medicamentos','tiene_alergias','tieneAlergias','alergias','no_consume','noConsume','actividad','ejercicio','frecuencia','sueno','estres','habitos','habitos_otros','habitosOtros','sintomas','metabolicas','come_estres','comeEstres','come_aburrido','comeAburrido','come_emociones','comeEmociones','hambre_emocional','hambreEmocional','come_rapido','comeRapido','come_lleno','comeLleno','culpa_comer','culpaComer','culpa_exceso','culpaExceso','dietas_repetidas','dietasRepetidas','horarios_regulares','horariosRegulares','comidas_fuera','comidasFuera','rec24_desayuno','rec24Desayuno','rec24_manana','rec24Mañana','rec24Manana','rec24_almuerzo','rec24Almuerzo','rec24_merienda','rec24Merienda','rec24_cena','rec24Cena','rec24_snacks','rec24Snacks','created_at','createdAt','updated_at','updatedAt','raw']);
 const rawLabel92=k=>String(k||'').replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase());
-function rawExtras92(hc){const raw=hc?.raw&&typeof hc.raw==='object'?hc.raw:{};return Object.entries(raw).filter(([k,v])=>!rawKnown92.has(k)&&v!==null&&v!==undefined&&String(Array.isArray(v)?v.join(''):v).trim()).map(([k,v])=>[rawLabel92(k),Array.isArray(v)?v.join(', '):typeof v==='object'?JSON.stringify(v):v])}
+function rawExtras92(hc){const raw=hc?.raw&&typeof hc.raw==='object'?hc.raw:{};return Object.entries(raw).filter(([k,v])=>k!=='raw'&&!rawKnown92.has(k)&&v!==null&&v!==undefined&&typeof v!=='object'&&String(v).trim()).map(([k,v])=>[rawLabel92(k),v])}
 function consentData92(p){try{if(typeof getPatientConsentSummary!=='function')return null;const s=getPatientConsentSummary(p?.id);return s&&Array.isArray(s.forms)?s:null}catch(_){return null}}
 function consentView92(p){const s=consentData92(p);if(!s)return '<div class="nm92-credit-note">El estado de consentimientos se consulta en el módulo de Consentimientos.</div>';return `<div class="nm92-info-grid">${s.forms.map(f=>{const r=s.rec?.[f.id];return field92(f.name,r?.completed?`Recibido${r.verifiedAt?' · '+date92(r.verifiedAt):''}`:'Pendiente')}).join('')}</div>`}
 function consentPdf92(p){const s=consentData92(p);if(!s)return pdfValue92('Consentimientos','Consultar módulo de Consentimientos');return s.forms.map(f=>{const r=s.rec?.[f.id];return pdfValue92(f.name,r?.completed?`Recibido${r.verifiedAt?' · '+date92(r.verifiedAt):''}`:'Pendiente')}).join('')}
@@ -15056,6 +15056,7 @@ function buildHistoryPdf92(p){
   </section>
  </div>`;
 }
+window.NMHistoryRawFixV94=true;
 window.downloadHistoriaClinica=async function(patientId){
  const p=(DB.patients||[]).find(x=>String(x.id)===String(patientId));if(!p)return notify?.('No se encontró el paciente.','warning');
  try{const node=document.createElement('div');node.innerHTML=buildHistoryPdf92(p);const safe=String(p.nombre||'Paciente').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_');await saveExecPdf92(node.firstElementChild,`Informe_Ejecutivo_HC_${safe}_${new Date().toISOString().slice(0,10)}.pdf`,'portrait');notify?.('Historia clínica completa descargada.','success')}catch(e){console.error('[HC PDF v92]',e);notify?.('No se pudo generar la historia clínica PDF: '+(e.message||'Error'),'danger')}
@@ -15203,3 +15204,5 @@ window.NMV93DebtsCreditsSeparated=true;
 
 </body>
 </html>
+
+  
