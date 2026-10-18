@@ -15129,6 +15129,8 @@ const M93=v=>typeof moneyRD==='function'?moneyRD(v):'RD$ '+N93(v).toLocaleString
 const D93=v=>{if(!v)return '—';try{return new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString('es-DO')}catch(_){return String(v)}};
 const today93=()=>new Date().toISOString().slice(0,10);
 const api93=()=>window.NMBillingClientAPI?.billingFetch||null;
+// v100: el gestor de saldos v92 vive en un IIFE anterior; usar la referencia publica.
+const Credit92=window.NMCredit92;
 let DEBTS93=[],DEBT_PAYMENTS93=[];
 
 function ensureTabs93(){
