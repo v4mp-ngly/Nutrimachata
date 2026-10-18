@@ -9272,7 +9272,7 @@ function renderBilling(){
   </style>
   <div class="billing-hero"><div><div class="billing-title">Facturación</div><div class="billing-sub">Facturas, cobros, productos, servicios y reportes en un solo lugar.</div></div><button class="btn btn-olive" onclick="openInvoiceModal()">＋ Nueva factura</button></div>
   <div class="bill-kpis"><div class="bill-kpi"><small>FACTURAS ESTE MES</small><b>${month.length}</b><span class="text-sm text-muted">Período actual</span></div><div class="bill-kpi"><small>TOTAL FACTURADO</small><b>${moneyRD(totalMonth)}</b><span class="text-sm text-muted">Este mes</span></div><div class="bill-kpi"><small>POR COBRAR</small><b style="color:#b76812">${moneyRD(due)}</b><span class="text-sm text-muted">Saldo pendiente</span></div><div class="bill-kpi"><small>PAGADAS ESTE MES</small><b>${paidMonth}</b><span class="text-sm text-muted">${month.length?Math.round(paidMonth/month.length*100):0}% del mes</span></div></div>
-  <div class="bill-workspace"><main><div class="bill-tabs">${[['invoices','Facturas'],['payments','Pagos'],['inventory','Productos y servicios'],['templates','Plantilla'],['financial','Reportes']].map(([k,l],i)=>`<button class="bill-tab ${i===0?'active':''}" data-btab="${k}" onclick="renderBillingTab('${k}',this)">${l}</button>`).join('')}</div><div id="billing-tab-content"></div></main><aside class="bill-side"><div class="bill-summary"><small>Total histórico</small><b class="big">${moneyRD(total)}</b><div class="bill-summary-row"><span>Cobrado</span><b>${moneyRD(collected)}</b></div><div class="bill-summary-row"><span>Pendiente</span><b>${moneyRD(due)}</b></div><div class="bill-summary-row"><span>% cobrado</span><b>${pct}%</b></div></div><div class="card bill-quick"><b>Accesos rápidos</b><a onclick="openInvoiceModal()"><span>Nueva factura</span><b>›</b></a><a onclick="openBillingProductModal()"><span>Nuevo producto / servicio</span><b>›</b></a><a onclick="renderBillingTab('payments')"><span>Registrar / revisar pagos</span><b>›</b></a><a onclick="renderBillingTab('financial')"><span>Reporte financiero</span><b>›</b></a></div></aside></div>`;
+  <div class="bill-workspace"><main><div class="bill-tabs">${[['balances','Saldos a favor'],['debts93','Deudas'],['invoices','Facturas'],['receivables','Cuentas por cobrar'],['payments','Pagos'],['inventory','Productos y servicios'],['templates','Plantilla'],['financial','Reportes'],['quotes','Cotizaciones'],['expenses','Gastos'],['cashclose','Cierre de caja'],['exports','Exportación'],['numbering','Configuración']].map(([k,l],i)=>`<button class="bill-tab ${i===0?'active':''}" data-btab="${k}" onclick="renderBillingTab('${k}',this)">${l}</button>`).join('')}</div><div id="billing-tab-content"></div></main><aside class="bill-side"><div class="bill-summary"><small>Total histórico</small><b class="big">${moneyRD(total)}</b><div class="bill-summary-row"><span>Cobrado</span><b>${moneyRD(collected)}</b></div><div class="bill-summary-row"><span>Pendiente</span><b>${moneyRD(due)}</b></div><div class="bill-summary-row"><span>% cobrado</span><b>${pct}%</b></div></div><div class="card bill-quick"><b>Accesos rápidos</b><a onclick="openInvoiceModal()"><span>Nueva factura</span><b>›</b></a><a onclick="openBillingProductModal()"><span>Nuevo producto / servicio</span><b>›</b></a><a onclick="renderBillingTab('payments')"><span>Registrar / revisar pagos</span><b>›</b></a><a onclick="renderBillingTab('financial')"><span>Reporte financiero</span><b>›</b></a></div></aside></div>`;
   renderBillingTab('invoices');
 }
 
@@ -14152,7 +14152,7 @@ const money54=v=>typeof moneyRD==='function'?moneyRD(Number(v||0)):'RD$ '+Number
 const today54=()=>new Date().toISOString().slice(0,10);
 function ensureAllBillingTabs54(){
  const tabs=document.querySelector('.bill-tabs'); if(!tabs)return;
- const wanted=[['invoices','Facturas'],['receivables','Cuentas por cobrar'],['payments','Pagos'],['inventory','Productos y servicios'],['templates','Plantilla'],['financial','Reportes'],['quotes','Cotizaciones'],['expenses','Gastos'],['cashclose','Cierre de caja'],['exports','Exportación'],['numbering','Configuración']];
+ const wanted=[['balances','Saldos a favor'],['debts93','Deudas'],['invoices','Facturas'],['receivables','Cuentas por cobrar'],['payments','Pagos'],['inventory','Productos y servicios'],['templates','Plantilla'],['financial','Reportes'],['quotes','Cotizaciones'],['expenses','Gastos'],['cashclose','Cierre de caja'],['exports','Exportación'],['numbering','Configuración']];
  wanted.forEach(([k,label])=>{
    let b=tabs.querySelector(`[data-btab="${k}"]`);
    if(!b){b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab=k;b.textContent=label;tabs.appendChild(b)}
@@ -15137,7 +15137,7 @@ let DEBTS93=[],DEBT_PAYMENTS93=[];
 function ensureTabs93(){
  const tabs=document.querySelector('.bill-tabs');if(!tabs)return;
  const old=tabs.querySelector('[data-btab="balances"]');if(old){old.textContent='Saldos a favor';old.onclick=()=>window.renderBillingTab('balances',old)}
- if(!tabs.querySelector('[data-btab="debts93"]')){const b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='debts93';b.textContent='Deudas';b.onclick=()=>window.renderBillingTab('debts93',b);const bal=tabs.querySelector('[data-btab="balances"]');bal?tabs.insertBefore(b,bal):tabs.appendChild(b)}
+ if(!tabs.querySelector('[data-btab="debts93"]')){const b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='debts93';b.textContent='Deudas';b.onclick=()=>window.renderBillingTab('debts93',b);const bal=tabs.querySelector('[data-btab="balances"]');bal?bal.insertAdjacentElement('afterend',b):tabs.insertBefore(b,tabs.firstChild)}
  const quick=document.querySelector('.bill-quick');if(quick){const q=quick.querySelector('[data-v92-balances]');if(q){q.innerHTML='<span>Saldos a favor</span><b>›</b>';q.onclick=()=>window.renderBillingTab('balances')};if(!quick.querySelector('[data-v93-debts]')){const a=document.createElement('a');a.dataset.v93Debts='1';a.innerHTML='<span>Registrar / revisar deudas</span><b>›</b>';a.onclick=()=>window.renderBillingTab('debts93');quick.appendChild(a)}}
 }
 
@@ -15188,7 +15188,7 @@ function fixBillingTabs95(){
   if(bal){bal.textContent='Saldos a favor';bal.onclick=()=>window.renderBillingTab('balances',bal);}
   if(!tabs.querySelector('[data-btab="debts93"]')){
     const b=document.createElement('button'); b.className='bill-tab'; b.type='button'; b.dataset.btab='debts93'; b.textContent='Deudas';
-    b.onclick=()=>window.renderBillingTab('debts93',b); bal?tabs.insertBefore(b,bal):tabs.appendChild(b);
+    b.onclick=()=>window.renderBillingTab('debts93',b); bal?bal.insertAdjacentElement('afterend',b):tabs.insertBefore(b,tabs.firstChild);
   }
 }
 const rb95=window.renderBilling;
@@ -15433,30 +15433,6 @@ window.NMV95IntegralFixes=true;
 })();
 </script>
 
-<script id="nm-v108-deudas-integradas">
-(function(){
-'use strict';
-function ensureDebts108(){
- const tabs=document.querySelector('.bill-tabs');
- if(!tabs)return;
- let b=tabs.querySelector('[data-btab="debts93"]');
- const bal=tabs.querySelector('[data-btab="balances"]');
- if(!b){b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='debts93';b.textContent='Deudas';}
- b.onclick=()=>window.renderBillingTab('debts93',b);
- if(bal && b.previousElementSibling!==bal) bal.insertAdjacentElement('afterend',b);
- const quick=document.querySelector('.bill-quick');
- if(quick && !quick.querySelector('[data-v108-debts]')){const q=document.createElement('a');q.dataset.v108Debts='1';q.innerHTML='<span>Deudas</span><b>›</b>';q.onclick=()=>window.renderBillingTab('debts93');quick.appendChild(q);}
-}
-const rb=window.renderBilling;
-window.renderBilling=function(){const r=rb?.apply(this,arguments);requestAnimationFrame(()=>requestAnimationFrame(ensureDebts108));return r;};
-try{renderBilling=window.renderBilling}catch(_){}
-const rt=window.renderBillingTab;
-window.renderBillingTab=function(tab,btn){if(tab==='debts93'&&typeof window.renderDebts93==='function')return window.renderDebts93();return rt?.apply(this,arguments);};
-try{renderBillingTab=window.renderBillingTab}catch(_){}
-document.addEventListener('DOMContentLoaded',ensureDebts108);
-requestAnimationFrame(()=>requestAnimationFrame(ensureDebts108));
-window.NMV108DebtsIntegrated=true;
-})();
-</script>
+
 </body>
 </html>
