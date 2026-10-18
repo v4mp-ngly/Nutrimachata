@@ -3184,10 +3184,9 @@ function savePubWizStep() {
       pubWizData.metabolicas  = getVal('metabolicas');
       break;
     case 5:
-      ['comeEstres','comeAburrido','hambreEmocional','comeRapido','comeLleno',
-       'culpaComer','dietasRepetidas','horariosRegulares'].forEach(k => {
-        pubWizData[k] = getRadio(k);
-      });
+      // v95: las 10 respuestas Sí/No son botones y toggleYesNo() ya las guarda
+      // directamente en pubWizData. No intentar leerlas como radios porque eso
+      // las reemplazaba por '' justo antes de guardar en Supabase.
       pubWizData.comidasFuera = getRadio('fuera');
       break;
     case 6:
@@ -3229,9 +3228,11 @@ function finishPublicReg() {
   pubWizData.email = autoEmail;
   pubWizData.pass  = autoPass;
 
-  const peso  = pubWizData.peso  || 0;
-  const talla = pubWizData.talla || 1.65;
-  const imc   = peso ? parseFloat((peso/(talla*talla)).toFixed(1)) : 0;
+  // v95: el autorregistro NO crea una evaluación ni inventa talla/peso.
+  // Todo permanece en 0 hasta que la doctora registre la primera evaluación.
+  const peso  = 0;
+  const talla = 0;
+  const imc   = 0;
   const initials = (pubWizData.nombre||'NP').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
   const color    = getPatientColor(pubWizData.nombre || 'NP');
 
@@ -3290,7 +3291,7 @@ function finishPublicReg() {
         auth_user_id:     signUp?.user?.id || null,
         direccion:        pubWizData.direccion || '',
         peso, talla, imc,
-        presion:          pubWizData.presion  || '—',
+        presion:          '',
         estado:           imc ? getImcCategory(imc) : 'Pendiente evaluación',
         objetivo:         pubWizData.objetivo || '',
         alergias:         pubWizData.alergias || 'Ninguna',
@@ -6635,56 +6636,7 @@ function openHistoriaClinica(patientId, activeTab) {
         <div class="card-header"><div class="card-title">Medidas corporales</div><div class="card-subtitle">cm · ${antropoDatasets.map(d=>d.label).join(', ')}</div></div>
         <div class="card-body"><div style="height:240px"><canvas id="hcp-evo-antropo"></canvas></div></div>
       </div>` : ''}
-      <!-- Summary table -->
-      <div class="card">
-        <div class="card-header"><div class="card-title">Tabla de progreso</div><div class="card-subtitle">Todas las medidas por evaluación</div></div>
-        <div class="table-container" style="overflow-x:auto">
-          <table style="min-width:700px">
-            <thead><tr>
-              <th>Fecha</th>
-              <th>Peso</th>
-              <th>Δ Peso</th>
-              <th>IMC</th>
-              <th>Estado</th>
-              <th>Presión</th>
-              ${evals.some(e=>e.cintura)?'<th>Cintura</th>':''}
-              ${evals.some(e=>e.abdomen)?'<th>Abdomen</th>':''}
-              ${evals.some(e=>e.cadera)?'<th>Cadera</th>':''}
-              ${evals.some(e=>e.muslo)?'<th>Muslo</th>':''}
-              ${evals.some(e=>e.pecho)?'<th>Pecho</th>':''}
-              ${evals.some(e=>e.cuello)?'<th>Cuello</th>':''}
-              ${evals.some(e=>e.muneca)?'<th>Muñeca</th>':''}
-              ${evals.some(e=>e.grasa)?'<th>% Grasa</th>':''}
-              ${evals.some(e=>e.fc)?'<th>FC</th>':''}
-              <th>Obs.</th>
-            </tr></thead>
-            <tbody>
-              ${[...evals].reverse().map((e, ri) => {
-                const prevE = evals[evals.length - 2 - ri];
-                const dP = prevE && e.peso && prevE.peso ? parseFloat((e.peso - prevE.peso).toFixed(1)) : null;
-                const isToday = e.fecha === new Date().toISOString().split('T')[0];
-                return `<tr style="${isToday?'background:rgba(94,140,42,0.06);font-weight:500':''}">
-                  <td class="font-mono text-sm" style="white-space:nowrap${isToday?';color:var(--olive-dark)':''}">${e.fecha}${isToday?' <span style="font-size:9px;background:var(--olive);color:white;border-radius:4px;padding:1px 5px;margin-left:4px">HOY</span>':''}</td>
-                  <td class="font-mono" style="font-weight:700">${e.peso} kg</td>
-                  <td>${dP!==null?`<span style="font-size:11px;font-weight:700;color:${dP<0?'var(--success)':dP>0?'var(--danger)':'var(--gray-400)'}">${dP>0?'+':''}${dP} kg</span>`:'<span style="color:var(--gray-300)">—</span>'}</td>
-                  <td class="font-mono" style="font-weight:700;color:${getImcColor(e.imc)}">${(e.imc||0).toFixed(1)}</td>
-                  <td><span class="badge ${getImcBadge(e.imc)}">${getImcCategory(e.imc)}</span></td>
-                  <td class="text-sm">${e.presion||'—'}</td>
-                  ${evals.some(ev=>ev.cintura)?`<td class="font-mono text-sm">${e.cintura!=null?e.cintura+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.abdomen)?`<td class="font-mono text-sm">${e.abdomen!=null?e.abdomen+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.cadera)?`<td class="font-mono text-sm">${e.cadera!=null?e.cadera+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.muslo)?`<td class="font-mono text-sm">${e.muslo!=null?e.muslo+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.pecho)?`<td class="font-mono text-sm">${e.pecho!=null?e.pecho+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.cuello)?`<td class="font-mono text-sm">${e.cuello!=null?e.cuello+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.muneca)?`<td class="font-mono text-sm">${e.muneca!=null?e.muneca+' cm':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.grasa)?`<td class="font-mono text-sm">${e.grasa!=null?e.grasa+'%':'—'}</td>`:''}
-                  ${evals.some(ev=>ev.fc)?`<td class="font-mono text-sm">${e.fc!=null?e.fc+' lpm':'—'}</td>`:''}
-                  <td class="text-sm text-muted" style="max-width:160px">${e.obs||'—'}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
+      <!-- v95: tabla de progreso única se renderiza debajo de los gráficos -->
       </div>` : `
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-olive btn-sm" onclick="openEvalModal('${p.id}')">+ Nueva Evaluación</button>
@@ -13766,7 +13718,8 @@ window.renderBillingTab=function(tab,btn){
 window.NMBillingV28={renderPayments:renderPayments28};
 })();
 </script>
-\n<script id="nm-billing-tab-persistence-v29">
+
+<script id="nm-billing-tab-persistence-v29">
 (function(){
 'use strict';
 let activeBillingTab='invoices';
@@ -13808,7 +13761,8 @@ window.renderBilling=function(){
 window.NMBillingTabStateV29={get:()=>activeBillingTab,set:v=>{activeBillingTab=v||'invoices'}};
 })();
 </script>
-\n<script id="nm-gastos-visible-v30">
+
+<script id="nm-gastos-visible-v30">
 (function(){
 'use strict';
 function ensureExpensesUI(){
@@ -13833,7 +13787,8 @@ window.NMEnsureExpensesV30=ensureExpensesUI;
 ensureExpensesUI();
 })();
 </script>
-\n<script id="nm-cotizaciones-v31">
+
+<script id="nm-cotizaciones-v31">
 (function(){
 'use strict';
 let QUOTES=[];
@@ -13863,7 +13818,8 @@ const prev=window.renderBillingTab;window.renderBillingTab=function(tab,btn){if(
 ensureQuoteUI();
 })();
 </script>
-\n<script id="nm-recibos-completos-v32">
+
+<script id="nm-recibos-completos-v32">
 (function(){
 'use strict';
 const esc32=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
@@ -15202,7 +15158,37 @@ window.NMV93DebtsCreditsSeparated=true;
 })();
 </script>
 
+<script id="nm-v95-integral-fixes">
+(function(){
+'use strict';
+function fixBillingTabs95(){
+  const tabs=document.querySelector('.bill-tabs');
+  if(!tabs)return;
+  const bal=tabs.querySelector('[data-btab="balances"]');
+  if(bal){bal.textContent='Saldos a favor';bal.onclick=()=>window.renderBillingTab('balances',bal);}
+  if(!tabs.querySelector('[data-btab="debts93"]')){
+    const b=document.createElement('button'); b.className='bill-tab'; b.type='button'; b.dataset.btab='debts93'; b.textContent='Deudas';
+    b.onclick=()=>window.renderBillingTab('debts93',b); bal?tabs.insertBefore(b,bal):tabs.appendChild(b);
+  }
+}
+const rb95=window.renderBilling;
+window.renderBilling=function(){
+  const r=rb95?.apply(this,arguments);
+  [0,60,250].forEach(ms=>setTimeout(fixBillingTabs95,ms));
+  return r;
+};
+try{renderBilling=window.renderBilling}catch(_){}
+const rt95=window.renderBillingTab;
+window.renderBillingTab=function(tab,btn){
+  if(tab==='balances' && typeof window.renderBalances92==='function') return window.renderBalances92();
+  if(tab==='debts93' && typeof window.renderDebts93==='function') return window.renderDebts93();
+  return rt95?.apply(this,arguments);
+};
+try{renderBillingTab=window.renderBillingTab}catch(_){}
+setTimeout(fixBillingTabs95,0);
+window.NMV95IntegralFixes=true;
+})();
+</script>
+
 </body>
 </html>
-
-  
