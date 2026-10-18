@@ -6386,7 +6386,7 @@ function openHistoriaClinica(patientId, activeTab) {
 
     <!-- TABS -->
     <div style="display:flex;gap:2px;background:var(--gray-100);padding:4px;border-radius:var(--radius);margin-bottom:24px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-      ${[['resumen','Resumen'],['hc-form','Historia Clínica'],['evaluaciones','Evaluaciones'],['dietas','Dietas'],['evolucion','Evolución']].map(([t,lbl])=>`
+      ${[['resumen','Resumen'],['hc-form','Historia Clínica'],['evaluaciones','Evaluaciones'],['dietas','Dietas'],['bitacora','Bitácora clínica'],['evolucion','Evolución']].map(([t,lbl])=>`
         <button id="hc-tab-btn-${t}" onclick="switchHCTabPage('${t}','${p.id}')"
           style="flex:1;min-width:max-content;padding:9px 16px;border:none;background:${t===tab?'var(--white)':'transparent'};color:${t===tab?'var(--olive-dark)':'var(--gray-500)'};border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;box-shadow:${t===tab?'var(--shadow-sm)':'none'};white-space:nowrap">
           ${lbl}
@@ -6618,6 +6618,13 @@ function openHistoriaClinica(patientId, activeTab) {
       `}
     </div>
 
+    <!-- ── BITÁCORA CLÍNICA ── -->
+    <div id="hcp-bitacora" style="display:${tab==='bitacora'?'block':'none'}">
+      <div id="nm-bitacora-v97-${p.id}">
+        <div class="card"><div class="card-body" style="padding:28px;text-align:center;color:var(--gray-500)">Cargando evolución clínica...</div></div>
+      </div>
+    </div>
+
     <!-- ── EVOLUCIÓN ── -->
     <div id="hcp-evolucion" style="display:${tab==='evolucion'?'block':'none'}">
       ${hasCharts ? `
@@ -6724,7 +6731,7 @@ function openHistoriaClinica(patientId, activeTab) {
 }
 
 function switchHCTabPage(tab, patientId) {
-  ['resumen','hc-form','evaluaciones','dietas','evolucion'].forEach(t => {
+  ['resumen','hc-form','evaluaciones','dietas','bitacora','evolucion'].forEach(t => {
     const el  = document.getElementById('hcp-' + t);
     const btn = document.getElementById('hc-tab-btn-' + t);
     if (el)  el.style.display = t === tab ? 'block' : 'none';
@@ -6774,7 +6781,7 @@ function switchHCTabPage(tab, patientId) {
 }
 
 function switchHCTab(tab, btn) {
-  ['resumen','hc-form','evaluaciones','dietas','evolucion'].forEach(t => {
+  ['resumen','hc-form','evaluaciones','dietas','bitacora','evolucion'].forEach(t => {
     const el = document.getElementById('hc-tab-'+t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
@@ -15271,7 +15278,58 @@ window.NMV95IntegralFixes=true;
 })();
 </script>
 
+
+<style id="nm-v97-clinical-notes-style">
+.nm97-note-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}.nm97-note-date{font:600 12px 'DM Mono',monospace;color:var(--olive-dark)}.nm97-note-doctor{font-size:12px;color:var(--gray-500);margin-top:3px}.nm97-note-body{white-space:pre-wrap;line-height:1.65;font-size:13px;color:var(--gray-700)}.nm97-note-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.nm97-note-box{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;padding:10px 12px}.nm97-note-box small{display:block;text-transform:uppercase;letter-spacing:.45px;color:var(--gray-400);font-size:9px;font-weight:700;margin-bottom:4px}.nm97-note-box div{font-size:12px;line-height:1.5}.nm97-note-card{border-left:3px solid var(--olive);margin-bottom:12px}.nm97-initial-lock{background:#f7f9f4;border:1px solid #e2eadb;border-radius:12px;padding:13px 15px;margin-bottom:16px;font-size:12px;color:#5e6858}.nm97-initial-lock b{color:var(--olive-dark)}
+@media(max-width:700px){.nm97-note-grid{grid-template-columns:1fr}}
+</style>
+<script id="nm-v97-clinical-notes">
+/* NutriMachata v97 - Historia inicial inmutable + bitácora clínica cronológica */
+(function(){
+ const esc97=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const clinicalRole97=()=>['admin','doctor','doctora','nutricionista'].includes(String(DB?.currentRole||'').toLowerCase());
+ const patientRole97=()=>String(DB?.currentRole||'').toLowerCase()==='patient';
+ const fmtDate97=v=>{if(!v)return 'Sin fecha';try{return new Date(v).toLocaleString('es-DO',{dateStyle:'medium',timeStyle:'short'})}catch(_){return String(v)}};
+ async function loadNotes97(patientId){
+   if(patientRole97()) return [];
+   return await supa(`notas_clinicas?paciente_id=eq.${encodeURIComponent(patientId)}&select=*&order=created_at.desc`,'GET');
+ }
+ window.renderClinicalNotesV97=async function(patientId){
+   const root=document.getElementById('nm-bitacora-v97-'+patientId); if(!root)return;
+   if(!clinicalRole97()){root.innerHTML='<div class="empty-state"><div class="empty-title">Contenido clínico interno</div><div class="empty-text">Las notas de evolución son de uso exclusivo del equipo médico.</div></div>';return;}
+   root.innerHTML='<div class="card"><div class="card-body" style="padding:28px;text-align:center;color:var(--gray-500)">Cargando notas...</div></div>';
+   try{
+    const rows=await loadNotes97(patientId);
+    root.innerHTML=`<div class="nm97-initial-lock"><b>Historia clínica inicial:</b> corresponde a la admisión original del paciente. Las consultas posteriores se documentan aquí como notas independientes y no reemplazan esa historia.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap"><div><h3 style="margin:0;color:var(--olive-dark)">Evolución clínica</h3><div class="text-muted text-sm">${rows.length} nota${rows.length===1?'':'s'} registrada${rows.length===1?'':'s'}</div></div><button class="btn btn-olive btn-sm" onclick="openClinicalNoteV97('${patientId}')">+ Nueva nota clínica</button></div>
+      ${rows.length?rows.map(n=>`<div class="card nm97-note-card"><div class="card-body"><div class="nm97-note-head"><div><div class="nm97-note-date">${esc97(fmtDate97(n.created_at))}</div><div class="nm97-note-doctor">🩺 ${esc97(n.doctor_nombre||'Profesional de salud')}</div></div>${n.updated_at&&n.updated_at!==n.created_at?`<span class="badge badge-gray">Editada ${esc97(fmtDate97(n.updated_at))}</span>`:''}</div><div class="nm97-note-body" style="margin-top:12px">${esc97(n.nota||'')}</div>${(n.indicaciones||n.proximo_objetivo)?`<div class="nm97-note-grid">${n.indicaciones?`<div class="nm97-note-box"><small>Indicaciones</small><div>${esc97(n.indicaciones)}</div></div>`:''}${n.proximo_objetivo?`<div class="nm97-note-box"><small>Próximo objetivo</small><div>${esc97(n.proximo_objetivo)}</div></div>`:''}</div>`:''}</div></div>`).join(''):'<div class="empty-state" style="padding:34px"><div class="empty-icon">📝</div><div class="empty-title">Sin notas clínicas todavía</div><div class="empty-text">La primera consulta posterior a la admisión aparecerá aquí.</div></div>'}`;
+   }catch(e){console.error('[Bitácora v97]',e);root.innerHTML=`<div class="alert alert-danger">No se pudo cargar la bitácora clínica: ${esc97(e.message||e)}</div>`;}
+ };
+ window.openClinicalNoteV97=function(patientId){
+   if(!clinicalRole97())return notify('Solo el equipo médico puede crear notas clínicas.','danger');
+   const p=(DB.patients||[]).find(x=>String(x.id)===String(patientId));
+   document.getElementById('nm-v97-note-modal')?.remove();
+   document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm-v97-note-modal" style="z-index:10030"><div class="modal modal-lg"><div class="modal-header"><div><div class="modal-title">Nueva nota clínica</div><div class="modal-subtitle">${esc97(p?.nombre||'Paciente')} · La fecha, hora y profesional se guardan automáticamente.</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button></div><div class="modal-body"><div class="form-group"><label>Nota de evolución *</label><textarea id="nm97-note" class="form-control" rows="8" placeholder="Evolución desde la consulta anterior, hallazgos, tolerancia, adherencia, síntomas, cambios relevantes..."></textarea></div><div class="form-row"><div class="form-group"><label>Indicaciones</label><textarea id="nm97-indications" class="form-control" rows="4" placeholder="Indicaciones médicas o nutricionales..."></textarea></div><div class="form-group"><label>Próximo objetivo</label><textarea id="nm97-goal" class="form-control" rows="4" placeholder="Objetivo para el próximo seguimiento..."></textarea></div></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" id="nm97-save-note" onclick="saveClinicalNoteV97('${patientId}')">Guardar nota</button></div></div></div>`);
+ };
+ window.saveClinicalNoteV97=async function(patientId){
+   const note=document.getElementById('nm97-note')?.value.trim()||''; if(!note)return notify('Escribe la nota de evolución antes de guardar.','warning');
+   const btn=document.getElementById('nm97-save-note'); if(btn){btn.disabled=true;btn.textContent='Guardando...'}
+   try{
+    await ensureSupaSession();
+    const uid=DB.currentUser?.supabaseId||DB.currentUser?.id||null;
+    const doctorName=DB.currentUser?.name||DB.currentUser?.email||'Profesional de salud';
+    const r=await supa('notas_clinicas?select=*','POST',{paciente_id:patientId,doctor_id:uid,doctor_nombre:doctorName,nota:note,indicaciones:document.getElementById('nm97-indications')?.value.trim()||null,proximo_objetivo:document.getElementById('nm97-goal')?.value.trim()||null});
+    if(!Array.isArray(r)||!r[0]?.id)throw new Error('Supabase no confirmó la nota clínica guardada.');
+    document.getElementById('nm-v97-note-modal')?.remove(); notify('Nota clínica guardada con fecha y profesional.','success'); await renderClinicalNotesV97(patientId);
+   }catch(e){console.error('[Guardar nota v97]',e);notify('No se pudo guardar la nota clínica: '+(e.message||e),'danger');if(btn){btn.disabled=false;btn.textContent='Guardar nota'}}
+ };
+ const oldSwitch97=window.switchHCTabPage;
+ window.switchHCTabPage=function(tab,patientId){const r=oldSwitch97?.apply(this,arguments);if(tab==='bitacora')setTimeout(()=>renderClinicalNotesV97(patientId),20);return r};
+ const oldOpen97=window.openHistoriaClinica;
+ window.openHistoriaClinica=function(patientId,activeTab){const r=oldOpen97?.apply(this,arguments);if((activeTab||'resumen')==='bitacora')setTimeout(()=>renderClinicalNotesV97(patientId),50);return r};
+ window.NMV97ClinicalNotes=true;
+})();
+</script>
+
 </body>
 </html>
-
-  
