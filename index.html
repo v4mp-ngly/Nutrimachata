@@ -15049,8 +15049,8 @@ const Credit92={rows:[],loaded:false,error:'',loading:null,async load(force=fals
 window.NMCredit92=Credit92;
 
 function ensureBalanceTab92(){
- const tabs=document.querySelector('.bill-tabs');if(tabs&&!tabs.querySelector('[data-btab="balances"]')){const b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='balances';b.textContent='Deudas y saldos';b.onclick=()=>window.renderBillingTab('balances',b);const ref=tabs.querySelector('[data-btab="payments"]')||tabs.querySelector('[data-btab="inventory"]');ref?tabs.insertBefore(b,ref):tabs.appendChild(b)}
- const quick=document.querySelector('.bill-quick');if(quick&&!quick.querySelector('[data-v92-balances]')){const a=document.createElement('a');a.dataset.v92Balances='1';a.innerHTML='<span>Deudas y saldos a favor</span><b>›</b>';a.onclick=()=>window.renderBillingTab('balances');quick.appendChild(a)}
+ const tabs=document.querySelector('.bill-tabs');if(tabs&&!tabs.querySelector('[data-btab="balances"]')){const b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='balances';b.textContent='Saldos a favor';b.onclick=()=>window.renderBillingTab('balances',b);const ref=tabs.querySelector('[data-btab="payments"]')||tabs.querySelector('[data-btab="inventory"]');ref?tabs.insertBefore(b,ref):tabs.appendChild(b)}
+ const quick=document.querySelector('.bill-quick');if(quick&&!quick.querySelector('[data-v92-balances]')){const a=document.createElement('a');a.dataset.v92Balances='1';a.innerHTML='<span>Saldos a favor</span><b>›</b>';a.onclick=()=>window.renderBillingTab('balances');quick.appendChild(a)}
 }
 function balanceRows92(){
  const invoices=(typeof getBillingData==='function'?getBillingData().invoices:[])||[],parties=new Map(allParties92().map(p=>[partyKey92(p.type,p.id),{...p,debt:0,credit:Credit92.balance(p.type,p.id),invoices:0}]));
@@ -15059,7 +15059,7 @@ function balanceRows92(){
  return [...parties.values()].filter(r=>r.debt>.009||r.credit>.009).sort((a,b)=>(b.debt+b.credit)-(a.debt+a.credit));
 }
 window.renderBalances92=async function(){
- const el=document.getElementById('billing-tab-content');if(!el)return;document.querySelectorAll('[data-btab]').forEach(b=>b.classList.toggle('active',b.dataset.btab==='balances'));el.innerHTML='<div class="card"><div class="card-body" style="padding:30px;text-align:center">Cargando deudas y saldos a favor...</div></div>';
+ const el=document.getElementById('billing-tab-content');if(!el)return;document.querySelectorAll('[data-btab]').forEach(b=>b.classList.toggle('active',b.dataset.btab==='balances'));el.innerHTML='<div class="card"><div class="card-body" style="padding:30px;text-align:center">Cargando saldos a favor...</div></div>';
  await Credit92.load(true);if(Credit92.error){el.innerHTML=`<div class="card"><div class="card-body"><div class="empty-title">Falta activar saldos a favor en Supabase</div><div class="empty-text">Ejecuta el archivo SQL v92. Detalle: ${E92(Credit92.error)}</div></div></div>`;return}
  const rows=balanceRows92(),debt=rows.reduce((n,r)=>n+r.debt,0),credit=rows.reduce((n,r)=>n+r.credit,0),net=Math.max(0,debt-credit);
  window.NMBalanceRows92=rows;
@@ -15082,7 +15082,7 @@ window.NMUpdatePaymentSummary92=function(){
  const values={'nm92-credit-applied':credit,'nm92-cash-applied':cashApplied,'nm92-new-credit':newCredit,'nm92-invoice-remaining':remaining};Object.entries(values).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=M92(v)});const warn=document.getElementById('nm92-overpay-warning');if(warn){warn.style.display=newCredit>.009?'block':'none';warn.innerHTML=`Se generará <b>${M92(newCredit)}</b> como saldo disponible para futuras facturas.`}
 };
 window.registerInvoicePayment=async function(id){
- const x=(getBillingData?.().invoices||[]).find(i=>String(i.id)===String(id));if(!x)return notify?.('La factura ya no existe.','danger');const rem=Math.max(0,N92(x.total)-N92(x.paid));if(rem<=.009)return notify?.('Esta factura ya está pagada. El saldo a favor puede administrarse desde “Deudas y saldos”.','info');
+ const x=(getBillingData?.().invoices||[]).find(i=>String(i.id)===String(id));if(!x)return notify?.('La factura ya no existe.','danger');const rem=Math.max(0,N92(x.total)-N92(x.paid));if(rem<=.009)return notify?.('Esta factura ya está pagada. El saldo a favor puede administrarse desde “Saldos a favor”.','info');
  await Credit92.load();const party=invoiceParty92(x),available=party.id?Credit92.balance(party.type,party.id):0;window.NMPaymentInvoice92=x;window.NMPaymentCredit92=available;
  document.getElementById('invoice-payment-modal')?.remove();document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="invoice-payment-modal" style="z-index:10000"><div class="modal" style="max-width:590px"><div class="modal-header"><div><div class="modal-title">Registrar pago · ${E92(x.number)}</div><div class="card-subtitle">${E92(x.patient||'Paciente')}</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><div class="nm92-credit-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="nm92-credit-kpi"><small>SALDO FACTURA</small><b>${M92(rem)}</b></div><div class="nm92-credit-kpi"><small>SALDO DISPONIBLE</small><b>${M92(available)}</b></div></div>${Credit92.error?`<div class="nm92-credit-warning">Ejecuta el SQL v92 para activar sobrepagos y saldos a favor. Los pagos normales siguen disponibles.</div>`:''}<div class="form-row"><div class="form-group"><label>Usar saldo disponible</label><input id="pay-credit-use" class="form-control" type="number" min="0" max="${available}" step="0.01" value="0.00" ${available>.009?'':'disabled'} oninput="NMUpdatePaymentSummary92()"></div><div class="form-group"><label>Monto recibido ahora</label><input id="pay-amount" class="form-control" type="number" min="0" step="0.01" value="${rem.toFixed(2)}" oninput="NMUpdatePaymentSummary92()"></div></div><div class="form-row"><div class="form-group"><label>Método</label><select id="pay-method" class="form-select"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Depósito</option><option>Otro</option></select></div><div class="form-group"><label>Referencia</label><input id="pay-reference" class="form-control" placeholder="Opcional"></div></div><div class="form-group"><label>Notas</label><input id="pay-notes" class="form-control" placeholder="Opcional"></div><div id="nm92-overpay-warning" class="nm92-credit-warning" style="display:none;margin-top:10px"></div><div class="nm92-pay-summary"><div><small>Aplicado desde saldo</small><b id="nm92-credit-applied">${M92(0)}</b></div><div><small>Aplicado del pago</small><b id="nm92-cash-applied">${M92(rem)}</b></div><div><small>Nuevo saldo a favor</small><b id="nm92-new-credit">${M92(0)}</b></div><div><small>Pendiente de factura</small><b id="nm92-invoice-remaining">${M92(0)}</b></div></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" onclick="saveInvoicePayment('${safeId92(id)}')">Guardar pago</button></div></div></div>`);window.NMUpdatePaymentSummary92();
 };
@@ -15137,7 +15137,7 @@ function ensureTabs93(){
  const tabs=document.querySelector('.bill-tabs');if(!tabs)return;
  const old=tabs.querySelector('[data-btab="balances"]');if(old){old.textContent='Saldos a favor';old.onclick=()=>window.renderBillingTab('balances',old)}
  if(!tabs.querySelector('[data-btab="debts93"]')){const b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='debts93';b.textContent='Deudas';b.onclick=()=>window.renderBillingTab('debts93',b);const bal=tabs.querySelector('[data-btab="balances"]');bal?tabs.insertBefore(b,bal):tabs.appendChild(b)}
- const quick=document.querySelector('.bill-quick');if(quick){const q=quick.querySelector('[data-v92-balances]');if(q){q.innerHTML='<span>Saldos a favor de pacientes</span><b>›</b>';q.onclick=()=>window.renderBillingTab('balances')};if(!quick.querySelector('[data-v93-debts]')){const a=document.createElement('a');a.dataset.v93Debts='1';a.innerHTML='<span>Registrar / revisar deudas</span><b>›</b>';a.onclick=()=>window.renderBillingTab('debts93');quick.appendChild(a)}}
+ const quick=document.querySelector('.bill-quick');if(quick){const q=quick.querySelector('[data-v92-balances]');if(q){q.innerHTML='<span>Saldos a favor</span><b>›</b>';q.onclick=()=>window.renderBillingTab('balances')};if(!quick.querySelector('[data-v93-debts]')){const a=document.createElement('a');a.dataset.v93Debts='1';a.innerHTML='<span>Registrar / revisar deudas</span><b>›</b>';a.onclick=()=>window.renderBillingTab('debts93');quick.appendChild(a)}}
 }
 
 window.renderBalances92=async function(){
@@ -15171,6 +15171,7 @@ const oldBilling93=window.renderBilling;window.renderBilling=function(){const r=
 setTimeout(ensureTabs93,0);
 window.NMV93DebtsCreditsSeparated=true;
 window.NMV102BillingDebtsCreditsSeparated=true;
+window.NMV103BillingNavigationSeparated=true;
 })();
 </script>
 
