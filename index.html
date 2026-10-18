@@ -15170,6 +15170,7 @@ const oldTab93=window.renderBillingTab;window.renderBillingTab=function(tab,btn)
 const oldBilling93=window.renderBilling;window.renderBilling=function(){const r=oldBilling93.apply(this,arguments);setTimeout(ensureTabs93,0);return r};
 setTimeout(ensureTabs93,0);
 window.NMV93DebtsCreditsSeparated=true;
+window.NMV102BillingDebtsCreditsSeparated=true;
 })();
 </script>
 
@@ -15324,25 +15325,32 @@ window.NMV95IntegralFixes=true;
    const btn=document.getElementById('nm97-save-note'); if(btn){btn.disabled=true;btn.textContent='Guardando...'}
    try{
     const session=await ensureSupaSession();
-    const authId=currentAuthUserId();
-    const authEmail=String(session?.user?.email||DB.currentUser?.email||'').trim();
+    const sessionEmail=String(session?.user?.email||'').trim().toLowerCase();
+    const appEmail=String(DB?.currentUser?.email||'').trim().toLowerCase();
+    const appRole=String(DB?.currentRole||DB?.currentUser?.role||DB?.currentUser?.rol||'').trim().toLowerCase();
+    const emails=[];
+    const addEmail=e=>{e=String(e||'').trim().toLowerCase();if(e&&/^\S+@\S+\.\S+$/.test(e)&&!emails.includes(e))emails.push(e)};
+    // El administrador principal de NutriMachata debe firmar con su usuarios.id,
+    // no con auth.users.id. Para doctores se resuelve por el correo autenticado.
+    if(appRole==='admin' && typeof NUTRI_ADMIN_EMAIL!=='undefined') addEmail(NUTRI_ADMIN_EMAIL);
+    addEmail(appEmail); addEmail(sessionEmail);
     let professional=null;
-    if(authId){
-      const byId=await supa(`usuarios?id=eq.${encodeURIComponent(authId)}&select=id,email,nombre,rol&limit=1`,'GET').catch(()=>[]);
-      professional=Array.isArray(byId)?byId[0]:null;
+    for(const email of emails){
+      const rows=await supa(`usuarios?email=eq.${encodeURIComponent(email)}&select=id,email,nombre,rol,activo&limit=1`,'GET').catch(()=>[]);
+      const row=Array.isArray(rows)?rows[0]:null;
+      if(row?.id){professional=row;break}
     }
-    if(!professional&&authEmail){
-      const byEmail=await supa(`usuarios?email=eq.${encodeURIComponent(authEmail)}&select=id,email,nombre,rol&limit=1`,'GET').catch(()=>[]);
-      professional=Array.isArray(byEmail)?byEmail[0]:null;
-    }
-    if(!professional?.id) throw new Error('Tu sesión está activa, pero no existe un perfil profesional vinculado en usuarios. Revisa el usuario del doctor/administrador.');
-    const role=String(professional.rol||DB.currentRole||'').toLowerCase();
+    if(!professional?.id) throw new Error('No se encontró en usuarios el perfil profesional asociado a esta sesión. Revisa el correo del administrador/doctor.');
+    const role=String(professional.rol||'').toLowerCase();
     if(!['admin','doctor','doctora','nutricionista'].includes(role)) throw new Error('El usuario autenticado no tiene un perfil profesional autorizado para firmar notas clínicas.');
-    const doctorName=professional.nombre||DB.currentUser?.name||professional.email||authEmail||'Profesional de salud';
-    const r=await supa('notas_clinicas?select=*','POST',{paciente_id:patientId,doctor_id:professional.id,doctor_nombre:doctorName,nota:note,indicaciones:document.getElementById('nm97-indications')?.value.trim()||null,proximo_objetivo:document.getElementById('nm97-goal')?.value.trim()||null});
+    if(professional.activo===false) throw new Error('Este profesional está desactivado y no puede firmar notas clínicas.');
+    const doctorName=professional.nombre||professional.email||'Profesional de salud';
+    const payload={paciente_id:patientId,doctor_id:professional.id,doctor_nombre:doctorName,nota:note,indicaciones:document.getElementById('nm97-indications')?.value.trim()||null,proximo_objetivo:document.getElementById('nm97-goal')?.value.trim()||null};
+    console.info('[Bitácora] Profesional resuelto:',{doctor_id:professional.id,doctor_nombre:doctorName,email:professional.email,rol:role});
+    const r=await supa('notas_clinicas?select=*','POST',payload);
     if(!Array.isArray(r)||!r[0]?.id)throw new Error('Supabase no confirmó la nota clínica guardada.');
     document.getElementById('nm-v97-note-modal')?.remove(); notify('Nota clínica guardada con fecha y profesional.','success'); await renderClinicalNotesV97(patientId);
-   }catch(e){console.error('[Guardar nota v97]',e);notify('No se pudo guardar la nota clínica: '+(e.message||e),'danger');if(btn){btn.disabled=false;btn.textContent='Guardar nota'}}
+   }catch(e){console.error('[Guardar nota v102]',e);notify('No se pudo guardar la nota clínica: '+(e.message||e),'danger');if(btn){btn.disabled=false;btn.textContent='Guardar nota'}}
  };
  const oldSwitch97=window.switchHCTabPage;
  window.switchHCTabPage=function(tab,patientId){const r=oldSwitch97?.apply(this,arguments);if(tab==='bitacora')setTimeout(()=>renderClinicalNotesV97(patientId),20);return r};
@@ -15350,6 +15358,7 @@ window.NMV95IntegralFixes=true;
  window.openHistoriaClinica=function(patientId,activeTab){const r=oldOpen97?.apply(this,arguments);if((activeTab||'resumen')==='bitacora')setTimeout(()=>renderClinicalNotesV97(patientId),50);return r};
  window.NMV97ClinicalNotes=true;
  window.NMV101ClinicalNotesFKFix=true;
+ window.NMV102ClinicalNotesUserIdFix=true;
  window.NMV101CreditBalancesFix=true;
 })();
 </script>
