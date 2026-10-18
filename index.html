@@ -2437,12 +2437,16 @@ async function testSupabaseConnection() {
   try {
     if(!navigator.onLine) return false;
     await ensureSupaSession();
-    const res = await fetch(SUPA_URL + '/rest/v1/usuarios?limit=1', {
-      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + supaAccessToken() },
+    // No usar una tabla protegida por RLS como prueba de conectividad.
+    // `usuarios` puede devolver 500 por una política/función y eso NO significa que Supabase esté caído.
+    const token = supaAccessToken();
+    const res = await fetch(SUPA_URL + '/auth/v1/user', {
+      headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + token },
       mode: 'cors', credentials: 'omit',
     });
-    // 200 = ok, 406 = no rows, 401/403 = RLS blocking but server IS reachable
-    const ok = res.ok || [200,401,403,406].includes(res.status);
+    // 200 confirma servidor + sesión. 401/403 confirman que el servidor responde,
+    // y ensureSupaSession se encarga de renovar la sesión cuando corresponde.
+    const ok = res.ok || [401,403].includes(res.status);
     console.log('Supabase connection test:', res.status, ok ? '✓' : '✗');
     return ok;
   } catch(e) {
@@ -12518,7 +12522,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
         const result=await rawLoad.apply(this,arguments);
         if(result===true && DB?.loaded){saveSnapshot('servidor-cargado');return result}
         if(restoreSnapshot()){
-          showBanner('Base de datos no disponible. Se abrió la última copia local guardada.','offline',6500);
+          showBanner('No se pudo actualizar un módulo desde Supabase. Se mantienen los datos ya cargados en pantalla.','offline',6500);
           try{notify('Mostrando la última copia local disponible','warning')}catch(_e){}
         }
         return result;
