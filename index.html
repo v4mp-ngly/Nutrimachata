@@ -15432,5 +15432,31 @@ window.NMV95IntegralFixes=true;
  window.NMV98TeamSettings=true;
 })();
 </script>
+
+<script id="nm-v108-deudas-integradas">
+(function(){
+'use strict';
+function ensureDebts108(){
+ const tabs=document.querySelector('.bill-tabs');
+ if(!tabs)return;
+ let b=tabs.querySelector('[data-btab="debts93"]');
+ const bal=tabs.querySelector('[data-btab="balances"]');
+ if(!b){b=document.createElement('button');b.className='bill-tab';b.type='button';b.dataset.btab='debts93';b.textContent='Deudas';}
+ b.onclick=()=>window.renderBillingTab('debts93',b);
+ if(bal && b.previousElementSibling!==bal) bal.insertAdjacentElement('afterend',b);
+ const quick=document.querySelector('.bill-quick');
+ if(quick && !quick.querySelector('[data-v108-debts]')){const q=document.createElement('a');q.dataset.v108Debts='1';q.innerHTML='<span>Deudas</span><b>›</b>';q.onclick=()=>window.renderBillingTab('debts93');quick.appendChild(q);}
+}
+const rb=window.renderBilling;
+window.renderBilling=function(){const r=rb?.apply(this,arguments);requestAnimationFrame(()=>requestAnimationFrame(ensureDebts108));return r;};
+try{renderBilling=window.renderBilling}catch(_){}
+const rt=window.renderBillingTab;
+window.renderBillingTab=function(tab,btn){if(tab==='debts93'&&typeof window.renderDebts93==='function')return window.renderDebts93();return rt?.apply(this,arguments);};
+try{renderBillingTab=window.renderBillingTab}catch(_){}
+document.addEventListener('DOMContentLoaded',ensureDebts108);
+requestAnimationFrame(()=>requestAnimationFrame(ensureDebts108));
+window.NMV108DebtsIntegrated=true;
+})();
+</script>
 </body>
 </html>
