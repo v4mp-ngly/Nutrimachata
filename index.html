@@ -1633,6 +1633,57 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
 @media(max-width:1200px){.nm-v113-main{grid-template-columns:1fr}.nm-v113-workspace{grid-template-columns:1fr 1fr}.nm-v113-health{grid-column:1/-1}.nm-donut-v113{grid-template-columns:180px 1fr}}
 @media(max-width:800px){.nm-welcome-actions{align-items:flex-end}.nm-primary-action{white-space:nowrap}.nm-v113-workspace{grid-template-columns:1fr}.nm-v113-health{grid-column:auto}.nm-donut-v113{grid-template-columns:1fr}.nm-donut-v113 .nm-donut{height:170px}.nm-quick-head{align-items:flex-start;flex-direction:column}.nm-quick-head p{display:none}}
 </style>
+<style id="nm-v114-premium-ui">
+/* NutriMachata V114 — Premium Clinical UI */
+:root{
+ --nm-bg:#f6f7f4;--nm-surface:#ffffff;--nm-surface-2:#fafbf9;--nm-ink:#172016;--nm-muted:#788174;
+ --nm-line:#e7ebe3;--nm-green:#356d1a;--nm-green-2:#5e8c2a;--nm-green-soft:#edf5e8;
+ --nm-warn:#b86a12;--nm-danger:#b94b3f;--nm-radius:16px;--nm-radius-sm:11px;
+ --nm-shadow:0 1px 2px rgba(26,44,18,.025),0 10px 32px rgba(35,58,25,.045);
+}
+html{background:var(--nm-bg)}
+body{background:var(--nm-bg)!important;color:var(--nm-ink);font-feature-settings:"ss01" 1,"cv02" 1;-webkit-font-smoothing:antialiased}
+.main-content{background:var(--nm-bg)!important}
+.sidebar{width:244px!important;background:#123f0b!important;box-shadow:none!important;border-right:1px solid rgba(255,255,255,.06)!important}
+.main-content{margin-left:244px!important}
+.sidebar-brand{padding:25px 20px 21px!important;border-bottom:0!important}
+.brand-mark{width:42px!important;height:42px!important;border-radius:12px!important;background:#fff!important;border:0!important;box-shadow:0 5px 16px rgba(0,0,0,.12)!important}
+.brand-text h2{font-size:18px!important;letter-spacing:-.35px!important}.brand-text span{font-size:8.5px!important;letter-spacing:1.35px!important;opacity:.52!important}
+.sidebar-nav{padding:13px 12px 18px!important}.nav-section-label{font-size:9px!important;letter-spacing:1.55px!important;margin:18px 10px 8px!important;color:rgba(255,255,255,.34)!important}
+.nav-item{min-height:43px!important;padding:10px 12px!important;margin:2px 0!important;border-radius:11px!important;color:rgba(255,255,255,.72)!important;font-size:13px!important;font-weight:500!important;gap:11px!important}
+.nav-item:hover{background:rgba(255,255,255,.065)!important;color:#fff!important}.nav-item.active{background:rgba(255,255,255,.12)!important;color:#fff!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)!important;font-weight:650!important}
+.nav-item.active:before{content:"";width:3px;height:20px;border-radius:3px;background:#a4d267;position:absolute;left:3px}.nav-item{position:relative}
+.sidebar-user{padding:14px 16px!important;border-top:1px solid rgba(255,255,255,.07)!important}.user-card{padding:7px 0!important}.user-avatar{box-shadow:0 0 0 3px rgba(255,255,255,.09)}
+.topbar{height:68px!important;padding:0 30px!important;background:rgba(255,255,255,.94)!important;border-bottom:1px solid var(--nm-line)!important;box-shadow:none!important;backdrop-filter:blur(18px)!important}
+.topbar-left h1{font-size:17px!important;font-weight:700!important;letter-spacing:-.25px}.topbar-left p{font-size:11px!important;color:#9aa095!important}
+.topbar-btn{width:38px!important;height:38px!important;border-radius:11px!important;border-color:var(--nm-line)!important;background:#fff!important}.topbar-btn:hover{background:var(--nm-green-soft)!important;border-color:#d8e6d0!important}
+.global-search,.topbar input[type="search"]{border-radius:12px!important;background:#fbfcfa!important;border-color:var(--nm-line)!important}
+.page-content{max-width:1540px!important;padding:28px 30px 46px!important}
+.section-title{font-size:27px!important;line-height:1.12!important;letter-spacing:-.75px!important;color:var(--nm-ink)!important}.section-sub{font-size:13px!important;color:var(--nm-muted)!important}
+.card,.dash-card,.kpi-card,.chart-card,.mini-metric,.soft-section{border:1px solid var(--nm-line)!important;border-radius:var(--nm-radius)!important;background:var(--nm-surface)!important;box-shadow:var(--nm-shadow)!important}
+.card:hover,.dash-card:hover,.kpi-card:hover{box-shadow:0 1px 2px rgba(26,44,18,.025),0 14px 38px rgba(35,58,25,.065)!important;transform:none!important}
+.kpi-card{padding:19px 20px!important}.kpi-card:after{display:none!important}.kpi-label{font-size:10px!important;letter-spacing:.5px!important;color:#858d81!important}.kpi-value{letter-spacing:-.55px!important}
+.dash-card-header,.card-header{background:transparent!important;border-bottom:1px solid #eef1eb!important;padding:18px 20px 14px!important}.dash-card-title{font-size:13px!important;font-weight:700!important;letter-spacing:-.15px}.dash-card-sub{font-size:10px!important;color:#969d92!important}
+.btn{min-height:38px;border-radius:10px!important;font-weight:650!important;box-shadow:none!important}.btn-olive{background:#4f7f1f!important;border-color:#4f7f1f!important;box-shadow:0 5px 14px rgba(65,111,25,.14)!important}.btn-olive:hover{background:#416c19!important;transform:translateY(-1px)!important}.btn-outline{background:#fff!important;border-color:var(--nm-line)!important;color:#394235!important}.btn-outline:hover{background:#f7f9f5!important}
+.form-control,.form-select,.form-textarea,input:not([type="checkbox"]):not([type="radio"]),select,textarea{border-radius:10px!important;border-color:#dfe5da!important;background:#fff;box-shadow:none!important}.form-control:focus,.form-select:focus,.form-textarea:focus,input:focus,select:focus,textarea:focus{border-color:#91b773!important;box-shadow:0 0 0 3px rgba(84,133,36,.09)!important;outline:none}
+label,.form-label{font-weight:650!important;color:#596154!important;font-size:11px!important}
+.table-wrap,.table-container{border:1px solid var(--nm-line)!important;border-radius:14px!important;overflow:hidden!important;background:#fff!important}table{border-collapse:separate!important;border-spacing:0!important}thead th{height:43px!important;background:#f8faf7!important;border-bottom:1px solid var(--nm-line)!important;color:#747d70!important;font-size:9.5px!important;letter-spacing:.45px!important;text-transform:uppercase!important}tbody td{border-bottom:1px solid #f0f2ed!important;color:#30382d!important}tbody tr:last-child td{border-bottom:0!important}tbody tr:hover{background:#fafcf9!important}
+.badge{border-radius:999px!important;padding:5px 9px!important;font-weight:650!important}.badge-success{background:#e9f5e7!important;color:#37722f!important}.badge-warning{background:#fff3df!important;color:#9a601d!important}
+.tabs,.bill-tabs{gap:6px!important}.tab,.bill-tab{border-radius:10px!important;border:1px solid var(--nm-line)!important;background:#fff!important;min-height:38px!important;font-weight:650!important;box-shadow:none!important}.tab.active,.bill-tab.active{background:#4f7f1f!important;color:#fff!important;border-color:#4f7f1f!important}
+.modal-overlay{background:rgba(19,28,16,.42)!important;backdrop-filter:blur(5px)!important}.modal{border:1px solid rgba(255,255,255,.55)!important;border-radius:20px!important;box-shadow:0 30px 90px rgba(20,36,14,.20)!important}.modal-header{padding:22px 24px 17px!important;background:#fff!important;border-bottom:1px solid var(--nm-line)!important}.modal-title{font-size:20px!important;letter-spacing:-.4px!important}.modal-body{padding:22px 24px!important}.modal-footer{padding:16px 24px 20px!important;background:#fbfcfa!important;border-top:1px solid var(--nm-line)!important}.modal-close{border-radius:9px!important;background:#f4f6f2!important}
+.settings-layout{gap:28px!important}.settings-sidebar{width:205px!important}.settings-nav-item{border-radius:10px!important;padding:11px 12px!important}.settings-nav-item.active{background:var(--nm-green-soft)!important;color:#386d1e!important;font-weight:700!important}
+.patient-avatar{box-shadow:none!important}.professional-hero{border:1px solid var(--nm-line)!important}.profile-summary-head{background:#174a0d!important}
+/* Dashboard refinement */
+.nm113-dashboard{gap:0}.nm113-hero{border-radius:18px!important;border:1px solid var(--nm-line)!important;box-shadow:var(--nm-shadow)!important;background:linear-gradient(135deg,#fff 0%,#fbfdf9 100%)!important;padding:22px 24px!important}.nm113-hero h2{font-size:23px!important;letter-spacing:-.65px!important}.nm113-finance{border-radius:18px!important}.nm113-finance-grid{gap:0!important;border:1px solid var(--nm-line)!important;border-radius:14px!important;overflow:hidden!important;background:#fff!important}.nm113-finance-item{border:0!important;border-right:1px solid var(--nm-line)!important;border-radius:0!important;background:#fff!important;box-shadow:none!important}.nm113-finance-item:last-child{border-right:0!important}.nm113-kpis{gap:12px!important}.nm113-kpi{border-radius:15px!important}.nm113-grid-main{gap:16px!important}.nm113-health-row{gap:16px!important}.nm113-progress{height:7px!important;background:#edf0ea!important}.nm113-progress>span{border-radius:999px!important}.nm113-list-row{padding:11px 0!important;border-bottom:1px solid #eef1eb!important}.nm113-list-row:last-child{border-bottom:0!important}
+/* billing */
+.bill-summary-card,.billing-kpi{border-radius:15px!important;border-color:var(--nm-line)!important;box-shadow:var(--nm-shadow)!important}.bill-quick{border-radius:16px!important;overflow:hidden!important}.bill-quick a{border-bottom:1px solid #eef1eb!important}
+/* subtle motion */
+.page-content{animation:nmV114In .28s cubic-bezier(.2,.7,.2,1)}@keyframes nmV114In{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.page-content{animation:none!important}*{scroll-behavior:auto!important}}
+@media(max-width:1024px){.sidebar{width:220px!important}.main-content{margin-left:220px!important}.page-content{padding:22px 20px 36px!important}}
+@media(max-width:768px){.sidebar{width:280px!important}.main-content{margin-left:0!important}.topbar{height:60px!important;padding:0 14px!important}.page-content{padding:16px 13px 30px!important}.section-title{font-size:23px!important}.modal{border-radius:18px 18px 0 0!important}.nm113-finance-grid{display:grid!important;grid-template-columns:1fr 1fr!important}.nm113-finance-item{border-right:0!important;border-bottom:1px solid var(--nm-line)!important}}
+</style>
+
 </head>
 <body>
 
