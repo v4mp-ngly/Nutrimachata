@@ -9803,13 +9803,28 @@ function renderSettings() {
           <button class="btn btn-olive" onclick="saveSettings()">Guardar Cambios</button>
         </div>
         <div id="settings-seguridad" class="settings-section">
-          <div class="settings-header"><h2>Seguridad</h2><p>Gestión de contraseñas y accesos</p></div>
-          <div class="form-group mb-4"><label>Contraseña actual</label><input class="form-control" type="password" placeholder="••••••••"></div>
-          <div class="form-row mb-4">
-            <div class="form-group"><label>Nueva contraseña</label><input class="form-control" type="password" placeholder="••••••••"></div>
-            <div class="form-group"><label>Confirmar contraseña</label><input class="form-control" type="password" placeholder="••••••••"></div>
+          <div class="settings-header"><h2>Seguridad</h2><p>Gestión segura de contraseñas y accesos</p></div>
+          <div class="card" style="padding:22px;margin-bottom:18px">
+            <h3 style="margin:0 0 6px">Mi contraseña</h3>
+            <p class="text-sm text-muted" style="margin:0 0 18px">Cambia la contraseña de tu propia cuenta. Por seguridad, ninguna contraseña actual se muestra en pantalla.</p>
+            <div class="form-group mb-4"><label>Contraseña actual</label><input id="nm111-current-password" class="form-control" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+            <div class="form-row mb-4">
+              <div class="form-group"><label>Nueva contraseña</label><input id="nm111-new-password" class="form-control" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo 8 caracteres"></div>
+              <div class="form-group"><label>Confirmar nueva contraseña</label><input id="nm111-confirm-password" class="form-control" type="password" autocomplete="new-password" minlength="8" placeholder="Repite la nueva contraseña"></div>
+            </div>
+            <button class="btn btn-olive" onclick="NM111.changeOwnPassword(this)">Actualizar mi contraseña</button>
           </div>
-          <button class="btn btn-olive" onclick="notify('Contraseña actualizada','success')">Cambiar Contraseña</button>
+          <div id="nm111-admin-password-panel" class="card" style="padding:22px;display:none">
+            <h3 style="margin:0 0 6px">Administrar contraseñas</h3>
+            <p class="text-sm text-muted" style="margin:0 0 18px">Solo administradores. Permite establecer una contraseña nueva para un doctor o paciente; la contraseña anterior nunca puede visualizarse.</p>
+            <div class="form-row mb-4">
+              <div class="form-group" style="flex:2"><label>Usuario</label><select id="nm111-target-user" class="form-select"><option value="">Cargando usuarios…</option></select></div>
+              <div class="form-group"><label>Nueva contraseña</label><input id="nm111-admin-new-password" class="form-control" type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
+              <div class="form-group"><label>Confirmar</label><input id="nm111-admin-confirm-password" class="form-control" type="password" minlength="8" autocomplete="new-password" placeholder="Repite la contraseña"></div>
+            </div>
+            <button class="btn btn-olive" onclick="NM111.adminSetPassword(this)">Cambiar contraseña del usuario</button>
+            <div id="nm111-edge-warning" class="text-xs text-muted" style="margin-top:12px">Esta acción requiere la Edge Function segura <b>admin-set-password</b> instalada en Supabase.</div>
+          </div>
         </div>
         <div id="settings-ia" class="settings-section">
           <div class="settings-header"><h2>Configuración IA</h2><p>Parámetros del asistente de inteligencia artificial</p></div>
@@ -15446,5 +15461,64 @@ window.NMV95IntegralFixes=true;
 </script>
 
 
+
+<script id="nm-v111-password-security">
+(function(){
+'use strict';
+const clean=s=>String(s||'').trim();
+const role=()=>String(window.DB?.currentRole||window.DB?.currentUser?.rol||window.DB?.currentUser?.role||'').toLowerCase();
+const isAdmin=()=>role()==='admin';
+function msg(t,type='success'){ if(typeof window.notify==='function') window.notify(t,type); else alert(t); }
+async function ownEmail(){
+  const e=clean(window.DB?.currentUser?.email); if(e) return e;
+  const token=window.supaAccessToken?.(); if(!token) throw new Error('No hay una sesión activa.');
+  const r=await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/user',{headers:{apikey:SUPA_ANON,Authorization:'Bearer '+token}});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j?.message||'No se pudo identificar la cuenta actual.'); return clean(j.email);
+}
+async function changeOwnPassword(btn){
+  const cur=document.getElementById('nm111-current-password')?.value||'', np=document.getElementById('nm111-new-password')?.value||'', cp=document.getElementById('nm111-confirm-password')?.value||'';
+  if(!cur) return msg('Escribe tu contraseña actual.','error');
+  if(np.length<8) return msg('La nueva contraseña debe tener al menos 8 caracteres.','error');
+  if(np!==cp) return msg('Las nuevas contraseñas no coinciden.','error');
+  const old=btn?.textContent; if(btn){btn.disabled=true;btn.textContent='Actualizando…';}
+  try{
+    const email=await ownEmail();
+    await supaAuthLogin(email,cur); // verifica contraseña actual y renueva la sesión
+    const token=supaAccessToken();
+    const r=await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/user',{method:'PUT',headers:{apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({password:np})});
+    const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j?.msg||j?.message||j?.error_description||'No se pudo actualizar la contraseña.');
+    ['nm111-current-password','nm111-new-password','nm111-confirm-password'].forEach(id=>{const x=document.getElementById(id);if(x)x.value='';});
+    msg('Contraseña actualizada correctamente.','success');
+  }catch(e){console.error('[Seguridad v111] Cambiar contraseña propia',e);msg(e.message||'No se pudo actualizar la contraseña.','error');}
+  finally{if(btn){btn.disabled=false;btn.textContent=old||'Actualizar mi contraseña';}}
+}
+async function loadAdminUsers(){
+  const panel=document.getElementById('nm111-admin-password-panel'); if(!panel)return;
+  panel.style.display=isAdmin()?'block':'none'; if(!isAdmin())return;
+  const sel=document.getElementById('nm111-target-user');
+  try{
+    const rows=await supa('usuarios?select=id,nombre,email,rol,activo&order=nombre.asc');
+    const list=(Array.isArray(rows)?rows:[]).filter(u=>u?.id&&u?.email);
+    sel.innerHTML='<option value="">Selecciona un usuario</option>'+list.map(u=>`<option value="${String(u.id).replace(/"/g,'&quot;')}">${String(u.nombre||u.email).replace(/</g,'&lt;')} · ${String(u.rol||'usuario').replace(/</g,'&lt;')} · ${String(u.email).replace(/</g,'&lt;')}</option>`).join('');
+  }catch(e){console.error('[Seguridad v111] Cargar usuarios',e);sel.innerHTML='<option value="">No se pudieron cargar los usuarios</option>';msg('No se pudo cargar la lista de usuarios.','error');}
+}
+async function adminSetPassword(btn){
+  if(!isAdmin()) return msg('Solo un administrador puede realizar esta acción.','error');
+  const uid=clean(document.getElementById('nm111-target-user')?.value), np=document.getElementById('nm111-admin-new-password')?.value||'', cp=document.getElementById('nm111-admin-confirm-password')?.value||'';
+  if(!uid)return msg('Selecciona un usuario.','error'); if(np.length<8)return msg('La nueva contraseña debe tener al menos 8 caracteres.','error'); if(np!==cp)return msg('Las contraseñas no coinciden.','error');
+  const token=await ensureSupaSession().then(x=>x?.access_token||supaAccessToken()); if(!token)return msg('Tu sesión ha vencido. Inicia sesión nuevamente.','error');
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='Actualizando…';}
+  try{
+    const r=await fetch(SUPA_URL.replace(/\/$/,'')+'/functions/v1/admin-set-password',{method:'POST',headers:{apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({target_user_id:uid,new_password:np})});
+    const j=await r.json().catch(()=>({})); if(!r.ok)throw new Error(j?.error||j?.message||'No se pudo cambiar la contraseña.');
+    document.getElementById('nm111-admin-new-password').value='';document.getElementById('nm111-admin-confirm-password').value='';msg('Contraseña del usuario actualizada correctamente.','success');
+  }catch(e){console.error('[Seguridad v111] Cambio administrativo',e);msg(e.message||'No se pudo cambiar la contraseña.','error');}
+  finally{if(btn){btn.disabled=false;btn.textContent=old||'Cambiar contraseña del usuario';}}
+}
+window.NM111={changeOwnPassword,adminSetPassword,loadAdminUsers};
+const oldSwitch=window.switchSettingsTab;
+window.switchSettingsTab=function(id,el){const r=oldSwitch?.apply(this,arguments);if(id==='seguridad')setTimeout(loadAdminUsers,0);return r;};
+})();
+</script>
 </body>
 </html>
