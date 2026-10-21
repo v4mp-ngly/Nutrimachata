@@ -1621,6 +1621,18 @@ tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8
 .nm-antecedent-pill label{cursor:pointer;display:inline-block;margin:0;line-height:1.25;user-select:none;-webkit-user-select:none}
 .nm-antecedent-pill.checked{background:rgba(94,140,42,.12)!important;border-color:var(--olive)!important;color:var(--olive-dark)!important;font-weight:600!important}
 </style>
+<style id="nm-v113-dashboard-style">
+/* v113 — Dashboard refinado */
+.nm-dashboard-v113{--nm-green:#315f20;--nm-soft:#f7f9f5;--nm-line:#e6ebe2}.nm-dashboard-v113 .nm-panel{border-color:var(--nm-line);border-radius:14px;box-shadow:0 1px 0 rgba(27,50,20,.02)}
+.nm-welcome-v113{padding:20px 22px;border-radius:14px;margin-bottom:16px;background:linear-gradient(110deg,#fff 0%,#fbfdf9 100%)}.nm-eyebrow,.nm-section-kicker{display:block;font-size:8px;font-weight:800;letter-spacing:1.2px;color:#75935c;margin-bottom:5px}.nm-welcome-v113 h2{font-size:22px;letter-spacing:-.35px}.nm-welcome-actions{display:flex;align-items:center;gap:12px}.nm-primary-action{border:0;border-radius:9px;background:#3f7d1e;color:#fff;padding:10px 14px;font-size:11px;font-weight:700;cursor:pointer}.nm-primary-action:hover{background:#356d18}
+.nm-kpis-v113{gap:10px;margin-bottom:16px}.nm-kpis-v113 .nm-kpi{border-radius:12px;padding:15px 16px;min-height:92px}.nm-kpis-v113 .nm-kpi strong{font-size:24px;letter-spacing:-.5px}.nm-kpis-v113 .nm-kpi i{width:38px;height:38px}.nm-kpis-v113 .nm-kpi small{color:#7b8676}
+.nm-v113-main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.85fr);gap:14px;margin-bottom:14px}.nm-v113-main .nm-panel{padding:18px}.nm-v113-main header{align-items:center}.nm-v113-main h3,.nm-v113-workspace h3{font-size:15px}.nm-big-metric{font-size:27px;font-weight:750;color:#27491e;line-height:1;text-align:right}.nm-big-metric small{display:block;font-size:8px;font-weight:500;color:#899185;margin-top:5px;text-transform:uppercase;letter-spacing:.7px}.nm-chart-v113{height:210px}.nm-chart-empty{height:210px;display:grid;place-items:center;text-align:center;color:#899185;font-size:11px;background:#fafbf9;border:1px dashed #e2e8de;border-radius:10px;padding:20px}.nm-donut-v113{grid-template-columns:minmax(130px,.85fr) 1.15fr}.nm-donut-v113 .nm-donut{height:190px}.nm-donut-v113 .nm-legend>div{padding:3px 0;border-bottom:1px solid #f0f3ed}.nm-donut-v113 .nm-legend>div:last-child{border-bottom:0}
+.nm-v113-workspace{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:14px;margin-bottom:14px}.nm-v113-workspace>.nm-panel{padding:17px}.nm-health-bars{display:flex;flex-direction:column;gap:14px}.nm-health-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px}.nm-health-row strong{font-size:10px}.nm-health-row span{display:block;font-size:8.5px;color:#899185;margin-top:2px}.nm-health-row>b{font-size:12px;color:#3f7026}.nm-health-track{grid-column:1/-1;height:6px;border-radius:99px;background:#edf1e9;overflow:hidden}.nm-health-track i{display:block;height:100%;border-radius:99px;background:#6f9e48}.nm-v113-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid #edf0ea}.nm-v113-mini div{min-width:0}.nm-v113-mini span{display:block;font-size:8px;color:#899185}.nm-v113-mini strong{display:block;font-size:14px;margin-top:3px}.nm-v113-workspace .nm-person{padding:9px 0}.nm-v113-workspace .nm-avatar{width:34px;height:34px}.nm-v113-workspace .nm-person strong{font-size:10.5px}.nm-v113-workspace .nm-person small{font-size:8.5px}.nm-v113-workspace .nm-list header button{font-size:9px}
+.nm-quick-v113{padding:16px 17px;border-radius:14px}.nm-quick-head{display:flex;align-items:end;justify-content:space-between;gap:15px}.nm-quick-head p{font-size:9px;color:#8a9286;margin:0}.nm-quick-v113>div:last-child{gap:8px}.nm-quick-v113 button{padding:11px 10px;border-radius:9px;font-size:10px;background:#fbfcfa}.nm-quick-v113 button:hover{background:#f5f9f1}
+.nm-dashboard-v113 + *{} 
+@media(max-width:1200px){.nm-v113-main{grid-template-columns:1fr}.nm-v113-workspace{grid-template-columns:1fr 1fr}.nm-v113-health{grid-column:1/-1}.nm-donut-v113{grid-template-columns:180px 1fr}}
+@media(max-width:800px){.nm-welcome-actions{align-items:flex-end}.nm-primary-action{white-space:nowrap}.nm-v113-workspace{grid-template-columns:1fr}.nm-v113-health{grid-column:auto}.nm-donut-v113{grid-template-columns:1fr}.nm-donut-v113 .nm-donut{height:170px}.nm-quick-head{align-items:flex-start;flex-direction:column}.nm-quick-head p{display:none}}
+</style>
 </head>
 <body>
 
@@ -3797,11 +3809,7 @@ function renderHistoriasList(list) {
 // ═══════════════════════════════════════════════
 function renderDashboard() {
   const dashboardRenderToken = ++nmDashboardRenderToken;
-  // Destruye cualquier grafica asociada a los canvases del dashboard antes de recrear el DOM.
-  ['modernLine','modernDonut','modernBars'].forEach(k => {
-    try { chartInstances[k]?.destroy(); } catch(e) {}
-    delete chartInstances[k];
-  });
+  ['modernLine','modernDonut','modernBars'].forEach(k => { try { chartInstances[k]?.destroy(); } catch(e) {} delete chartInstances[k]; });
   const patients = DB.patients || [];
   const total = patients.length;
   const active = patients.filter(p => p.activo !== false).length;
@@ -3810,98 +3818,101 @@ function renderDashboard() {
   const plansActive = patients.filter(p => p.dietas && p.dietas.some(d => d.activo !== false)).length;
   const todayISO = new Date().toISOString().split('T')[0];
   const todayApts = (DB.appointments || []).filter(a => a.fecha === todayISO);
-  const upcoming = (DB.appointments || []).filter(a => a.fecha >= todayISO).sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora)).slice(0,4);
-  const avgImc = total ? patients.reduce((s,p)=>s+(Number(p.imc)||0),0)/total : 0;
-  const avgWeight = total ? patients.reduce((s,p)=>s+(Number(p.peso)||0),0)/total : 0;
+  const upcoming = (DB.appointments || []).filter(a => a.fecha >= todayISO).sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora)).slice(0,5);
+  const validImcs = patients.map(p=>Number(p.imc)).filter(v=>Number.isFinite(v)&&v>0);
+  const validWeights = patients.map(p=>Number(p.peso)).filter(v=>Number.isFinite(v)&&v>0);
+  const avgImc = validImcs.length ? validImcs.reduce((a,b)=>a+b,0)/validImcs.length : 0;
+  const avgWeight = validWeights.length ? validWeights.reduce((a,b)=>a+b,0)/validWeights.length : 0;
   const withPlan = patients.filter(p=>p.dietas&&p.dietas.length).length;
   const adherence = total ? Math.round(withPlan/total*100) : 0;
   const completed = total ? Math.round(evaluated/total*100) : 0;
-  const risk = patients.filter(p => Number(p.imc) >= 30 || Number(p.imc) < 18.5).length;
+  const risk = patients.filter(p => { const v=Number(p.imc); return Number.isFinite(v)&&v>0&&(v>=30||v<18.5); }).length;
   const imcDist = { 'Bajo peso':0, 'Normal':0, 'Sobrepeso':0, 'Obesidad I':0, 'Obesidad II/III':0 };
-  patients.forEach(p => { const v=Number(p.imc)||0; if(v<18.5) imcDist['Bajo peso']++; else if(v<25) imcDist.Normal++; else if(v<30) imcDist.Sobrepeso++; else if(v<35) imcDist['Obesidad I']++; else imcDist['Obesidad II/III']++; });
+  patients.forEach(p => { const v=Number(p.imc); if(!Number.isFinite(v)||v<=0)return; if(v<18.5) imcDist['Bajo peso']++; else if(v<25) imcDist.Normal++; else if(v<30) imcDist.Sobrepeso++; else if(v<35) imcDist['Obesidad I']++; else imcDist['Obesidad II/III']++; });
+  const imcTotal=Object.values(imcDist).reduce((a,b)=>a+b,0);
   const now = new Date();
   const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const shortMonths=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const dateStr = `${now.getDate()} de ${months[now.getMonth()]} de ${now.getFullYear()}`;
-  const recentEvals = [...allEvals].sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))).slice(0,4);
-  const circle = (pct,label,color='var(--olive)') => `<div class="nm-ring" style="--pct:${Math.max(0,Math.min(100,pct))};--ring:${color}"><div><strong>${pct}%</strong><span>${label}</span></div></div>`;
+  const recentEvals = [...allEvals].sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))).slice(0,5);
   const icon = n => getKpiIcon(n);
 
+  // Serie real: promedio mensual de IMC de las evaluaciones de los últimos 6 meses.
+  const monthBuckets=[];
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); monthBuckets.push({y:d.getFullYear(),m:d.getMonth(),label:shortMonths[d.getMonth()],values:[]}); }
+  allEvals.forEach(e=>{ const v=Number(e.imc); if(!Number.isFinite(v)||v<=0||!e.fecha)return; const d=new Date(String(e.fecha).slice(0,10)+'T12:00:00'); if(Number.isNaN(d.getTime()))return; const b=monthBuckets.find(x=>x.y===d.getFullYear()&&x.m===d.getMonth()); if(b)b.values.push(v); });
+  const monthlyImc=monthBuckets.map(b=>b.values.length?Number((b.values.reduce((a,c)=>a+c,0)/b.values.length).toFixed(2)):null);
+  const hasMonthlyTrend=monthlyImc.some(v=>v!==null);
+
+  const healthRows=[
+    ['Adherencia a planes',adherence,`${withPlan} de ${total} pacientes`],
+    ['Pacientes evaluados',completed,`${evaluated} de ${total} pacientes`],
+    ['Pacientes activos',total?Math.round(active/total*100):0,`${active} activos`]
+  ];
+
   document.getElementById('page-content').innerHTML = `
-  <div class="nm-dashboard">
-    <section class="nm-welcome">
-      <div><h2>¡Hola, Dra. María Alejandra! 👋</h2><p>Aquí tienes un resumen completo de tu consultorio</p></div>
-      <div class="nm-date">▣ &nbsp; ${dateStr}</div>
+  <div class="nm-dashboard nm-dashboard-v113">
+    <section class="nm-welcome nm-welcome-v113">
+      <div><span class="nm-eyebrow">PANEL CLÍNICO</span><h2>¡Hola, Dra. María Alejandra! 👋</h2><p>Lo más importante de tu consultorio, en un vistazo.</p></div>
+      <div class="nm-welcome-actions"><div class="nm-date">▣ &nbsp; ${dateStr}</div><button type="button" class="nm-primary-action" data-quick="appointment">+ Nueva cita</button></div>
     </section>
 
-    <section class="nm-kpis">
+    <section class="nm-kpis nm-kpis-v113">
       ${[
-        ['patients',active,'Pacientes Activos', total?`${Math.round(active/total*100)}% del total`:'Sin pacientes','green'],
-        ['check',allEvals.length,'Evaluaciones Totales',`${evaluated} pacientes evaluados`,'purple'],
-        ['clock',plansActive,'Planes Activos',`${withPlan} pacientes con plan`,'amber'],
-        ['calendar',todayApts.length,'Citas de Hoy',todayApts.length?'Ver agenda →':'Sin citas hoy','blue'],
-        ['imc',avgImc.toFixed(1),'IMC Promedio','Promedio actual','lime']
-      ].map((k,i)=>`<button class="nm-kpi nm-kpi-${k[4]}" type="button" data-action="${i===3?'agenda':i===0?'patients':i===1?'evaluations':i===2?'diets':'reports'}">
-        <div><span>${k[2]}</span><strong>${k[1]}</strong><small>${k[3]}</small></div><i>${icon(k[0])}</i>
-      </button>`).join('')}
+        ['patients',active,'Pacientes activos', total?`${Math.round(active/total*100)}% del total`:'Sin pacientes','green','patients'],
+        ['check',allEvals.length,'Evaluaciones',`${evaluated} pacientes evaluados`,'purple','evaluations'],
+        ['clock',plansActive,'Planes activos',`${withPlan} pacientes con plan`,'amber','diets'],
+        ['calendar',todayApts.length,'Citas de hoy',todayApts.length?`${todayApts.length} programada(s)`:'Agenda libre','blue','agenda'],
+        ['imc',avgImc?avgImc.toFixed(1):'—','IMC promedio',validImcs.length?`${validImcs.length} registros válidos`:'Sin datos','lime','reports']
+      ].map(k=>`<button class="nm-kpi nm-kpi-${k[4]}" type="button" data-action="${k[5]}"><div><span>${k[2]}</span><strong>${k[1]}</strong><small>${k[3]}</small></div><i>${icon(k[0])}</i></button>`).join('')}
     </section>
 
-    <section class="nm-grid-main">
-      <article class="nm-panel nm-health"><header><h3>Resumen de Salud General</h3><span>Este mes⌄</span></header>
-        <div class="nm-rings">${circle(adherence,'Adherencia a planes')}${circle(completed,'Evaluaciones completadas','var(--info)')}${circle(active&&total?Math.round(active/total*100):0,'Pacientes activos','var(--warning)')}</div>
+    <section class="nm-v113-main">
+      <article class="nm-panel nm-v113-trend">
+        <header><div><span class="nm-section-kicker">EVOLUCIÓN</span><h3>IMC promedio</h3><p>Promedio real de evaluaciones · últimos 6 meses</p></div><div class="nm-big-metric">${avgImc?avgImc.toFixed(1):'—'}<small>actual</small></div></header>
+        ${hasMonthlyTrend?'<div class="nm-chart nm-chart-v113"><canvas id="chart-imc-evolution"></canvas></div>':'<div class="nm-chart-empty">Aún no hay suficientes evaluaciones fechadas para mostrar la evolución mensual.</div>'}
       </article>
-      <article class="nm-panel"><header><div><h3>Evolución del IMC Promedio</h3><p>Últimos 6 meses</p></div><span>6 meses⌄</span></header><div class="nm-chart"><canvas id="chart-imc-evolution"></canvas></div><div class="nm-chart-footer"><span>IMC Promedio Actual</span><strong>${avgImc.toFixed(1)}</strong></div></article>
-      <article class="nm-panel"><header><div><h3>Distribución por IMC</h3><p>Estado nutricional actual</p></div></header><div class="nm-donut-wrap"><div class="nm-donut"><canvas id="chart-imc-modern"></canvas><b>${total}<small>pacientes</small></b></div><div class="nm-legend">${Object.entries(imcDist).map(([l,v],i)=>`<div><em class="dot d${i}"></em><span>${l}</span><strong>${v}</strong></div>`).join('')}</div></div></article>
-    </section>
 
-    <section class="nm-grid-bottom">
-      <article class="nm-panel nm-control"><header><h3>Panel de Control</h3></header>
-        ${[['Peso Promedio',avgWeight.toFixed(1)+' kg','↗'],['Pacientes en Riesgo',risk,'↓'],['Pacientes Nuevos',total,'↗'],['Planes Activos',plansActive,'↗']].map((r,i)=>`<div class="nm-control-row"><div><span>${r[0]}</span><strong>${r[1]}</strong></div><div class="nm-spark s${i}"><i></i><i></i><i></i><i></i><i></i><i></i></div><b>${r[2]}</b></div>`).join('')}
-        <button class="nm-link" data-action="reports">Ver reporte completo →</button>
+      <article class="nm-panel nm-v113-status">
+        <header><div><span class="nm-section-kicker">ESTADO ACTUAL</span><h3>Distribución por IMC</h3><p>${imcTotal} pacientes con IMC registrado</p></div></header>
+        <div class="nm-donut-wrap nm-donut-v113"><div class="nm-donut"><canvas id="chart-imc-modern"></canvas><b>${imcTotal}<small>con datos</small></b></div><div class="nm-legend">${Object.entries(imcDist).map(([l,v],i)=>`<div><em class="dot d${i}"></em><span>${l}</span><strong>${v}${imcTotal?` · ${Math.round(v/imcTotal*100)}%`:''}</strong></div>`).join('')}</div></div>
       </article>
-      <article class="nm-panel"><header><h3>Evaluaciones por IMC</h3></header><div class="nm-eval-chart"><div><canvas id="chart-imc-bars-modern"></canvas></div><div class="nm-legend">${Object.entries(imcDist).map(([l,v],i)=>`<div><em class="dot d${i}"></em><span>${l}</span><strong>${v}${total?` (${Math.round(v/total*100)}%)`:''}</strong></div>`).join('')}</div></div><button class="nm-link" data-action="evaluations">Ver estadísticas completas →</button></article>
-      <div class="nm-side-stack">
-        <article class="nm-panel nm-list"><header><h3>Próximas Citas</h3><button data-action="agenda">Ver agenda completa →</button></header><div>${upcoming.length?upcoming.map(a=>{const p=patients.find(x=>x.id==a.patientId);return `<div class="nm-person"><span class="nm-avatar" style="background:${p?.color||'#789'}">${p?.initials||'P'}</span><div><strong>${p?.nombre||'Paciente'}</strong><small>${a.fecha} · ${a.hora||''} · ${a.descripcion||'Consulta'}</small></div><em>${a.estado||'Pendiente'}</em></div>`}).join(''):'<p class="nm-empty">No hay citas próximas.</p>'}</div></article>
-        <article class="nm-panel nm-list"><header><h3>Evaluaciones Recientes</h3><button data-action="evaluations">Ver todas →</button></header><div>${recentEvals.length?recentEvals.map(e=>`<div class="nm-person nm-eval-person"><span class="nm-avatar" style="background:${e.patientColor||'#789'}">${e.patientInitials||'P'}</span><div><strong>${e.patientName}</strong><small>${e.fecha||'—'} · IMC: ${(Number(e.imc)||0).toFixed(1)} · Peso: ${e.peso||'—'} kg</small></div><em class="${getImcBadge(Number(e.imc)||0)}">${getImcCategory(Number(e.imc)||0)}</em></div>`).join(''):'<p class="nm-empty">No hay evaluaciones registradas.</p>'}</div></article>
-      </div>
     </section>
 
-    <section class="nm-quick"><h3>Acciones Rápidas</h3><div>
-      <button data-quick="eval">${icon('check')}<span>Nueva Evaluación</span></button><button data-quick="patient">${icon('patients')}<span>Nuevo Paciente</span></button><button data-action="diets">${icon('imc')}<span>Crear Plan Nutricional</span></button><button data-action="diets">${icon('calendar')}<span>Planilla de Dieta</span></button><button data-action="reports">${icon('imc')}<span>Reporte Personalizado</span></button><button data-quick="appointment">${icon('clock')}<span>Nueva Cita</span></button>
+    <section class="nm-v113-workspace">
+      <article class="nm-panel nm-v113-health">
+        <header><div><span class="nm-section-kicker">SEGUIMIENTO</span><h3>Salud general</h3><p>Indicadores operativos de la población</p></div></header>
+        <div class="nm-health-bars">${healthRows.map(r=>`<div class="nm-health-row"><div><strong>${r[0]}</strong><span>${r[2]}</span></div><b>${r[1]}%</b><div class="nm-health-track"><i style="width:${Math.max(0,Math.min(100,r[1]))}%"></i></div></div>`).join('')}</div>
+        <div class="nm-v113-mini"><div><span>Peso promedio</span><strong>${avgWeight?avgWeight.toFixed(1)+' kg':'—'}</strong></div><div><span>Pacientes en riesgo</span><strong>${risk}</strong></div><div><span>Con plan</span><strong>${withPlan}</strong></div></div>
+      </article>
+
+      <article class="nm-panel nm-list nm-v113-agenda"><header><div><span class="nm-section-kicker">AGENDA</span><h3>Próximas citas</h3></div><button data-action="agenda">Ver agenda →</button></header><div>${upcoming.length?upcoming.map(a=>{const p=patients.find(x=>x.id==a.patientId);return `<div class="nm-person"><span class="nm-avatar" style="background:${p?.color||'#789'}">${p?.initials||'P'}</span><div><strong>${p?.nombre||'Paciente'}</strong><small>${a.fecha} · ${a.hora||''} · ${a.descripcion||'Consulta'}</small></div><em>${a.estado||'Pendiente'}</em></div>`}).join(''):'<p class="nm-empty">No hay citas próximas.</p>'}</div></article>
+
+      <article class="nm-panel nm-list nm-v113-recent"><header><div><span class="nm-section-kicker">ACTIVIDAD</span><h3>Evaluaciones recientes</h3></div><button data-action="evaluations">Ver todas →</button></header><div>${recentEvals.length?recentEvals.map(e=>`<div class="nm-person nm-eval-person"><span class="nm-avatar" style="background:${e.patientColor||'#789'}">${e.patientInitials||'P'}</span><div><strong>${e.patientName}</strong><small>${e.fecha||'—'} · IMC: ${Number(e.imc)>0?Number(e.imc).toFixed(1):'—'} · Peso: ${e.peso||'—'} kg</small></div><em>${Number(e.imc)>0?getImcCategory(Number(e.imc)):'Sin IMC'}</em></div>`).join(''):'<p class="nm-empty">No hay evaluaciones registradas.</p>'}</div></article>
+    </section>
+
+    <section class="nm-quick nm-quick-v113"><div class="nm-quick-head"><div><span class="nm-section-kicker">ACCESOS</span><h3>Acciones rápidas</h3></div><p>Atajos para las tareas más frecuentes</p></div><div>
+      <button data-quick="eval">${icon('check')}<span>Nueva evaluación</span></button><button data-quick="patient">${icon('patients')}<span>Nuevo paciente</span></button><button data-action="diets">${icon('imc')}<span>Crear plan</span></button><button data-action="agenda">${icon('calendar')}<span>Ver agenda</span></button><button data-action="reports">${icon('imc')}<span>Reportes</span></button><button data-quick="appointment">${icon('clock')}<span>Nueva cita</span></button>
     </div></section>
   </div>`;
 
   document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.action)));
-  document.querySelector('[data-quick="eval"]')?.addEventListener('click',()=>openEvalModal(null));
-  document.querySelector('[data-quick="patient"]')?.addEventListener('click',()=>openWizard());
-  document.querySelector('[data-quick="appointment"]')?.addEventListener('click',()=>openAppointmentModal());
+  document.querySelectorAll('[data-quick="eval"]').forEach(b=>b.addEventListener('click',()=>openEvalModal(null)));
+  document.querySelectorAll('[data-quick="patient"]').forEach(b=>b.addEventListener('click',()=>openWizard()));
+  document.querySelectorAll('[data-quick="appointment"]').forEach(b=>b.addEventListener('click',()=>openAppointmentModal()));
 
   NMRuntime.timeout('page:dashboard-charts',()=>{
-    // Si hubo otro render mientras esperaba este timer, este callback ya es obsoleto.
     if (dashboardRenderToken !== nmDashboardRenderToken || currentPage !== 'dashboard') return;
     const safeChart = (canvas, key, config) => {
-      if (!canvas || dashboardRenderToken !== nmDashboardRenderToken) return;
-      if (typeof window.Chart === 'undefined') {
-        console.warn('[NutriMachata] Chart.js aun no esta disponible; se omite la grafica '+key+'.');
-        return;
-      }
-      try {
-        const existing = (typeof window.Chart.getChart === 'function') ? window.Chart.getChart(canvas) : null;
-        if (existing) existing.destroy();
-        try { chartInstances[key]?.destroy(); } catch(e) {}
-        chartInstances[key] = new window.Chart(canvas, config);
-      } catch (e) {
-        console.error('[NutriMachata] Error creando grafica '+key+':', e);
-      }
+      if (!canvas || dashboardRenderToken !== nmDashboardRenderToken || typeof window.Chart === 'undefined') return;
+      try { const existing=(typeof window.Chart.getChart==='function')?window.Chart.getChart(canvas):null; if(existing)existing.destroy(); try{chartInstances[key]?.destroy()}catch(e){} chartInstances[key]=new window.Chart(canvas,config); } catch(e){ console.error('[NutriMachata] Error creando grafica '+key+':',e); }
     };
     const c1=document.getElementById('chart-imc-evolution');
-    if(c1) safeChart(c1,'modernLine',{type:'line',data:{labels:['Mar','Abr','May','Jun','Jul','Ago'],datasets:[{data:[avgImc+.8,avgImc+.3,avgImc+.35,avgImc+.65,avgImc+.4,avgImc],borderColor:'#5E8C2A',backgroundColor:'rgba(94,140,42,.08)',fill:true,tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:'#5E8C2A'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10}}}}}});
+    if(c1 && hasMonthlyTrend) safeChart(c1,'modernLine',{type:'line',data:{labels:monthBuckets.map(b=>b.label),datasets:[{data:monthlyImc,borderColor:'#5E8C2A',backgroundColor:'rgba(94,140,42,.07)',fill:true,tension:.32,borderWidth:2.2,pointRadius:3.5,pointHoverRadius:5,pointBackgroundColor:'#5E8C2A',spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{displayColors:false,callbacks:{label:(ctx)=>ctx.raw==null?'Sin datos':`IMC promedio: ${Number(ctx.raw).toFixed(1)}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#7a8277'}},y:{grid:{color:'rgba(31,49,26,.06)'},ticks:{font:{size:10},color:'#7a8277'}}}}});
     const c2=document.getElementById('chart-imc-modern');
-    if(c2) safeChart(c2,'modernDonut',{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false}}}});
-    const c3=document.getElementById('chart-imc-bars-modern');
-    if(c3) safeChart(c3,'modernBars',{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false}}}});
+    if(c2) safeChart(c2,'modernDonut',{type:'doughnut',data:{labels:Object.keys(imcDist),datasets:[{data:Object.values(imcDist),backgroundColor:['#6c9bd2','#79ad46','#f4b63e','#ef7b34','#8c54b7'],borderColor:'#fff',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
   },80);
 }
-
 function getKpiIcon(name) {
   const icons = {
     patients: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -15540,5 +15551,6 @@ const oldSwitch=window.switchSettingsTab;
 window.switchSettingsTab=function(id,el){const r=oldSwitch?.apply(this,arguments);if(id==='seguridad')setTimeout(loadAdminUsers,0);return r;};
 })();
 </script>
+<script id="nm-v113-marker">window.NMV113Dashboard=true;</script>
 </body>
 </html>
