@@ -15585,3 +15585,60 @@ window.switchSettingsTab=function(id,el){const r=oldSwitch?.apply(this,arguments
 <script id="nm-v115-marker">window.NMV115Visual=true;</script>
 </body>
 </html>
+<style id="nm-v117-patients-premium">
+/* NutriMachata v117 — Patients workspace */
+.patients-page{display:flex;flex-direction:column;gap:22px}
+.patients-actions{display:flex;justify-content:flex-end;align-items:center;margin:0}
+.patients-kpis{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:0!important;background:#fff;border:1px solid #e8ede5;border-radius:22px;overflow:hidden;box-shadow:0 12px 34px rgba(27,61,22,.045)}
+.patients-kpis .kpi-card{border:0!important;border-right:1px solid #edf0eb!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:22px 24px!important;text-align:left!important;min-height:112px}
+.patients-kpis .kpi-card:last-child{border-right:0!important}.patients-kpis .kpi-label{font-size:10px!important;letter-spacing:.11em;text-transform:uppercase;color:#8a9386!important;font-weight:700}.patients-kpis .kpi-value{font-size:30px!important;line-height:1.1;margin-top:8px;color:#173d19!important}
+.patients-workspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;gap:20px!important;align-items:start}
+.patients-list-pane{min-width:0}.patient-toolbar{background:#fff;border:1px solid #e7ece4;border-radius:20px;padding:14px!important;margin-bottom:12px;box-shadow:0 8px 28px rgba(30,54,27,.035)}
+.patient-toolbar-row{gap:10px}.patient-toolbar .form-control,.patient-toolbar .form-select{height:46px!important;border-radius:13px!important;background:#f8faf7!important;border-color:#e8ece5!important}
+.patient-directory{background:#fff;border:1px solid #e7ece4;border-radius:22px;overflow:hidden;box-shadow:0 14px 40px rgba(30,54,27,.045)}
+.patient-directory-header{padding:20px 22px!important;border-bottom:1px solid #edf0eb!important}.patient-directory-header>div:first-child>div:first-child{font-size:17px!important;color:#20261f!important}.patient-directory .table-container{overflow:auto}
+.patient-directory table{border-collapse:separate;border-spacing:0;width:100%}.patient-directory thead th{position:sticky;top:0;background:#f8faf7!important;color:#879083!important;font-size:9px!important;letter-spacing:.11em!important;font-weight:700!important;border-bottom:1px solid #e9ede6!important;padding:12px 16px!important;z-index:2}.patient-directory tbody tr{background:#fff}.patient-directory tbody tr:hover{background:#f7faf5!important}.patient-directory tbody td{border-bottom:1px solid #eff2ed!important}
+.patient-preview-pane{position:sticky;top:88px}.patient-preview-pane>div{border-radius:24px!important;box-shadow:0 18px 48px rgba(25,67,27,.15)!important;background:linear-gradient(155deg,#173f1a 0%,#285f23 68%,#397c2d 100%)!important}
+.patient-preview-pane .btn{border-radius:12px!important}
+/* Clinical record shell */
+.nm-hc-shell{display:flex;flex-direction:column;gap:18px}.nm-hc-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.nm-hc-actions{display:flex;gap:8px;flex-wrap:wrap}.nm-hc-hero{background:linear-gradient(145deg,#153d18 0%,#276323 68%,#347a2c 100%);border-radius:26px;padding:30px 32px;color:#fff;position:relative;overflow:hidden;box-shadow:0 18px 46px rgba(23,65,25,.16)}.nm-hc-hero:after{content:"";position:absolute;width:300px;height:300px;border-radius:50%;right:-100px;top:-150px;border:48px solid rgba(255,255,255,.045)}.nm-hc-tabs{display:flex;gap:6px;background:#fff;border:1px solid #e6ebe3;padding:6px;border-radius:16px;margin-bottom:22px;overflow:auto;box-shadow:0 8px 24px rgba(30,54,27,.035)}
+@media(max-width:1180px){.patients-workspace{grid-template-columns:1fr!important}.patient-preview-pane{display:none}.patients-kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:680px){.patients-kpis{grid-template-columns:1fr}.patients-kpis .kpi-card{border-right:0!important;border-bottom:1px solid #edf0eb!important}.patients-kpis .kpi-card:last-child{border-bottom:0!important}.patients-actions{justify-content:stretch}.patients-actions>div{width:100%}.patients-actions .btn{flex:1}.patient-toolbar-row{flex-direction:column}.patient-toolbar .form-select{width:100%!important}}
+</style>
+<script id="nm-v117-patients-ui">
+(function(){
+'use strict';
+const oldRenderPatients=window.renderPatients;
+window.renderPatients=function(){
+  const r=oldRenderPatients?.apply(this,arguments);
+  const page=document.querySelector('.patients-page');
+  if(!page)return r;
+  const actions=page.querySelector('.patients-actions');
+  if(actions&&!actions.querySelector('.nm-v117-patient-intro')){
+    const intro=document.createElement('div'); intro.className='nm-v117-patient-intro';
+    intro.innerHTML='<div style="font-size:10px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#6e8e62;margin-bottom:6px">Gestión clínica</div><div style="font-size:25px;line-height:1.15;font-weight:700;color:#20261f">Tu población, en una vista más clara.</div><div style="font-size:13px;color:#8a9186;margin-top:6px">Busca, revisa y entra al expediente sin perder contexto.</div>';
+    actions.style.justifyContent='space-between'; actions.insertBefore(intro,actions.firstChild);
+  }
+  return r;
+};
+try{renderPatients=window.renderPatients}catch(_){ }
+
+const oldOpenHC=window.openHistoriaClinica;
+window.openHistoriaClinica=function(patientId,activeTab){
+  const r=oldOpenHC?.apply(this,arguments);
+  setTimeout(()=>{
+    const root=document.getElementById('page-content'); if(!root)return;
+    const first=root.firstElementChild; if(!first||first.classList.contains('nm-hc-shell'))return;
+    first.classList.add('nm-hc-top');
+    const hero=[...root.children].find(el=>String(el.getAttribute('style')||'').includes('linear-gradient(135deg,var(--olive-dark)'));
+    if(hero)hero.classList.add('nm-hc-hero');
+    const tabs=[...root.children].find(el=>String(el.getAttribute('style')||'').includes('overflow-x:auto')&&el.querySelector('[id^="hc-tab-btn-"]'));
+    if(tabs)tabs.classList.add('nm-hc-tabs');
+    root.classList.add('nm-hc-shell');
+  },0);
+  return r;
+};
+try{openHistoriaClinica=window.openHistoriaClinica}catch(_){ }
+window.NMV117PatientsPremium=true;
+})();
+</script>
