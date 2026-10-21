@@ -15669,6 +15669,68 @@ window.switchSettingsTab=function(id,el){const r=oldSwitch?.apply(this,arguments
   window.NMV118PatientClinicalPermissions=true;
 })();
 </script>
+<style id="nm-v120-clinical-record-ui">
+/* v120 · Clinical Record Experience */
+.nm120-record-shell{max-width:1500px;margin:0 auto}
+.nm120-record-shell>.nm120-record-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;margin-bottom:18px}
+.nm120-record-back{border:0;background:transparent;color:#5f685b;font-weight:700;font-size:13px;padding:8px 0;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.nm120-record-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.nm120-record-actions .btn{border-radius:10px!important;min-height:38px!important;padding:0 13px!important;box-shadow:none!important}
+.nm120-record-shell .nm120-identity{background:#fff!important;color:#1f2b1c!important;border:1px solid #e4e9df!important;border-radius:18px!important;padding:0!important;margin-bottom:16px!important;overflow:hidden!important;box-shadow:0 10px 30px rgba(25,55,16,.045)!important}
+.nm120-identity-main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(420px,.9fr);gap:0;align-items:stretch}
+.nm120-person{padding:26px 28px;display:flex;gap:18px;align-items:center;min-width:0}
+.nm120-avatar{width:66px;height:66px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:#174a0d;color:#fff;font-size:21px;font-weight:800;flex:0 0 auto;box-shadow:0 8px 20px rgba(23,74,13,.16)}
+.nm120-person h1{font-size:25px;line-height:1.15;margin:0 0 7px;font-weight:750;letter-spacing:-.55px;color:#1e281c}
+.nm120-person-meta{font-size:12px;color:#7c8578;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nm120-person-meta i{width:3px;height:3px;border-radius:50%;background:#c5ccc0;display:inline-block}
+.nm120-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}.nm120-tag{font-size:11px;font-weight:700;border-radius:999px;padding:5px 9px;background:#f3f6f0;color:#556052;border:1px solid #e7ebe3}.nm120-tag.status{background:#edf6e8;color:#356d20;border-color:#dcebd4}
+.nm120-metrics{display:grid;grid-template-columns:repeat(3,1fr);background:#f8faf6;border-left:1px solid #e7ebe3}
+.nm120-metric{padding:23px 18px;display:flex;flex-direction:column;justify-content:center;border-left:1px solid #e7ebe3}.nm120-metric:first-child{border-left:0}.nm120-metric span{font-size:10px;letter-spacing:.8px;text-transform:uppercase;font-weight:800;color:#8a9386;margin-bottom:8px}.nm120-metric strong{font-size:25px;line-height:1;font-weight:760;color:#234d18;letter-spacing:-.5px}.nm120-metric small{font-size:10px;color:#99a096;margin-top:6px}
+.nm120-record-shell .nm120-tabs{display:flex!important;gap:3px!important;background:#fff!important;border:1px solid #e5e9e1!important;border-radius:13px!important;padding:5px!important;margin-bottom:18px!important;overflow:auto!important;box-shadow:0 3px 14px rgba(25,55,16,.025)!important}
+.nm120-record-shell .nm120-tabs button{background:transparent!important;box-shadow:none!important;border:0!important;color:#737d70!important;border-radius:9px!important;font-weight:650!important;font-size:12px!important;padding:9px 13px!important;flex:0 0 auto!important}
+.nm120-record-shell .nm120-tabs button.nm120-active{background:#edf4e9!important;color:#245c16!important}
+.nm120-record-shell #hcp-resumen>.card,.nm120-record-shell #hcp-hc-form>.card,.nm120-record-shell #hcp-evaluaciones>.card,.nm120-record-shell #hcp-dietas>.card{border:1px solid #e6eae2!important;border-radius:15px!important;box-shadow:0 5px 20px rgba(25,55,16,.025)!important}
+.nm120-record-shell .card{border-color:#e6eae2!important;box-shadow:0 5px 20px rgba(25,55,16,.025)!important}
+.nm120-record-shell .card-header{border-bottom-color:#edf0eb!important;background:transparent!important}
+.nm120-record-shell .card-title{font-weight:750!important;color:#263223!important}
+.nm120-record-shell .info-item label{font-size:10px!important;letter-spacing:.65px!important;text-transform:uppercase!important;color:#92998f!important;font-weight:800!important}.nm120-record-shell .info-item span{font-size:13px!important;color:#313a2f!important}
+.nm120-record-shell .hc-timeline{padding-left:10px}.nm120-record-shell .hc-event{border-left-color:#dfe6da!important}.nm120-record-shell .hc-event-content{background:#fff;border:1px solid #e7ebe3;border-radius:14px;padding:15px 17px!important;box-shadow:none!important}.nm120-record-shell .hc-event-title{font-weight:750!important}
+/* Historias directory */
+.nm120-hc-page{max-width:1500px;margin:0 auto}.nm120-hc-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}.nm120-hc-intro h2{margin:0;font-size:25px;letter-spacing:-.5px;color:#222d20}.nm120-hc-intro p{margin:5px 0 0;color:#858d82;font-size:13px}.nm120-hc-toolbar{background:#fff;border:1px solid #e5e9e1;border-radius:14px;padding:10px;display:grid;grid-template-columns:minmax(260px,1fr) 210px auto;gap:9px;margin-bottom:14px}.nm120-hc-list{background:#fff;border:1px solid #e5e9e1;border-radius:16px;overflow:hidden}.nm120-hc-list-head{padding:16px 20px;border-bottom:1px solid #edf0eb;display:flex;justify-content:space-between;align-items:center}.nm120-hc-list-head strong{font-size:14px}.nm120-hc-list-head span{font-size:11px;color:#8d9589}.nm120-hc-list #historias-list>div{padding:16px 20px!important;border-bottom:1px solid #eef1ec!important}.nm120-hc-list #historias-list>div:hover{background:#fafcf8!important}.nm120-hc-list #historias-list .patient-avatar{border-radius:13px!important;width:44px!important;height:44px!important}
+@media(max-width:1050px){.nm120-identity-main{grid-template-columns:1fr}.nm120-metrics{border-left:0;border-top:1px solid #e7ebe3}.nm120-record-top{grid-template-columns:1fr!important}.nm120-record-actions{justify-content:flex-start}.nm120-hc-toolbar{grid-template-columns:1fr 180px auto}}
+@media(max-width:700px){.nm120-person{padding:20px}.nm120-person h1{font-size:21px}.nm120-avatar{width:54px;height:54px;border-radius:15px}.nm120-metrics{grid-template-columns:repeat(3,1fr)}.nm120-metric{padding:16px 10px}.nm120-metric strong{font-size:20px}.nm120-record-actions .btn{flex:1 1 130px}.nm120-hc-toolbar{grid-template-columns:1fr}.nm120-hc-intro{align-items:flex-start;flex-direction:column}}
+</style>
+<script id="nm-v120-clinical-record-experience">
+(function(){
+'use strict';
+function decorateRecord120(p,tab){
+ const root=document.getElementById('page-content'); if(!root||!p)return;
+ root.classList.add('nm120-record-shell');
+ const children=[...root.children];
+ const top=children.find(el=>el.tagName==='DIV'&&el.querySelector('button[onclick*="_hcOriginPage"]'));
+ if(top){top.className='nm120-record-top';const back=top.querySelector('button[onclick*="_hcOriginPage"]');if(back){back.className='nm120-record-back';back.innerHTML='← <span>Volver al directorio</span>'}const acts=top.querySelector('div');if(acts)acts.className='nm120-record-actions'}
+ const hero=[...root.children].find(el=>el.tagName==='DIV'&&String(el.getAttribute('style')||'').includes('linear-gradient')&&el.textContent.includes(p.nombre));
+ if(hero){
+   hero.className='nm120-identity'; hero.removeAttribute('style');
+   const evals=p.evaluaciones||[], last=evals.length?evals[evals.length-1]:null;
+   const imc=Number(p.imc)>0?Number(p.imc).toFixed(1):'—'; const peso=Number(p.peso)>0?Number(p.peso).toFixed(1):'—';
+   hero.innerHTML=`<div class="nm120-identity-main"><div class="nm120-person"><div class="nm120-avatar">${p.initials||'P'}</div><div style="min-width:0"><h1>${p.nombre||'Paciente'}</h1><div class="nm120-person-meta"><span>${p.edad||'—'} años</span><i></i><span>${typeof formatPatientSex==='function'?formatPatientSex(p.sexo):(p.sexo||'—')}</span>${p.cedula?`<i></i><span>${p.cedula}</span>`:''}</div><div class="nm120-tags"><span class="nm120-tag status">${p.activo!==false?'● Paciente activo':'Paciente inactivo'}</span><span class="nm120-tag">${p.estado||'Sin clasificación'}</span>${p.objetivo?`<span class="nm120-tag">Objetivo: ${String(p.objetivo).slice(0,36)}</span>`:''}</div></div></div><div class="nm120-metrics"><div class="nm120-metric"><span>Peso actual</span><strong>${peso}</strong><small>${peso==='—'?'Sin evaluación':'kg'}</small></div><div class="nm120-metric"><span>IMC actual</span><strong>${imc}</strong><small>${p.estado||'Sin clasificar'}</small></div><div class="nm120-metric"><span>Seguimiento</span><strong>${evals.length}</strong><small>${last?.fecha?'Última '+last.fecha:'Sin evaluaciones'}</small></div></div></div>`;
+ }
+ const tabs=[...root.children].find(el=>el.tagName==='DIV'&&el.querySelector('[id^="hc-tab-btn-"]'));
+ if(tabs){tabs.className='nm120-tabs';tabs.removeAttribute('style');tabs.querySelectorAll('button').forEach(b=>{b.removeAttribute('style');b.classList.toggle('nm120-active',b.id===`hc-tab-btn-${tab||'resumen'}`)})}
+}
+const oldOpen120=window.openHistoriaClinica;
+window.openHistoriaClinica=function(patientId,activeTab){const r=oldOpen120.apply(this,arguments);try{const p=(DB.patients||[]).find(x=>x.id==patientId);decorateRecord120(p,activeTab||'resumen')}catch(e){console.warn('[v120 expediente]',e)}return r};
+try{openHistoriaClinica=window.openHistoriaClinica}catch(_){ }
+const oldSwitch120=window.switchHCTabPage;
+if(typeof oldSwitch120==='function') window.switchHCTabPage=function(tab,id){const r=oldSwitch120.apply(this,arguments);setTimeout(()=>{const p=(DB.patients||[]).find(x=>x.id==id);decorateRecord120(p,tab)},0);return r};
+try{switchHCTabPage=window.switchHCTabPage}catch(_){ }
+const oldHist120=window.renderHistorias;
+window.renderHistorias=function(){const r=oldHist120.apply(this,arguments);const root=document.getElementById('page-content');if(!root)return r;const search=document.getElementById('hc-search');const filter=document.getElementById('hc-filter-status');const list=document.getElementById('historias-list');if(!search||!list)return r;const toolbar=search.closest('.card');const listCard=list.closest('.card');if(toolbar){toolbar.className='nm120-hc-toolbar';toolbar.removeAttribute('style');const row=toolbar.querySelector('.flex');if(row){row.style.display='contents';row.classList.remove('flex','items-center','gap-3')}}if(listCard){listCard.className='nm120-hc-list';const head=listCard.querySelector('.card-header');if(head)head.className='nm120-hc-list-head'}root.classList.add('nm120-hc-page');const intro=document.createElement('div');intro.className='nm120-hc-intro';intro.innerHTML='<div><h2>Expedientes clínicos</h2><p>Consulta historias, evolución y estado clínico desde un solo lugar.</p></div>';root.insertBefore(intro,root.firstChild);return r};
+try{renderHistorias=window.renderHistorias}catch(_){ }
+})();
+</script>
+
 </body>
 </html>
 <style id="nm-v117-patients-premium">
