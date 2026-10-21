@@ -15411,8 +15411,20 @@ window.NMV95IntegralFixes=true;
    document.getElementById('nm98-doctor-modal')?.remove(); document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm98-doctor-modal" style="z-index:10060"><div class="modal" style="max-width:760px"><div class="modal-header"><div><div class="modal-title">${d?'Editar profesional':'Nuevo doctor'}</div><div class="modal-subtitle">${d?'Actualiza los datos del profesional.':'Crea la cuenta de acceso y el perfil médico.'}</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body"><input id="nm98-doctor-id" type="hidden" value="${esc98(d?.id||'')}"><div class="form-row"><div class="form-group"><label>Nombre completo *</label><input id="nm98-doctor-name" class="form-control" value="${esc98(d?.nombre||'')}"></div><div class="form-group"><label>Especialidad</label><input id="nm98-doctor-specialty" class="form-control" value="${esc98(d?.especialidad||'')}"></div></div><div class="form-row"><div class="form-group"><label>Correo *</label><input id="nm98-doctor-email" type="email" class="form-control" value="${esc98(d?.email||'')}" ${d?'readonly':''}></div><div class="form-group"><label>Teléfono</label><input id="nm98-doctor-phone" class="form-control" value="${esc98(d?.telefono||'')}"></div></div>${d?'':`<div class="form-group"><label>Contraseña inicial *</label><input id="nm98-doctor-password" type="password" class="form-control" minlength="6" placeholder="Mínimo 6 caracteres"><div class="text-xs text-muted mt-2">El doctor podrá iniciar sesión con este correo y contraseña. Si Supabase exige confirmación de correo, deberá confirmar el mensaje recibido.</div></div>`}</div><div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" id="nm98-save-doctor" onclick="saveDoctor98()">${d?'Guardar cambios':'Crear doctor'}</button></div></div></div>`)
  };
  window.saveDoctor98=async function(){
-   if(!isAdmin98())return; const id=document.getElementById('nm98-doctor-id')?.value||'',name=document.getElementById('nm98-doctor-name')?.value.trim()||'',email=document.getElementById('nm98-doctor-email')?.value.trim().toLowerCase()||'',specialty=document.getElementById('nm98-doctor-specialty')?.value.trim()||'',phone=document.getElementById('nm98-doctor-phone')?.value.trim()||'',btn=document.getElementById('nm98-save-doctor');
-   if(!name||!email)return notify('Completa nombre y correo.','warning'); if(btn){btn.disabled=true;btn.textContent='Guardando...'}
+   if(!isAdmin98())return;
+   const id=document.getElementById('nm98-doctor-id')?.value||'',
+         name=document.getElementById('nm98-doctor-name')?.value.trim()||'',
+         emailRaw=document.getElementById('nm98-doctor-email')?.value||'',
+         email=emailRaw.normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/\s+/g,'').trim().toLowerCase(),
+         specialty=document.getElementById('nm98-doctor-specialty')?.value.trim()||'',
+         phone=document.getElementById('nm98-doctor-phone')?.value.trim()||'',
+         btn=document.getElementById('nm98-save-doctor');
+   if(!name||!email)return notify('Completa nombre y correo.','warning');
+   const emailInput=document.getElementById('nm98-doctor-email');
+   if(emailInput)emailInput.value=email;
+   const emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+   if(!emailOk)return notify('El correo no tiene un formato válido. Ejemplo: doctor@correo.com','warning');
+   if(btn){btn.disabled=true;btn.textContent='Guardando...'}
    try{
      await ensureSupaSession();
      if(id){await supa(`usuarios?id=eq.${encodeURIComponent(id)}`,'PATCH',{nombre:name,telefono:phone||null,especialidad:specialty||null});}
