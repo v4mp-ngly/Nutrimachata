@@ -2039,6 +2039,20 @@ function supaSessionExpiresSoon(skew=SUPA_REFRESH_SKEW_SECONDS){
   if(!exp) return false;
   return exp <= Math.floor(Date.now()/1000) + skew;
 }
+
+async function nmResolveRole125(user){
+  if(!user?.id)throw new Error('No hay una sesión autenticada.');
+  const allowed=['admin','doctor','patient'];
+  const trusted=String(user.app_metadata?.role||'').trim().toLowerCase();
+  let profile=null,problem=null;
+  try{profile=await SB.getUsuario(String(user.email||'').trim().toLowerCase())}catch(e){problem=e}
+  if(profile?.activo===false)throw new Error('Esta cuenta está desactivada. Contacta a la administración.');
+  const role=String(profile?.rol||'').trim().toLowerCase();
+  if(allowed.includes(role))return role;
+  if(allowed.includes(trusted))return trusted;
+  throw new Error(problem?'No se pudo verificar el rol de tu cuenta. Revisa la conexión y la política de lectura de usuarios.':'La cuenta no tiene un rol autorizado. La administración debe revisar su perfil en usuarios.');
+}
+
 async function supaAuthLogin(email,password){
   const res=await fetch(SUPA_URL.replace(/\/$/,'')+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:SUPA_ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
   const data=await res.json().catch(()=>({}));
@@ -2064,6 +2078,7 @@ function restoreSupaSession(){
 }
 function clearSupaSession(){
   SUPA_AUTH_SESSION=null;
+  try{sessionStorage.removeItem('nutrimachata_critical_snapshot_v3');DB.patients=[];DB.appointments=[];DB.currentUser=null;DB.currentRole='';DB.loaded=false;}catch(_){}
   try{ sessionStorage.removeItem('nutri_supa_session'); }catch(_){}
 }
 async function refreshSupaSession(force=false){
@@ -2135,7 +2150,8 @@ function saveEvaluationDraft(){
   try{
     const modal=document.getElementById('modal-evaluation');
     if(!modal || !modal.classList.contains('open')) return;
-    const draft={savedAt:Date.now(),fields:{}};
+    const owner=currentAuthUserId();if(!owner)return;
+    const draft={savedAt:Date.now(),owner,fields:{}};
     modal.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{
       if(el.type==='password' || el.type==='file') return;
       draft.fields[el.id]=el.type==='checkbox'?el.checked:el.value;
@@ -2146,7 +2162,7 @@ function saveEvaluationDraft(){
 function restoreEvaluationDraft(){
   try{
     const draft=JSON.parse(sessionStorage.getItem('nutri_eval_draft')||'null');
-    if(!draft?.fields) return false;
+    if(!draft?.fields || !currentAuthUserId() || draft.owner!==currentAuthUserId()) return false;
     Object.entries(draft.fields).forEach(([id,val])=>{
       const el=document.getElementById(id); if(!el) return;
       if(el.type==='checkbox') el.checked=!!val; else el.value=val ?? '';
@@ -2341,7 +2357,7 @@ async function supaWriteAdaptive(path, method, body, maxRetries=12) {
       const msg=String(e?.message||'');
       const m=msg.match(/Could not find the ['"]([^'"]+)['"] column|column ["]?([a-zA-Z0-9_]+)["]? .*does not exist/i);
       const missing=m&&(m[1]||m[2]);
-      if(missing && Object.prototype.hasOwnProperty.call(payload,missing)){
+      if(missing && ['color','initials','updated_at'].includes(missing) && Object.prototype.hasOwnProperty.call(payload,missing)){
         console.warn(`[Supabase] ${missing} no existe en ${path}; reintento sin ese campo opcional.`);
         delete payload[missing]; continue;
       }
@@ -2379,10 +2395,7 @@ const SB = {
     const r = await supaWriteAdaptive('pacientes?select=*', 'POST', data);
     const created = Array.isArray(r) ? r[0] : null;
     if (!created?.id) throw new Error('Supabase no devolvió el UUID del paciente creado. Revisa RLS/permisos de INSERT y SELECT.');
-    // Verificación real: no damos éxito hasta poder leer el mismo UUID.
-    const verify = await supa(`pacientes?id=eq.${encodeURIComponent(created.id)}&select=*&limit=1`, 'GET');
-    if (!Array.isArray(verify) || !verify[0]?.id) throw new Error('El paciente fue enviado, pero no pudo verificarse en Supabase. Revisa la política SELECT de pacientes.');
-    return verify[0];
+    return created;
   },
   async updatePaciente(id, data) {
     return await supa(`pacientes?id=eq.${id}`, 'PATCH', data);
@@ -2444,6 +2457,7 @@ const SB = {
     if (!pacienteId) throw new Error('No se puede guardar la historia clínica sin paciente_id.');
     const clean = { ...data, paciente_id: pacienteId };
     ['antecedentes','antec_fam','habitos','sintomas'].forEach(k => {
+      if (!Object.prototype.hasOwnProperty.call(clean,k) || clean[k] === undefined) return;
       if (clean[k] == null) clean[k] = [];
       else if (!Array.isArray(clean[k])) clean[k] = [clean[k]].filter(Boolean);
     });
@@ -2454,7 +2468,7 @@ const SB = {
     const write = async (attempt=0) => {
       await ensureSupaSession();
       const url = SUPA_URL.replace(/\/$/,'') + '/rest/v1/historias_clinicas?on_conflict=paciente_id';
-      const res = await fetch(url, {
+      const res = await nmFetchTimeout(url, {
         method:'POST', mode:'cors', credentials:'omit',
         headers:{
           apikey:SUPA_ANON,
@@ -2555,6 +2569,7 @@ function decodeCitaDescripcion(valor) {
 
 async function loadFromSupabase() {
   const previouslyLoaded = !!DB.loaded;
+  const nm125LoadOwner=currentAuthUserId();
   if (IS_LOCAL) {
     console.info('Modo local — usando datos de ejemplo.');
     showLoadingOverlay(false);
@@ -2581,14 +2596,16 @@ async function loadFromSupabase() {
       try { return await supaFetchAll(path); }
       catch (e) { console.warn(`[carga opcional] ${label}:`, e); return []; }
     };
-    const [citasRaw, evalsRaw, dietasRaw, hcsRaw, usuariosRaw] = await Promise.all([
+    const [citasRaw, evalsRaw, dietasRaw, hcsRaw, usuariosRaw, seguimientosRaw] = await Promise.all([
       safeLoad('citas','citas?order=fecha.asc,hora.asc&select=*'),
       safeLoad('evaluaciones','evaluaciones?order=fecha.asc&select=*'),
       safeLoad('dietas','dietas?order=created_at.desc&select=*'),
       safeLoad('historias_clinicas','historias_clinicas?select=*'),
       safeLoad('usuarios','usuarios?select=id,email,rol,nombre'),
+      safeLoad('seguimiento_paciente','seguimiento_paciente?select=*&order=fecha.asc'),
     ]);
 
+    if(!nm125LoadOwner||nm125LoadOwner!==currentAuthUserId())throw new Error('La sesión cambió durante la carga. Vuelve a abrir el módulo.');
     const pacs    = pacientesRaw || [];
     const evals   = evalsRaw    || [];
     const dietas  = dietasRaw   || [];
@@ -2596,7 +2613,7 @@ async function loadFromSupabase() {
     const citas   = citasRaw    || [];
     const usuarios = usuariosRaw || [];
     // Seguimiento ya no forma parte del guardado/carga obligatoria de Evaluación.
-    const seguimientos = [];
+    const seguimientos = seguimientosRaw || [];
 
     // Combinar seguimiento estructurado con cada evaluación. La tabla
     // seguimiento_paciente es la fuente principal; el JSON antiguo en obs
@@ -2991,13 +3008,7 @@ async function doLogin() {
     const au=auth?.user||{};
     if(!au.id) throw new Error('Supabase autenticó la sesión pero no devolvió el usuario.');
 
-    // 2) Resolver rol sin depender de public.usuarios para la cuenta administradora.
-    let role=(au.user_metadata?.role||au.app_metadata?.role||'').toLowerCase();
-    if(email===NUTRI_ADMIN_EMAIL) role='admin';
-    if(!role && email!==NUTRI_ADMIN_EMAIL){
-      try { const profile=await SB.getUsuario(email); role=String(profile?.rol||'').toLowerCase(); } catch(_) {}
-    }
-    if(!role) role=DB.loginRole==='patient'?'patient':'admin';
+    const role=await nmResolveRole125(au);
 
     // 3) Para paciente, resolver solo su expediente antes de entrar.
     let patientId=null;
@@ -3081,9 +3092,7 @@ async function resumeExistingSession(){
     await ensureSupaSession();
     const au=SUPA_AUTH_SESSION.user||{};
     const email=String(au.email||'').trim().toLowerCase();
-    let role=String(au.user_metadata?.role||au.app_metadata?.role||'').toLowerCase();
-    if(email===NUTRI_ADMIN_EMAIL) role='admin';
-    if(!role) role='patient';
+    const role=await nmResolveRole125(au);
     let patientId=null;
     if(role==='patient'){
       let pacs=[];
@@ -4359,15 +4368,28 @@ async function savePatient(id) {
 let NM_PATIENT_REFRESH_PROMISE = null;
 async function refreshPatientsFromSupabase(options={}) {
   try { await ensureSupaSession(); } catch(_) { return DB.patients || []; }
+  const nm125RefreshOwner=currentAuthUserId();
   if (NM_PATIENT_REFRESH_PROMISE) return NM_PATIENT_REFRESH_PROMISE;
   NM_PATIENT_REFRESH_PROMISE = (async()=>{
     try {
       const rows = await SB.getPacientes();
-      if (!Array.isArray(rows)) return DB.patients || [];
+      if(!nm125RefreshOwner||nm125RefreshOwner!==currentAuthUserId())return DB.patients||[];
+      if (!Array.isArray(rows)) throw new Error('Respuesta de pacientes inválida.');
       const current = Array.isArray(DB.patients) ? DB.patients : [];
+      // A directory refresh only updates patient fields. Related clinical records
+      // remain in their UI representation until explicitly reloaded from their tables.
       DB.patients = rows.map(row => {
         const old = current.find(x => String(x.id) === String(row.id));
-        return mapPaciente(row, old?.evaluations || [], old?.diets || [], old?.historiaClinica || null);
+        const mapped = mapPaciente(row, old?.evaluaciones || [], [], null);
+        if(old){
+          mapped.evaluaciones=old.evaluaciones||[];
+          mapped.dietas=old.dietas||[];
+          mapped.historiaClinica=old.historiaClinica||{};
+          mapped.citas=old.citas||[];
+          if('portalAuth' in old)mapped.portalAuth=old.portalAuth;
+          if('consentimiento' in old)mapped.consentimiento=old.consentimiento;
+        }
+        return mapped;
       });
       if (options.render !== false && (document.getElementById('page-title')?.textContent || '').trim() === 'Pacientes') {
         renderPatients();
@@ -4909,9 +4931,8 @@ async function finishWizard() {
   // Auto-generate credentials
   const autoEmail = (wizData.email || '').trim() ||
     wizData.nombre.toLowerCase().replace(/\s+/g,'.').replace(/[^a-z.]/g,'') + '@paciente.com';
-  const autoPass = generatePassword();
   wizData.email = autoEmail;
-  wizData.pass  = autoPass;
+  delete wizData.pass;
 
   const peso  = wizData.peso  || 0;
   const talla = wizData.talla || 1.65;
@@ -4938,12 +4959,7 @@ async function finishWizard() {
     estado: getImcCategory(imc),
     color, initials, activo: true,
     created: today,
-    evaluaciones: [{
-      fecha: today, peso, talla, imc,
-      presion: wizData.presion || '—',
-      estado: 'Primera consulta',
-      obs: wizData.obsConsulta || 'Registro inicial'
-    }],
+    evaluaciones: [],
     dietas: [], citas: [],
     objetivo: wizData.objetivo || '',
     alergias: wizData.alergias || 'Ninguna',
@@ -4964,7 +4980,10 @@ async function finishWizard() {
 
   try {
     // 1. Save paciente to Supabase
-    const sbPac = await SB.createPaciente({
+    wizData._nm125CreateId ||= crypto.randomUUID();
+    wizData._nm125Owner=currentAuthUserId();
+    try{sessionStorage.setItem('nutri_hc_draft',JSON.stringify(wizData));}catch(_){}
+    const patientPayload = {
       nombre:           newPatient.nombre,
       cedula:           newPatient.cedula   || '',
       edad:             newPatient.edad     || 0,
@@ -4981,11 +5000,17 @@ async function finishWizard() {
       no_consume:       newPatient.noConsume || '',
       enfermedades:     newPatient.enfermedades || 'Ninguna',
       color, initials, activo: true,
-    });
+    };
+    patientPayload.id=wizData._nm125PatientId||wizData._nm125CreateId;
+    let sbPac;
+    if(wizData._nm125PatientId){const rows=await SB.updatePaciente(wizData._nm125PatientId,patientPayload);sbPac=Array.isArray(rows)?rows[0]:rows;}
+    else sbPac=await SB.createPaciente(patientPayload);
 
     if (!sbPac?.id) throw new Error('Supabase no confirmó la creación del paciente.');
     const realId = sbPac.id;
     newPatient.id = realId;
+    wizData._nm125PatientId=realId;
+    try{sessionStorage.setItem('nutri_hc_draft',JSON.stringify(wizData));}catch(_){}
     // El paciente YA existe en Supabase desde este punto. Reflejarlo inmediatamente
     // para que un fallo posterior nunca haga parecer que fue borrado.
     if (!DB.patients.some(p => String(p.id) === String(realId))) DB.patients.push(newPatient);
@@ -5029,7 +5054,7 @@ async function finishWizard() {
 
       // 3. Evaluación inicial es secundaria: si falla, paciente + historia NO se pierden.
       if (peso > 0) {
-        try { await supa('evaluaciones', 'POST', {
+        try { const initialRows=await supa('evaluaciones', 'POST', {
           paciente_id:         realId,
           fecha: today, peso, talla, imc,
           presion:             wizData.presion     || newPatient.presion || '—',
@@ -5044,7 +5069,7 @@ async function finishWizard() {
           muslo:               wizData.muslo       || null,
           porcentaje_grasa:    wizData.grasa       || null,
           frecuencia_cardiaca: wizData.fc          || null,
-        }); } catch (evalErr) { console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr); }
+        }); newPatient.evaluaciones=(initialRows||[]).map(e=>({...e,grasa:e.porcentaje_grasa??null,fc:e.frecuencia_cardiaca??null})); } catch (evalErr) { console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr); }
       }
 
       // v84: no crear cuentas Auth desde la sesión administrativa del navegador.
@@ -5062,7 +5087,7 @@ async function finishWizard() {
 
       try { sessionStorage.removeItem('nutri_hc_draft'); } catch (_) {}
       closeModal('modal-wizard');
-      notify('✓ Paciente e historia clínica guardados y verificados en Supabase', 'success');
+      notify(peso>0&&!newPatient.evaluaciones.length?'Paciente e historia guardados. La evaluación inicial quedó pendiente; regístrala desde Evaluaciones.':'Paciente e historia clínica guardados en Supabase.',peso>0&&!newPatient.evaluaciones.length?'warning':'success');
     }
   } catch(e) {
     console.error('Error guardando paciente/historia en Supabase:', e);
@@ -5076,35 +5101,10 @@ async function finishWizard() {
   // El paciente ya fue añadido al estado local inmediatamente tras confirmarlo Supabase.
   if (!DB.patients.some(p => String(p.id) === String(newPatient.id))) DB.patients.push(newPatient);
 
-  // Show credentials screen
-  document.getElementById('page-content').innerHTML = `
-      <div style="max-width:520px;margin:0 auto">
-        <div style="background:linear-gradient(135deg,var(--olive-dark),var(--olive));border-radius:var(--radius-xl);padding:32px;color:white;text-align:center;margin-bottom:20px">
-          <div style="font-size:48px;margin-bottom:12px"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-          <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:6px">¡Historia Clínica Registrada!</div>
-          <div style="font-size:14px;opacity:0.8">${newPatient.nombre}</div>
-        </div>
-        <div class="card" style="padding:24px;margin-bottom:16px">
-          <div style="font-size:13px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px">Credenciales generadas automáticamente</div>
-          <div style="background:var(--beige);border-radius:var(--radius);padding:16px;margin-bottom:10px">
-            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Email / Usuario</div>
-            <div style="font-size:15px;font-weight:600;font-family:'DM Mono',monospace;color:var(--black)">${autoEmail}</div>
-          </div>
-          <div style="background:var(--beige);border-radius:var(--radius);padding:16px;margin-bottom:16px">
-            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Contraseña</div>
-            <div style="font-size:15px;font-weight:600;font-family:'DM Mono',monospace;color:var(--black)">${autoPass}</div>
-          </div>
-          <div style="background:rgba(94,140,42,0.08);border:1px solid var(--olive-pale);border-radius:var(--radius);padding:12px;font-size:12px;color:var(--olive-dark);margin-bottom:16px">
-            ⚠️ Anote o comparta estas credenciales con el paciente para que acceda a su portal
-          </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-olive" style="flex:1" onclick="navigate('historias')">Ver Historias Clínicas</button>
-            <button class="btn btn-outline" style="flex:1" onclick="openHistoriaClinica('${newPatient.id}')">Ver HC</button>
-            <button class="btn btn-outline" style="flex:1" onclick="downloadHistoriaClinica('${newPatient.id}')">📥 Descargar HC</button>
-          </div>
-        </div>
-      </div>
-    `;
+  // The clinical record is confirmed; portal access is managed separately.
+  document.getElementById('page-content').innerHTML=`<div class="card" style="max-width:620px;margin:32px auto;padding:28px"><h2>Historia clínica registrada</h2><p id="nm125-created-name"></p><p>El expediente quedó guardado. El acceso al portal se gestiona desde la cuenta del paciente.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-olive" onclick="navigate('historias')">Ver historias clínicas</button><button class="btn btn-outline" id="nm125-open-hc">Abrir expediente</button></div></div>`;
+  document.getElementById('nm125-created-name').textContent=newPatient.nombre;
+  document.getElementById('nm125-open-hc').onclick=()=>openHistoriaClinica(newPatient.id);
 }
 
 function downloadHistoriaClinica(patientId) {
@@ -6132,39 +6132,14 @@ function renderHCFormView(p) {
 }
 
 async function saveRec24(patientId) {
-  const p = DB.patients.find(x => x.id == patientId);
-  if (!p) return;
-  if (!p.historiaClinica) p.historiaClinica = {};
-
-  const keys = ['rec24Desayuno','rec24Mañana','rec24Almuerzo','rec24Merienda','rec24Cena','rec24Snacks'];
-  const updates = {};
-  keys.forEach(key => {
-    const el = document.getElementById('rec24-' + key);
-    if (el) {
-      p.historiaClinica[key] = el.value.trim();
-      updates[key] = el.value.trim() || null;
-    }
-  });
-
-  // Map JS keys to Supabase snake_case columns
-  const sbMap = {
-    rec24Desayuno: 'rec24_desayuno', rec24Mañana: 'rec24_manana',
-    rec24Almuerzo: 'rec24_almuerzo', rec24Merienda: 'rec24_merienda',
-    rec24Cena: 'rec24_cena',         rec24Snacks: 'rec24_snacks',
-  };
-  const sbData = {};
-  Object.entries(sbMap).forEach(([js, col]) => {
-    sbData[col] = updates[js] !== undefined ? updates[js] : null;
-  });
-  sbData.updated_at = new Date().toISOString();
-
-  try {
-    await SB.upsertHistoria(patientId, sbData);
-    notify('Recordatorio guardado ✓', 'success');
-  } catch(e) {
-    console.error(e);
-    notify('Error al guardar. Los datos se conservan en memoria.', 'warning');
-  }
+  const p=DB.patients.find(x=>String(x.id)===String(patientId));
+  if(!p)return notify('No se encontró el paciente.','warning');
+  const fields={rec24Desayuno:'rec24_desayuno',rec24Mañana:'rec24_manana',rec24Almuerzo:'rec24_almuerzo',rec24Merienda:'rec24_merienda',rec24Cena:'rec24_cena',rec24Snacks:'rec24_snacks'};
+  const updates={},payload={updated_at:new Date().toISOString()};
+  for(const [key,col] of Object.entries(fields)){const el=document.getElementById('rec24-'+key);if(el){updates[key]=el.value.trim();payload[col]=updates[key]||null;}}
+  if(!Object.keys(updates).length)return notify('No hay campos del recordatorio para guardar.','warning');
+  try{await SB.upsertHistoria(patientId,payload);p.historiaClinica={...(p.historiaClinica||{}),...updates};notify('Recordatorio guardado correctamente.','success');return true}
+  catch(e){notify('No se pudo guardar el recordatorio. Los campos siguen abiertos: '+(e.message||'Error'),'danger');return false}
 }
 
 let _hcOriginPage = 'historias';
@@ -11399,10 +11374,12 @@ async function saveEditPatient(patientId) {
     tieneAlergias:    parseBool(gv('hc-tieneAlergias')),
     comeEstres:       parseBool(gv('hc-comeEstres')),
     comeAburrido:     parseBool(gv('hc-comeAburrido')),
+    comeEmociones:    document.getElementById('hc-comeEmociones')?parseBool(gv('hc-comeEmociones')):p.historiaClinica?.comeEmociones,
     hambreEmocional:  parseBool(gv('hc-hambreEmocional')),
     comeRapido:       parseBool(gv('hc-comeRapido')),
     comeLleno:        parseBool(gv('hc-comeLleno')),
     culpaComer:       parseBool(gv('hc-culpaComer')),
+    culpaExceso:      document.getElementById('hc-culpaExceso')?parseBool(gv('hc-culpaExceso')):p.historiaClinica?.culpaExceso,
     dietasRepetidas:  parseBool(gv('hc-dietasRepetidas')),
     horariosRegulares:parseBool(gv('hc-horariosRegulares')),
     comidasFuera:     parseBool(gv('hc-comidasFuera')),
@@ -11434,9 +11411,11 @@ async function saveEditPatient(patientId) {
     updated_at:      new Date().toISOString(),
   };
 
+  let nm125PatientConfirmed=false;
   try {
     // Save patient
     await SB.updatePaciente(patientId, sbData);
+    nm125PatientConfirmed=true;
 
     // Save HC — complete field mapping
     const hcSbData = {
@@ -11499,7 +11478,7 @@ async function saveEditPatient(patientId) {
     }
   } catch(e) {
     console.error(e);
-    notify('Error al guardar cambios', 'danger');
+    notify((nm125PatientConfirmed?'Los datos personales se guardaron; no se pudo completar la historia clínica. ':'No se pudieron guardar los cambios. ')+(e.message||'Error desconocido'),'danger');
   }
 }
 
@@ -12519,7 +12498,9 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
 
   function criticalSnapshot(){
     return {
-      version:3,
+      version:4,
+      owner:currentAuthUserId(),
+      role:DB?.currentUser?.role||'',
       savedAt:new Date().toISOString(),
       patients:Array.isArray(DB?.patients)?DB.patients:[],
       appointments:Array.isArray(DB?.appointments)?DB.appointments:[],
@@ -12529,6 +12510,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
   function saveSnapshot(reason='auto'){
     try{
       const snap=criticalSnapshot();
+      if(!snap.owner||String(DB?.currentUser?.supabaseId||DB?.currentUser?.id||'')!==String(snap.owner))return false;
       sessionStorage.setItem(SNAP_KEY,JSON.stringify(snap));
       window.__nmLastSnapshot={time:snap.savedAt,reason};
       return true;
@@ -12538,6 +12520,7 @@ function pressureHigh(v){if(!v)return false;const m=String(v).match(/(\d+)\D+(\d
     try{
       const raw=sessionStorage.getItem(SNAP_KEY);if(!raw)return false;
       const snap=JSON.parse(raw);if(!snap||!Array.isArray(snap.patients))return false;
+      if(!currentAuthUserId()||snap.owner!==currentAuthUserId()||snap.role!==DB?.currentUser?.role)return false;
       DB.patients=snap.patients;
       DB.appointments=Array.isArray(snap.appointments)?snap.appointments:[];
       if(snap.settings&&typeof snap.settings==='object')DB.settings={...(DB.settings||{}),...snap.settings};
@@ -16021,5 +16004,86 @@ async function build(root){
 }
 async function save(root,filename){const pdf=await build(root);pdf.save(filename||'Historia_Clinica.pdf');return true}
 window.NMHistoryPDF124={build,save};
+})();
+</script>
+
+<script id="nm-clinical-stability-v125">
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const busy=new Set();
+const staff=async()=>{await ensureSupaSession();const role=await nmResolveRole125(SUPA_AUTH_SESSION.user);if(!['admin','doctor'].includes(role))throw new Error('Esta acción está reservada al equipo clínico.');return role};
+// UUID remains tied to the open form when a POST response is lost. A retry reads
+// the same ID instead of blindly creating a second record.
+const originalCreate=SB.createPaciente;
+SB.createPaciente=async function(data){
+ const modal=document.getElementById('modal-patient');
+ if(!data.id&&modal?.classList.contains('open')){modal.dataset.nmCreateId ||= crypto.randomUUID();data={...data,id:modal.dataset.nmCreateId};}
+ if(data.id){
+  try{const rows=await supaWriteAdaptive('pacientes?select=*','POST',data);if(!rows?.[0]?.id)throw new Error('No se confirmó el paciente.');return rows[0]}
+  catch(e){if(!/23505|duplicate key/i.test(String(e.message)))throw e;const row=await SB.getPaciente(data.id);if(!row)throw e;for(const k of Object.keys(data)){if(['updated_at','color','initials'].includes(k))continue;if(JSON.stringify(row[k]??null)!==JSON.stringify(data[k]??null))throw new Error('El paciente ya quedó guardado antes del reintento. Ábrelo desde Pacientes para actualizar sus datos.');}return row;}
+ }
+ return originalCreate.call(this,data);
+};
+function mappedEvaluation(row){return{...row,obs:cleanEvalObs(row.obs||''),grasa:row.porcentaje_grasa??row.grasa??null,fc:row.frecuencia_cardiaca??row.fc??null}}
+async function saveEvaluation125(){
+ const el=id=>document.getElementById(id),value=id=>el(id)?.value??'';
+ const pid=value('eval-patient-select'),evalId=value('eval-id');
+ if(!pid)throw new Error('Selecciona un paciente.');
+ const peso=Number(value('eval-peso')),talla=parseTalla(value('eval-talla-cm')||value('eval-talla'));
+ if(!Number.isFinite(peso)||peso<=0||!Number.isFinite(talla)||talla<=0)throw new Error('Peso y talla deben ser mayores que cero.');
+ const fecha=value('eval-fecha');if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha))throw new Error('Selecciona la fecha de la evaluación.');
+ const imc=Number((peso/(talla*talla)).toFixed(1));
+ const body={paciente_id:pid,fecha,peso,talla,imc,presion:value('eval-presion'),estado:value('eval-estado')||getImcCategory(imc),obs:cleanEvalObs(value('eval-obs'))};
+ for(const [field,id] of Object.entries({cuello:'eval-cuello',pecho:'eval-pecho',muneca:'eval-muneca',cintura:'eval-cintura',abdomen:'eval-abdomen',cadera:'eval-cadera',muslo:'eval-muslo',porcentaje_grasa:'eval-grasa',frecuencia_cardiaca:'eval-fc'})){const raw=value(id);if(!raw.trim()){body[field]=null;continue}const n=Number(raw);if(!Number.isFinite(n)||n<0)throw new Error('Revisa el valor de '+field.replace(/_/g,' ')+'.');body[field]=n;}
+ const modal=el('modal-evaluation');
+ let row;
+ if(evalId){const rows=await SB.updateEvaluacion(evalId,body);row=Array.isArray(rows)?rows[0]:rows;if(!row?.id)throw new Error('No se confirmó la actualización de la evaluación.');}
+ else{
+  if(!modal)throw new Error('No se encontró el formulario de evaluación.');
+  modal.dataset.nmCreateId ||= crypto.randomUUID();
+  try{row=await SB.createEvaluacion({...body,id:modal.dataset.nmCreateId})}
+  catch(e){if(!/23505|duplicate key/i.test(String(e.message)))throw e;const rows=await supa('evaluaciones?id=eq.'+encodeURIComponent(modal.dataset.nmCreateId)+'&select=*&limit=1');row=rows?.[0];if(!row?.id)throw e;const changed=Object.keys(body).some(k=>JSON.stringify(row[k]??null)!==JSON.stringify(body[k]??null));if(changed)throw new Error('La evaluación ya se guardó antes del reintento. Ábrela desde el historial para editarla.');}
+  if(!row?.id)throw new Error('Supabase no confirmó la evaluación.');
+ }
+ // From this point the evaluation exists. A secondary failure cannot turn it into a new INSERT.
+ let hidden=el('eval-id');if(!hidden){hidden=document.createElement('input');hidden.id='eval-id';hidden.type='hidden';modal?.appendChild(hidden)}hidden.value=row.id;
+ const p=DB.patients.find(p=>String(p.id)===String(pid));
+ if(p){p.evaluaciones=(p.evaluaciones||[]).filter(e=>String(e.id)!==String(row.id));p.evaluaciones.push(mappedEvaluation(row));}
+ let warning='';
+ const latest=p?[...p.evaluaciones].sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')))[0]:row;
+ const summary={peso:Number(latest.peso),talla:Number(latest.talla),imc:Number(latest.imc),presion:latest.presion||'',estado:getImcCategory(Number(latest.imc)),updated_at:new Date().toISOString()};
+ if(p)Object.assign(p,summary);
+ try{await SB.updatePaciente(pid,summary)}catch(e){warning='La evaluación quedó guardada; no se pudo actualizar el resumen del paciente: '+(e.message||'Error');}
+ clearEvaluationDraft();closeModal('modal-evaluation');
+ try{if(currentPage==='evaluations')renderEvaluations();else if(currentPage==='patients')renderPatients();else if(currentPage==='dashboard')renderDashboard();document.dispatchEvent(new CustomEvent('nm:patients-updated',{detail:{action:'evaluation',patientId:pid}}))}catch(e){console.warn('[Vista evaluación]',e)}
+ notify(warning||(evalId?'Evaluación actualizada.':'Evaluación guardada.'),warning?'warning':'success');return true;
+}
+window.saveEvaluation=saveEvaluation125;
+try{saveEvaluation=window.saveEvaluation}catch(_){}
+for(const name of ['savePatient','finishWizard','saveEditPatient','saveEvaluation']){
+ const old=window[name];if(typeof old!=='function')continue;
+ window[name]=async function(...args){const key=name+':'+String(args[0]||'');if(busy.has(key))return false;busy.add(key);try{await staff();if(name==='savePatient'&&['null','undefined',''].includes(String(args[0])))args[0]=null;return await old.apply(this,args)}catch(e){notify('No se pudo completar el guardado: '+(e.message||'Error'),'danger');return false}finally{busy.delete(key)}};
+}
+try{savePatient=window.savePatient;finishWizard=window.finishWizard;saveEditPatient=window.saveEditPatient;saveEvaluation=window.saveEvaluation}catch(_){}
+const diagnosticSQL=`-- NutriMachata: diagnóstico de esquema y permisos. Solo lectura.
+SELECT tablename,policyname,roles,cmd,permissive,qual,with_check FROM pg_policies WHERE schemaname='public' AND tablename IN ('usuarios','pacientes','historias_clinicas','evaluaciones','seguimiento_paciente','asignaciones_pacientes') ORDER BY tablename,policyname;
+SELECT c.relname AS tabla,c.relrowsecurity AS rls_activo,c.relforcerowsecurity AS rls_forzado FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('usuarios','pacientes','historias_clinicas','evaluaciones','seguimiento_paciente','asignaciones_pacientes');
+SELECT table_name,column_name,data_type,is_nullable,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('usuarios','pacientes','historias_clinicas','evaluaciones','seguimiento_paciente','asignaciones_pacientes') ORDER BY table_name,ordinal_position;
+SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' AND tablename IN ('usuarios','pacientes','historias_clinicas','evaluaciones','seguimiento_paciente','asignaciones_pacientes');
+SELECT p.proname,pg_get_functiondef(p.oid) AS definicion FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('nm_is_staff','nm_patient_owned');
+SELECT table_name,grantee,privilege_type FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name IN ('usuarios','pacientes','historias_clinicas','evaluaciones','seguimiento_paciente','asignaciones_pacientes') AND grantee IN ('anon','authenticated') ORDER BY table_name,grantee,privilege_type;
+`;
+window.NMClinicalDiagnostic125=async function(){
+ try{if(await staff()!=='admin')throw new Error('Solo la administración puede abrir el diagnóstico.');document.getElementById('nm125-diagnostic')?.remove();
+ const modal=document.createElement('div');modal.id='nm125-diagnostic';modal.className='modal-overlay open';modal.style.zIndex='11000';modal.innerHTML='<div class="modal" style="max-width:850px"><div class="modal-header"><h3>Diagnóstico de guardado y permisos</h3><button class="modal-close" data-close>×</button></div><div class="modal-body"><p>Comprueba la sesión y la lectura de las tablas. Esta revisión no modifica registros ni comprueba los permisos de escritura.</p><div data-results></div><p>Para revisar las políticas actuales, ejecuta estas consultas en el editor SQL de Supabase y comparte los resultados.</p><textarea readonly style="width:100%;height:200px;font:12px monospace" aria-label="Consultas de diagnóstico"></textarea></div><div class="modal-footer"><button class="btn btn-outline" data-copy>Copiar consultas SQL</button><button class="btn btn-olive" data-check>Comprobar lectura</button></div></div>';
+ document.body.appendChild(modal);modal.querySelector('textarea').value=diagnosticSQL;modal.querySelector('[data-close]').onclick=()=>modal.remove();modal.querySelector('[data-copy]').onclick=async()=>{try{await navigator.clipboard.writeText(diagnosticSQL);notify('Consultas copiadas.','success')}catch(_){modal.querySelector('textarea').select();notify('Selecciona y copia las consultas.','info')}};
+ modal.querySelector('[data-check]').onclick=async function(){this.disabled=true;const output=modal.querySelector('[data-results]');try{await ensureSupaSession();const rows=await Promise.all(['usuarios','pacientes','historias_clinicas','evaluaciones','seguimiento_paciente','asignaciones_pacientes'].map(async table=>{try{await supa(table+'?select=id&limit=1');return '<li>'+E(table)+': lectura aceptada (puede devolver cero filas por RLS).</li>'}catch(e){return '<li>'+E(table)+': '+E(e.message)+'</li>'}}));output.innerHTML='<ul>'+rows.join('')+'</ul>'}catch(e){output.textContent=e.message}finally{this.disabled=false}};
+ }catch(e){notify(e.message,'warning')}
+};
+const oldNavigate=window.navigate;
+window.navigate=function(page,...args){const r=oldNavigate.apply(this,[page,...args]);if(page==='settings')setTimeout(()=>{if(DB.currentUser?.role!=='admin'||document.getElementById('nm125-check-button'))return;const target=document.getElementById('page-content');if(!target)return;const b=document.createElement('button');b.id='nm125-check-button';b.className='btn btn-outline';b.textContent='Diagnóstico de guardado y permisos';b.onclick=window.NMClinicalDiagnostic125;target.prepend(b)},0);return r};
+try{navigate=window.navigate}catch(_){}
+window.NMClinical125={busy,diagnosticSQL};
 })();
 </script>
