@@ -2270,6 +2270,53 @@ function nmConnectionBanner(show=true,msg='Problemas de conexión con Supabase. 
     }else window.NMSupabaseStabilityV41?.hideOffline?.();
   }catch(_){}
 }
+// Asignaciones v128: resolver el perfil real antes de modificar una asignación.
+const nmAssignmentPending128 = new Set();
+async function nmSaveAssignment128(patientId, doctorId) {
+  const key = String(patientId);
+  if (nmAssignmentPending128.has(key)) throw new Error('Esta asignación ya se está guardando.');
+  nmAssignmentPending128.add(key);
+  try {
+    const session = await ensureSupaSession();
+    const email = String(session?.user?.email || '').trim().toLowerCase();
+    if (!email || !session?.user?.id) throw new Error('Inicia sesión nuevamente para asignar pacientes.');
+    const users = await supa(`usuarios?email=eq.${encodeURIComponent(email)}&select=id,email,rol,activo&limit=2`, 'GET');
+    if (!Array.isArray(users) || users.length !== 1 || !users[0].id) {
+      throw new Error('No se encontró un perfil único en usuarios para tu correo de acceso. La asignación anterior se conserva.');
+    }
+    const actor = users[0];
+    if (String(actor.rol || '').toLowerCase() !== 'admin' || actor.activo === false) {
+      throw new Error('Tu perfil debe ser un administrador activo para asignar pacientes.');
+    }
+    if (doctorId) {
+      const doctors = await supa(`usuarios?id=eq.${encodeURIComponent(doctorId)}&select=id,rol,activo&limit=1`, 'GET');
+      const doctor = doctors?.[0];
+      if (!doctor || doctor.activo === false || !['admin','doctor','doctora','nutricionista'].includes(String(doctor.rol || '').toLowerCase())) {
+        throw new Error('Selecciona un profesional activo.');
+      }
+    }
+    const filter = `paciente_id=eq.${encodeURIComponent(patientId)}&activo=eq.true`;
+    const existing = await supa(`asignaciones_pacientes?${filter}&select=id,especialista_id`, 'GET');
+    if (currentAuthUserId() !== session.user.id) throw new Error('La sesión cambió. Vuelve a iniciar sesión.');
+    if (!doctorId) {
+      if (existing?.length) await supa(`asignaciones_pacientes?${filter}`, 'PATCH', {activo:false});
+      return;
+    }
+    const payload = {paciente_id:patientId, especialista_id:doctorId, activo:true, asignado_por:actor.id};
+    // Un único PATCH cambia el responsable sin desactivar primero la fila.
+    if (existing?.length) {
+      await supa(`asignaciones_pacientes?id=eq.${encodeURIComponent(existing[0].id)}`, 'PATCH', payload);
+      if (existing.length > 1) {
+        await supa(`asignaciones_pacientes?${filter}&id=neq.${encodeURIComponent(existing[0].id)}`, 'PATCH', {activo:false});
+      }
+    } else {
+      await supa('asignaciones_pacientes', 'POST', payload);
+    }
+  } finally {
+    nmAssignmentPending128.delete(key);
+  }
+}
+
 async function supa(path, method='GET', body=null) {
   method = String(method || 'GET').toUpperCase();
   if (IS_LOCAL) {
@@ -15306,9 +15353,7 @@ window.NMV95IntegralFixes=true;
     if(!isAdmin()) return notify('Solo la administración puede asignar pacientes.','danger');
     const doctorId=document.getElementById('nm-doc-'+patientId)?.value||'';
     try{
-      const existing=await supa(`asignaciones_pacientes?paciente_id=eq.${encodeURIComponent(patientId)}&activo=eq.true&select=id`,'GET');
-      for(const row of (existing||[])) await supa(`asignaciones_pacientes?id=eq.${encodeURIComponent(row.id)}`,'PATCH',{activo:false});
-      if(doctorId) await supa('asignaciones_pacientes','POST',{paciente_id:patientId,especialista_id:doctorId,activo:true,asignado_por:DB.currentUser?.id||null});
+      await nmSaveAssignment128(patientId, doctorId);
       notify(doctorId?'Paciente asignado correctamente.':'Paciente dejado sin doctor asignado.','success');
       await renderMedicalTeamV96();
     }catch(e){console.error('[Asignación v96]',e);notify('No se pudo guardar la asignación: '+(e.message||e),'danger');}
@@ -15464,7 +15509,7 @@ window.NMV95IntegralFixes=true;
  window.toggleDoctor98=async function(id,active){try{await supa(`usuarios?id=eq.${encodeURIComponent(id)}`,'PATCH',{activo:!!active});notify(active?'Doctor activado.':'Doctor desactivado.','success');await renderTeamSettings98()}catch(e){notify('No se pudo cambiar el estado: '+(e.message||e),'danger')}};
  window.assignDoctor98=async function(patientId){
    if(!isAdmin98())return;const doctorId=document.getElementById('nm98-doc-'+patientId)?.value||'';
-   try{const existing=await supa(`asignaciones_pacientes?paciente_id=eq.${encodeURIComponent(patientId)}&activo=eq.true&select=id`,'GET');for(const row of(existing||[]))await supa(`asignaciones_pacientes?id=eq.${encodeURIComponent(row.id)}`,'PATCH',{activo:false});if(doctorId)await supa('asignaciones_pacientes','POST',{paciente_id:patientId,especialista_id:doctorId,activo:true,asignado_por:DB.currentUser?.supabaseId||DB.currentUser?.id||null});notify(doctorId?'Paciente asignado correctamente.':'Paciente dejado sin doctor asignado.','success');await renderTeamSettings98()}catch(e){console.error('[Asignar v98]',e);notify('No se pudo guardar la asignación: '+(e.message||e),'danger')}
+   try{await nmSaveAssignment128(patientId, doctorId);notify(doctorId?'Paciente asignado correctamente.':'Paciente dejado sin doctor asignado.','success');await renderTeamSettings98()}catch(e){console.error('[Asignar v98]',e);notify('No se pudo guardar la asignación: '+(e.message||e),'danger')}
  };
  // Equipo médico deja de ser una página independiente: se administra desde Configuración.
  const idx=ADMIN_NAV.findIndex(x=>x.id==='team');if(idx>=0)ADMIN_NAV.splice(idx,1);
