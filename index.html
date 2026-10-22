@@ -14996,6 +14996,8 @@ function resolveParty92(type,id){return allParties92().find(p=>p.type===type&&St
 window.NMResolveParty92=resolveParty92;
 
 async function saveExecPdf92(node,filename,orientation='portrait'){
+ // Billing uses the same exact A4 layout for preview and download; clinical reports retain their pagination.
+ if(window.NMBillingA4V121 && /RECIBO|APLICACIÓN DE SALDO|ESTADO DE CUENTA|INFORME DE DEUDAS Y SALDOS/i.test(node.querySelector('.nm92-exec-title')?.textContent||''))return window.NMBillingA4V121.save(node,filename,{orientation});
  if(typeof html2pdf!=='function')throw new Error('El generador PDF no está disponible.');
  const landscape=orientation==='landscape';
  const stage=document.createElement('div');
@@ -15838,3 +15840,78 @@ html body #sidebar .logout-btn:hover{color:#fff!important;background:rgba(255,25
 html body #sidebar img{filter:none!important}
 @media(max-width:900px){html body #sidebar.sidebar{box-shadow:18px 0 42px rgba(9,59,8,.22)!important}}
 </style>
+
+
+<script id="nm-billing-a4-v121">
+(function(){
+'use strict';
+const safe=v=>String(v||'Documento').replace(/[^\w-]+/g,'_');
+const css=`
+.nm121-document.nm121-document{margin:0!important;padding:0!important;max-width:none!important;min-height:0!important;height:auto!important;background:#fff!important;color:#263126!important;font-family:Arial,Helvetica,sans-serif!important;line-height:1.35!important;overflow:visible!important;box-sizing:border-box!important}
+.nm121-document *{box-sizing:border-box!important;min-width:0;box-shadow:none!important;animation:none!important;transition:none!important}
+.nm121-document .v39-head,.nm121-document .v39-party,.nm121-document .v39-bottom{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:7mm!important}
+.nm121-document .v39-title{text-align:right!important}
+.nm121-document .v39-topline{margin-bottom:4mm!important}
+.nm121-document .v39-brand img{max-height:15mm!important;max-width:55mm!important;object-fit:contain!important}
+.nm121-document .v39-party{margin:4mm 0!important;padding:3mm!important}
+.nm121-document table{width:100%!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse!important}
+.nm121-document th,.nm121-document td{padding:2mm!important;font-size:10px!important;vertical-align:top!important;overflow-wrap:anywhere!important;white-space:normal!important}
+.nm121-document .v39-summary{width:43%!important;margin:4mm 0 3mm auto!important}
+.nm121-document .v39-summary>div{padding:1mm 2mm!important;font-size:11px!important}
+.nm121-document .v39-summary .total{font-size:16px!important;padding:2mm!important}
+.nm121-document .v39-bottom{padding:3mm!important;margin-top:2mm!important}
+.nm121-document .v39-bottom p{white-space:pre-wrap!important;overflow-wrap:anywhere!important}
+.nm121-document .v39-footer{margin-top:3mm!important}
+.nm121-document .v39-footline{height:2mm!important;margin-top:2mm!important}
+.nm121-document .nm92-page{width:100%!important;min-height:0!important;height:auto!important;padding:0!important;margin:0!important;break-before:auto!important;break-after:auto!important}
+.nm121-document .nm92-pdf-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.nm121-document .nm92-exec-head{gap:6mm!important}
+.nm121-document .nm92-exec-title{max-width:48%!important}
+.nm121-document .nm92-exec-title b{font-size:18px!important}
+.nm121-document .nm92-patient-band{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.nm121-document .p69-title strong{font-size:18px!important}
+.nm121-document .p69-total{max-width:48%!important;width:85mm!important}
+.nm121-document .num,.nm121-document .p69-total b,.nm121-document .v39-summary b{overflow-wrap:normal!important;white-space:nowrap!important}
+`;
+async function build(node,filename,options={}){
+ if(typeof html2pdf!=='function')throw new Error('El generador PDF no está disponible.');
+ const land=options.orientation==='landscape',width=land?297:210,height=land?210:297,margin=10,usableW=width-20,usableH=height-28;
+ const host=document.createElement('div');host.style.cssText='position:absolute;left:0;top:0;z-index:-2147483647;pointer-events:none;background:white;';host.style.width=usableW+'mm';
+ const doc=node.cloneNode(true);doc.classList.remove('nm-pdf64');doc.classList.add('nm121-document');doc.style.setProperty('width',usableW+'mm','important');doc.style.setProperty('max-width','none','important');
+ host.appendChild(doc);const style=document.createElement('style');style.textContent=css;doc.appendChild(style);document.body.appendChild(host);
+ try{
+  if(document.fonts?.ready)await document.fonts.ready;
+  await Promise.all([...doc.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});setTimeout(resolve,4000)})));
+  // Capture continuous content with no artificial page-break gaps. Fit once into A4.
+  const worker=html2pdf().set({margin:0,filename,html2canvas:{scale:2,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0,windowWidth:1200},jsPDF:{unit:'mm',format:'a4',orientation:land?'landscape':'portrait',compress:true},pagebreak:{mode:[]}}).from(doc).toCanvas();
+  const canvas=await worker.get('canvas');if(!canvas.width||!canvas.height)throw new Error('El documento está vacío.');
+  await worker.toPdf();const generated=await worker.get('pdf'),PDF=generated.constructor,pdf=new PDF({unit:'mm',format:'a4',orientation:land?'landscape':'portrait',compress:true});
+  const ratio=Math.min(usableW/canvas.width,usableH/canvas.height),w=canvas.width*ratio,h=canvas.height*ratio;
+  pdf.addImage(canvas.toDataURL('image/jpeg',.98),'JPEG',margin+(usableW-w)/2,margin,w,h,undefined,'FAST');
+  pdf.setDrawColor(218,226,212);pdf.line(margin,height-13,width-margin,height-13);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(105);
+  pdf.text('NutriMachata | '+new Date().toLocaleDateString('es-DO'),margin,height-8);pdf.text('Página 1 de 1',width-margin,height-8,{align:'right'});
+  pdf.setProperties({title:String(filename||'Facturación').replace(/\.pdf$/i,''),subject:'Documento de facturación A4',creator:'NutriMachata'});
+  return pdf;
+ }finally{host.remove()}
+}
+async function save(node,filename,options={}){const pdf=await build(node,filename,options);pdf.save(filename||'Documento.pdf');return true}
+async function preview(node,filename,options={}){
+ const pdf=await build(node,filename,options),url=URL.createObjectURL(pdf.output('blob'));
+ document.getElementById('nm121-pdf-preview')?.dispatchEvent(new Event('nm121-close'));
+ const overlay=document.createElement('div');overlay.id='nm121-pdf-preview';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#edf0eb;display:flex;flex-direction:column';
+ const bar=document.createElement('div');bar.style.cssText='padding:12px 18px;background:white;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #dce3d7';
+ const title=document.createElement('strong');title.textContent='Vista previa · A4 · 1 página';title.style.marginRight='auto';bar.appendChild(title);
+ const close=document.createElement('button');close.className='btn btn-outline';close.textContent='Cerrar';
+ const download=document.createElement('button');download.className='btn btn-olive';download.textContent='Descargar PDF';download.onclick=()=>pdf.save(filename||'Documento.pdf');
+ const cleanup=()=>{URL.revokeObjectURL(url);overlay.remove()};close.onclick=cleanup;overlay.addEventListener('nm121-close',cleanup,{once:true});bar.append(close,download);
+ const frame=document.createElement('iframe');frame.title='Vista previa del PDF de facturación A4';frame.src=url;frame.style.cssText='width:100%;flex:1;border:0;min-height:0';overlay.append(bar,frame);document.body.appendChild(overlay);return true;
+}
+const isBilling=node=>node?.matches?.('.nm-billing-pdf69,.invoice-print-doc')||node?.querySelector?.('.nm-billing-pdf69,.invoice-print-doc');
+const oldSave=window.NMProPDF64?.save,oldPreview=window.NMProPDF64?.preview;
+if(window.NMProPDF64){window.NMProPDF64.save=(n,f,o={})=>isBilling(n)?save(n,f,o):oldSave(n,f,o);window.NMProPDF64.preview=(n,f,o={})=>isBilling(n)?preview(n,f,o):oldPreview(n,f,o)}
+function invoice(id){const b=getBillingData(),x=b.invoices.find(i=>String(i.id)===String(id));if(!x)throw new Error('La factura ya no existe.');const wrap=document.createElement('div');wrap.innerHTML=nmInvoiceDocumentHTML(x,b);return{node:wrap.firstElementChild,filename:safe(x.number)+'_'+safe(x.patient)+'.pdf'}}
+window.downloadInvoicePDF=async function(id){try{const x=invoice(id);await save(x.node,x.filename,{orientation:'landscape'});window.notify?.('Factura A4 descargada en una página.','success')}catch(e){console.error(e);window.notify?.('No se pudo generar la factura: '+e.message,'danger')}};
+window.previewInvoicePDF=async function(id){try{const x=invoice(id);return await preview(x.node,x.filename,{orientation:'landscape'})}catch(e){console.error(e);window.notify?.('No se pudo preparar el PDF: '+e.message,'danger')}};
+window.NMBillingA4V121={build,save,preview};
+})();
+</script>
