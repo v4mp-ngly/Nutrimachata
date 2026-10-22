@@ -15885,7 +15885,15 @@ async function build(node,filename,options={}){
   // Capture continuous content with no artificial page-break gaps. Fit once into A4.
   const worker=html2pdf().set({margin:0,filename,html2canvas:{scale:2,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0,windowWidth:1200},jsPDF:{unit:'mm',format:'a4',orientation:land?'landscape':'portrait',compress:true},pagebreak:{mode:[]}}).from(doc).toCanvas();
   const canvas=await worker.get('canvas');if(!canvas.width||!canvas.height)throw new Error('El documento está vacío.');
-  await worker.toPdf();const generated=await worker.get('pdf'),PDF=generated.constructor,pdf=new PDF({unit:'mm',format:'a4',orientation:land?'landscape':'portrait',compress:true});
+  await worker.toPdf();
+  // jsPDF returns an API object whose constructor is Object, not the jsPDF factory.
+  // Reuse the initialized API, append a clean A4 page, then discard the raster pages.
+  const pdf=await worker.get('pdf');
+  if(typeof pdf?.addImage!=='function'||typeof pdf?.addPage!=='function'||typeof pdf?.deletePage!=='function')throw new Error('No se pudo inicializar el generador PDF.');
+  const previousPages=pdf.internal.getNumberOfPages();
+  pdf.addPage([width,height],land?'landscape':'portrait');
+  for(let p=0;p<previousPages;p++)pdf.deletePage(1);
+  pdf.setPage(1);
   const ratio=Math.min(usableW/canvas.width,usableH/canvas.height),w=canvas.width*ratio,h=canvas.height*ratio;
   pdf.addImage(canvas.toDataURL('image/jpeg',.98),'JPEG',margin+(usableW-w)/2,margin,w,h,undefined,'FAST');
   pdf.setDrawColor(218,226,212);pdf.line(margin,height-13,width-margin,height-13);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(105);
