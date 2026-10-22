@@ -4224,6 +4224,8 @@ function deletePatient(id) {
 }
 
 function openSimplePatientModal(p = null) {
+  const form=document.getElementById('modal-patient');if(form){delete form.dataset.nmCreateId;delete form.dataset.nmSavedPatientId;}
+  document.getElementById('nm127-patient-message')?.remove();
   const isEdit = !!p;
   document.getElementById('patient-modal-title').textContent = isEdit ? 'Editar Paciente' : 'Nuevo Paciente';
   document.getElementById('patient-modal-body').innerHTML = `
@@ -4292,74 +4294,54 @@ function calcIMCModal() {
 }
 
 let NM_PATIENT_SAVE_BUSY = false;
+let NM_PATIENT_WRITE_REVISION127 = 0;
 async function savePatient(id) {
-  if (NM_PATIENT_SAVE_BUSY) return;
-  // v87: supa() valida/renueva la sesión al escribir; evitamos un preflight duplicado que podía bloquear el alta.
-  const saveBtn = document.querySelector('#modal-patient .btn-olive');
-  NM_PATIENT_SAVE_BUSY = true;
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.nmOldText = saveBtn.textContent; saveBtn.textContent = 'Guardando…'; }
-  const nombre = document.getElementById('pm-nombre').value.trim();
-  const dob    = document.getElementById('pm-dob')?.value || '';
-  let edad = parseInt(document.getElementById('pm-edad').value);
-  if (!edad && dob) edad = calcAgeFromDobStr(dob);
-  if (!nombre || !edad) { notify('Nombre y edad son requeridos', 'danger'); NM_PATIENT_SAVE_BUSY=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';} return; }
-  const peso  = parseFloat(document.getElementById('pm-peso').value) || 0;
-  const talla = parseTalla(document.getElementById('pm-talla-cm')?.value || document.getElementById('pm-talla')?.value) || 0;
-  const cedula    = document.getElementById('pm-cedula')?.value.trim()     || '';
-  const direccion = document.getElementById('pm-direccion')?.value.trim()  || '';
-  const objetivo  = document.getElementById('pm-objetivo')?.value.trim()   || '';
-  const imc   = (peso > 0 && talla > 0) ? parseFloat((peso / (talla * talla)).toFixed(1)) : null;
-  const sbData = {
-    nombre, edad, cedula, fecha_nacimiento: dob || null, direccion, objetivo,
-    sexo:     document.getElementById('pm-sexo').value,
-    telefono: document.getElementById('pm-tel').value,
-    email:    document.getElementById('pm-email').value,
-    peso, talla, imc,
-    presion:  document.getElementById('pm-presion').value || '—',
-    estado:   Number.isFinite(imc) ? getImcCategory(imc) : '',
-    color:    getPatientColor(nombre),
-    initials: nombre.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2),
-    activo:   true,
-    updated_at: new Date().toISOString(),
-  };
-  try {
-    if (id) {
-      await SB.updatePaciente(id, sbData);
-      const p = DB.patients.find(x => x.id == id);
-      if (p) Object.assign(p, { ...sbData, usuario: sbData.email });
-      notify('Paciente actualizado', 'success');
-    } else {
-      const created = await SB.createPaciente(sbData);
-      if (!created?.id) throw new Error('Supabase no confirmó la creación del paciente.');
-      if (created && created.id) {
-        const newP = mapPaciente(created, [], [], null);
-        // Supabase devuelve el registro real. Lo incorporamos de inmediato al estado
-        // de la aplicación para que NO sea necesario recargar ni abrir otra pestaña.
-        DB.patients = [newP, ...(DB.patients || []).filter(x => String(x.id) !== String(newP.id))];
-        if ((document.getElementById('page-title')?.textContent || '').trim() === 'Pacientes') {
-          renderPatients();
-        }
-        document.dispatchEvent(new CustomEvent('nm:patients-updated', {detail:{action:'created', patient:newP}}));
-        // v80: el alta administrativa SOLO guarda el expediente clínico.
-        // No usamos signUp aquí: Supabase signUp reemplaza la sesión actual por la
-        // del paciente y deja al administrador sin sesión para el refresh siguiente.
-        // El acceso del portal del paciente se gestiona por separado.
-        notify('Paciente registrado correctamente', 'success');
-      }
-    }
-  } catch(e) {
-    console.error(e);
-    notify('No se pudo guardar el paciente en Supabase: ' + (e.message || 'error desconocido'), 'danger');
-    NM_PATIENT_SAVE_BUSY=false;
-    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';}
-    return;
-  }
-  // Confirma el directorio contra Supabase sin obligar a recargar la página.
-  await refreshPatientsFromSupabase({render:false});
-  NM_PATIENT_SAVE_BUSY=false;
-  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=saveBtn.dataset.nmOldText||'Guardar';}
-  closeModal('modal-patient');
-  renderPatients();
+  if(NM_PATIENT_SAVE_BUSY)return false;
+  const modal=document.getElementById('modal-patient'),button=modal?.querySelector('.btn-olive');
+  if(!modal)return false;
+  const get=id=>document.getElementById(id)?.value??'';
+  const originalText=button?.textContent||'Guardar';
+  let message=modal.querySelector('#nm127-patient-message');
+  if(!message){message=document.createElement('div');message.id='nm127-patient-message';message.setAttribute('role','status');message.style.cssText='margin:12px 0;padding:12px;border-radius:8px;white-space:pre-wrap;font-size:13px';(document.getElementById('patient-modal-body')||modal).appendChild(message)}
+  const show=(text,error=false)=>{message.textContent=text;message.style.background=error?'#fff1ef':'#f0f6eb';message.style.color=error?'#8c302a':'#355e20';};
+  NM_PATIENT_SAVE_BUSY=true;if(button){button.disabled=true;button.textContent='Guardando…'}
+  let confirmed=null;
+  try{
+    await ensureSupaSession();
+    const role=await nmResolveRole125(SUPA_AUTH_SESSION.user);
+    const editId=(id&& !['null','undefined'].includes(String(id)))?id:modal.dataset.nmSavedPatientId||null;
+    if(!editId&&role!=='admin')throw new Error('La creación de pacientes corresponde a la administración. La doctora puede trabajar con sus pacientes asignados.');
+    if(!['admin','doctor'].includes(role))throw new Error('Esta cuenta no tiene permiso para registrar pacientes.');
+    const nombre=get('pm-nombre').trim(),dob=get('pm-dob');
+    const rawAge=get('pm-edad');let edad=rawAge.trim()===''?calcAgeFromDobStr(dob):Number(rawAge);
+    if(!nombre)throw new Error('Completa el nombre del paciente.');
+    if(!Number.isInteger(edad)||edad<0||edad>120)throw new Error('Completa una edad válida o la fecha de nacimiento.');
+    const peso=Number(get('pm-peso')||0),talla=parseTalla(get('pm-talla-cm')||get('pm-talla'))||0;
+    if(!Number.isFinite(peso)||peso<0||!Number.isFinite(talla)||talla<0)throw new Error('Revisa el peso y la talla.');
+    const imc=peso>0&&talla>0?Number((peso/(talla*talla)).toFixed(1)):null;
+    const data={nombre,edad,cedula:get('pm-cedula').trim(),fecha_nacimiento:dob||null,direccion:get('pm-direccion').trim(),objetivo:get('pm-objetivo').trim(),sexo:get('pm-sexo'),telefono:get('pm-tel').trim(),email:get('pm-email').trim().toLowerCase(),peso,talla,imc,presion:get('pm-presion')||'—',estado:Number.isFinite(imc)?getImcCategory(imc):'',color:getPatientColor(nombre),initials:nombre.split(/\s+/).map(n=>n[0]).join('').toUpperCase().slice(0,2),activo:true,updated_at:new Date().toISOString()};
+    show('Enviando el registro a Supabase…');
+    if(editId){const rows=await SB.updatePaciente(editId,data);confirmed=Array.isArray(rows)?rows[0]:rows;}
+    else confirmed=await SB.createPaciente(data);
+    if(!confirmed?.id)throw new Error('Supabase no confirmó el registro. Conservamos el formulario para que puedas revisar el error.');
+    modal.dataset.nmSavedPatientId=String(confirmed.id);
+    NM_PATIENT_WRITE_REVISION127++;
+    show('Supabase confirmó el registro. Verificando su lectura…');
+    // Verify the exact UUID, without racing a full-directory refresh started before the INSERT.
+    const verified=await SB.getPaciente(confirmed.id);
+    if(!verified?.id)throw new Error('El registro fue creado, pero esta sesión no puede volver a leerlo. Revisa el permiso SELECT de pacientes.');
+    const old=(DB.patients||[]).find(p=>String(p.id)===String(verified.id));
+    const mapped=mapPaciente(verified,old?.evaluaciones||[],[],null);
+    if(old){mapped.evaluaciones=old.evaluaciones||[];mapped.dietas=old.dietas||[];mapped.historiaClinica=old.historiaClinica||{};mapped.citas=old.citas||[];if('portalAuth' in old)mapped.portalAuth=old.portalAuth;}
+    DB.patients=[mapped,...(DB.patients||[]).filter(p=>String(p.id)!==String(mapped.id))];
+    closeModal('modal-patient');
+    try{renderPatients();document.dispatchEvent(new CustomEvent('nm:patients-updated',{detail:{action:editId?'updated':'created',patient:mapped}}))}catch(e){console.warn('[Vista de pacientes]',e)}
+    notify(editId?'Paciente actualizado y verificado en Supabase.':'Paciente registrado y verificado en Supabase.','success');return true;
+  }catch(e){
+    const detail=String(e.message||'Error desconocido');
+    const text=confirmed?.id?'Supabase confirmó el registro, pero no se completó la verificación. No crees otro paciente; este formulario conserva su identificador.\n'+detail:'No se pudo guardar el paciente.\n'+detail;
+    show(text,true);notify(text,confirmed?.id?'warning':'danger');console.error('[Guardado paciente v127]',e);return false;
+  }finally{NM_PATIENT_SAVE_BUSY=false;if(button){button.disabled=false;button.textContent=originalText}}
 }
 
 
@@ -4369,10 +4351,12 @@ let NM_PATIENT_REFRESH_PROMISE = null;
 async function refreshPatientsFromSupabase(options={}) {
   try { await ensureSupaSession(); } catch(_) { return DB.patients || []; }
   const nm125RefreshOwner=currentAuthUserId();
+  const nm127RefreshRevision=NM_PATIENT_WRITE_REVISION127;
   if (NM_PATIENT_REFRESH_PROMISE) return NM_PATIENT_REFRESH_PROMISE;
   NM_PATIENT_REFRESH_PROMISE = (async()=>{
     try {
       const rows = await SB.getPacientes();
+      if(nm127RefreshRevision!==NM_PATIENT_WRITE_REVISION127)return DB.patients||[];
       if(!nm125RefreshOwner||nm125RefreshOwner!==currentAuthUserId())return DB.patients||[];
       if (!Array.isArray(rows)) throw new Error('Respuesta de pacientes inválida.');
       const current = Array.isArray(DB.patients) ? DB.patients : [];
@@ -11542,6 +11526,7 @@ function getPatientColor(name) {
 function openModal(id) {
   const modal=document.getElementById(id);
   if(!modal){ console.warn('[NutriMachata] Modal inexistente:',id); return false; }
+  if(id==='modal-evaluation'&&!modal.classList.contains('open'))delete modal.dataset.nmCreateId;
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
   return true;
@@ -16063,7 +16048,7 @@ window.saveEvaluation=saveEvaluation125;
 try{saveEvaluation=window.saveEvaluation}catch(_){}
 for(const name of ['savePatient','finishWizard','saveEditPatient','saveEvaluation']){
  const old=window[name];if(typeof old!=='function')continue;
- window[name]=async function(...args){const key=name+':'+String(args[0]||'');if(busy.has(key))return false;busy.add(key);try{await staff();if(name==='savePatient'&&['null','undefined',''].includes(String(args[0])))args[0]=null;return await old.apply(this,args)}catch(e){notify('No se pudo completar el guardado: '+(e.message||'Error'),'danger');return false}finally{busy.delete(key)}};
+ window[name]=async function(...args){const key=name+':'+String(args[0]||'');if(busy.has(key))return false;busy.add(key);try{if(name!=='savePatient')await staff();if(name==='savePatient'&&['null','undefined',''].includes(String(args[0])))args[0]=null;return await old.apply(this,args)}catch(e){notify('No se pudo completar el guardado: '+(e.message||'Error'),'danger');return false}finally{busy.delete(key)}};
 }
 try{savePatient=window.savePatient;finishWizard=window.finishWizard;saveEditPatient=window.saveEditPatient;saveEvaluation=window.saveEvaluation}catch(_){}
 const diagnosticSQL=`-- NutriMachata: diagnóstico de esquema y permisos. Solo lectura.
