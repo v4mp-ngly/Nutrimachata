@@ -14996,6 +14996,7 @@ function resolveParty92(type,id){return allParties92().find(p=>p.type===type&&St
 window.NMResolveParty92=resolveParty92;
 
 async function saveExecPdf92(node,filename,orientation='portrait'){
+ if(window.NMHistoryPDF124 && /^Informe_Ejecutivo_HC_/i.test(String(filename||'')))return window.NMHistoryPDF124.save(node,filename);
  // Billing uses the same exact A4 layout for preview and download; clinical reports retain their pagination.
  if(window.NMBillingA4V121 && /RECIBO|APLICACIÓN DE SALDO|ESTADO DE CUENTA|INFORME DE DEUDAS Y SALDOS/i.test(node.querySelector('.nm92-exec-title')?.textContent||''))return window.NMBillingA4V121.save(node,filename,{orientation});
  if(typeof html2pdf!=='function')throw new Error('El generador PDF no está disponible.');
@@ -15968,6 +15969,57 @@ async function build(data){
  pdf.setProperties({title:clean(data.receiptNumber)+' · '+clean(x.number),subject:'Recibo de pago A4',creator:'NutriMachata'});return pdf;
 }
 async function save(data){const pdf=await build(data);const name=(clean(data.receiptNumber)||'Recibo')+'_'+(clean(data.invoice?.number)||'Factura');pdf.save(name.replace(/[^a-zA-Z0-9_-]/g,'_')+'.pdf');return true}
-window.NMReceiptA4V123={build,save};
+window.NMReceiptA4V123={build,save,logo:receiptLogo};
+})();
+</script>
+
+<script id="nm-history-pdf-v124">
+(function(){
+'use strict';
+const clean=v=>String(v??'').replace(/[\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim();
+async function build(root){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
+ const worker=html2pdf().set({margin:0,canvas,jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true}}).toPdf();
+ const pdf=await worker.get('pdf');if(typeof pdf?.text!=='function')throw new Error('Generador PDF no disponible.');
+ const old=pdf.internal.getNumberOfPages();pdf.addPage('a4','portrait');for(let i=0;i<old;i++)pdf.deletePage(1);pdf.setPage(1);
+ const green=[49,86,38],ink=[38,49,38],gray=[105,115,102],left=14,right=196,bottom=274,width=182;
+ const patient=clean(root.querySelector('.nm92-patient-band b')?.textContent)||'Paciente';
+ const src=root.querySelector('.nm92-exec-logo')?.getAttribute('src'),logo=await window.NMReceiptA4V123?.logo?.(src);
+ let y=0,pageTitle='',sectionTitle='',pageStarted=false;
+ function text(value,x,top,size=9,bold=false,color=ink,align='left'){pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(...color);pdf.text(clean(value),x,top,{align})}
+ function lines(value,w,size=9,bold=false){pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);return pdf.splitTextToSize(clean(value)||'No informado',w)}
+ function rule(at){pdf.setDrawColor(221,229,216);pdf.setLineWidth(.25);pdf.line(left,at,right,at)}
+ function newPage(title=pageTitle,continued=false){if(pageStarted)pdf.addPage('a4','portrait');pageStarted=true;pageTitle=title;
+  if(logo){const w=Math.min(43,logo.width/logo.height*15),h=w*logo.height/logo.width;pdf.addImage(logo.data,'PNG',left,13,w,h)}else text('NutriMachata',left,22,17,true,green);
+  const headings=lines(title,126,13,true);headings.forEach((s,i)=>text(s,right,19+i*5.3,13,true,green,'right'));
+  const h=Math.max(29,20+headings.length*5.3);text('Dra. María Alejandra Chalas · Nutrición clínica',left,h+4,7,false,gray);rule(h+8);y=h+15;
+  const names=lines(patient+(continued?' · Continuación':''),width,9,true);for(const s of names){text(s,left,y,9,true);y+=4}y+=5;
+ }
+ function ensure(h){if(y+h>bottom)newPage(pageTitle,true)}
+ function heading(title){sectionTitle=clean(title);ensure(17);text(sectionTitle.toUpperCase(),left,y,10,true,green);y+=3;rule(y);y+=6}
+ function paragraph(value,size=9,bold=false){const ls=lines(value,width-6,size,bold);for(const s of ls){ensure(5);text(s,left+3,y,size,bold);y+=4.4}y+=3}
+ function cardData(el){return{label:clean(el.querySelector('small,.nm92-pdf-label')?.textContent),value:clean(el.querySelector('b')?.textContent)||'No informado',detail:el.matches('.nm92-pdf-kpi')?clean(el.querySelector('span')?.textContent):''}}
+ function cards(elements,columns=2){const values=elements.map(cardData);for(let i=0;i<values.length;i+=columns){const pair=values.slice(i,i+columns),cw=(width-(columns-1)*4)/columns,measured=pair.map(c=>({c,label:lines(c.label,cw-6,7.5,true),value:lines(c.value+(c.detail?' · '+c.detail:''),cw-6,9.5)}));const height=Math.max(...measured.map(v=>v.label.length*3.6+v.value.length*4.4+5));
+   if(height>210){for(const {c} of measured){ensure(14);text(c.label,left+3,y,8,true,gray);y+=5;paragraph(c.value+(c.detail?' · '+c.detail:''),9.5)}continue}
+   ensure(height+3);for(let col=0;col<measured.length;col++){const {label,value}=measured[col],x=left+col*(cw+4);pdf.setFillColor(248,250,246);pdf.setDrawColor(224,231,220);pdf.roundedRect(x,y-3,cw,height,1.5,1.5,'FD');let at=y+1;for(const s of label){text(s,x+3,at,7.5,true,gray);at+=3.6}at+=1;for(const s of value){text(s,x+3,at,9.5,false);at+=4.4}}y+=height+2;
+ }}
+ function table(table){const rowNodes=[...table.querySelectorAll('tr')];if(!rowNodes.length)return;let headers=[...table.querySelectorAll('thead th')].map(c=>clean(c.textContent));const n=headers.length||Math.max(...rowNodes.map(r=>r.children.length));let widths=({7:[19,15,14,24,15,17,78],6:[20,32,32,28,32,38],5:[22,38,25,24,73],2:[150,32]})[n]||Array(n).fill(width/n);let rows=rowNodes.filter(r=>!r.closest('thead')).map(r=>[...r.children].map(c=>({text:clean(c.textContent),span:Number(c.colSpan||1)})));
+  const drawHeader=()=>{if(!headers.length)return;const hs=headers.map((h,i)=>lines(h,widths[i]-4,7.5,true)),h=Math.max(...hs.map(a=>a.length))*3.7+5;ensure(h+7);let x=left;pdf.setFillColor(...green);pdf.rect(left,y-3,width,h,'F');hs.forEach((arr,i)=>{arr.forEach((s,j)=>text(s,x+2,y+1+j*3.7,7.5,true,[255,255,255]));x+=widths[i]});y+=h};drawHeader();
+  for(const cells of rows){const spanning=cells.length===1&&cells[0].span>1,ws=spanning?[width]:widths;const vals=cells.map((c,i)=>lines(c.text,ws[i]-4,8));let offset=0,total=Math.max(...vals.map(v=>v.length));while(offset<total){if(y+9>bottom){newPage(pageTitle,true);drawHeader()}let count=Math.min(total-offset,Math.floor((bottom-y-4)/3.9));if(count<1){newPage(pageTitle,true);drawHeader();continue}const h=count*3.9+4;let x=left;vals.forEach((ls,i)=>{ls.slice(offset,offset+count).forEach((s,j)=>text(s,x+2,y+1+j*3.9,8));x+=ws[i]});y+=h;rule(y-2);offset+=count;if(offset<total){newPage(pageTitle,true);drawHeader()}}}y+=5;
+ }
+ function render(el){if(el.matches('.nm92-exec-head,style,script'))return;
+  if(el.matches('.nm92-patient-band,.nm92-pdf-grid,.nm92-pdf-kpis,.nm92-pdf-alerts')){cards([...el.children],el.matches('.nm92-patient-band')?4:el.matches('.nm92-pdf-kpis')?3:2);return}
+  if(el.matches('.nm92-pdf-card,.nm92-pdf-alert,.nm92-pdf-kpi')){cards([el]);return}
+  if(el.tagName==='TABLE'){table(el);return}
+  if(el.tagName==='H3'){heading(el.textContent);return}
+  if(el.children.length){for(const c of el.children)render(c)}else if(clean(el.textContent)){paragraph(el.textContent)}
+ }
+ const sections=[...root.querySelectorAll('section.nm92-page')];if(!sections.length)throw new Error('No se encontraron las secciones de la historia clínica.');
+ for(const section of sections){newPage(clean(section.querySelector('.nm92-exec-title b')?.textContent)||'HISTORIA CLÍNICA');for(const child of section.children)render(child)}
+ const pages=pdf.internal.getNumberOfPages();for(let p=1;p<=pages;p++){pdf.setPage(p);rule(281);const who=lines(patient,142,7)[0];text(who,left,286,7,false,gray);text('Confidencial · Página '+p+' de '+pages,right,286,7,false,gray,'right')}
+ pdf.setProperties({title:'Historia clínica · '+patient,subject:'Expediente clínico completo',creator:'NutriMachata'});return pdf;
+}
+async function save(root,filename){const pdf=await build(root);pdf.save(filename||'Historia_Clinica.pdf');return true}
+window.NMHistoryPDF124={build,save};
 })();
 </script>
