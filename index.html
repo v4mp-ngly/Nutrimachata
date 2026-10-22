@@ -15163,6 +15163,7 @@ try{saveInvoicePayment=window.saveInvoicePayment}catch(_){ }
 
 window.downloadPaymentReceiptV20=async function(invoiceId,paymentId){
  const x=(getBillingData?.().invoices||[]).find(i=>String(i.id)===String(invoiceId)),p=x?.paymentHistory?.find(q=>String(q.id)===String(paymentId));if(!x||!p)return notify?.('No se encontró el pago.','warning');await Credit92.load();const party=invoiceParty92(x),available=party.id?Credit92.balance(party.type,party.id):0,h=x.paymentHistory||[],idx=h.findIndex(q=>String(q.id)===String(paymentId)),before=h.slice(0,Math.max(0,idx)).reduce((n,q)=>n+N92(q.amount),0),applied=N92(p.applied,p.amount),received=N92(p.received,p.amount),creditGen=N92(p.creditGenerated),creditUsed=N92(p.creditUsed),remaining=Math.max(0,N92(x.total)-before-applied),no=window.NMReceiptNumberConfigured?window.NMReceiptNumberConfigured(p,x):(window.NMReceiptNumber?.(p)||'RECIBO'),node=document.createElement('div');
+ if(window.NMReceiptA4V123){try{return await window.NMReceiptA4V123.save({invoice:x,payment:p,receiptNumber:no,before,applied,received,creditGenerated:creditGen,creditUsed,remaining,available,logo:logo92()})}catch(e){console.error('[Recibo A4 v123]',e);notify?.('No se pudo generar el recibo: '+e.message,'danger');return}}
  node.innerHTML=`<div class="nm92-exec-document"><section class="nm92-page"><div class="nm92-exec-head"><div>${logo92()?`<img class="nm92-exec-logo" src="${E92(logo92())}">`:''}</div><div class="nm92-exec-title"><b>${received>.009?'RECIBO DE PAGO':'APLICACIÓN DE SALDO'}</b><span>${E92(no)}</span><span>${E92(p.datetime||p.date||'')}</span></div></div><div class="nm92-patient-band"><div><small>Paciente / cliente</small><b>${E92(x.patient||'—')}</b></div><div><small>Factura</small><b>${E92(x.number||'—')}</b></div><div><small>Método</small><b>${E92(p.method||'Otro')}</b></div><div><small>Referencia</small><b>${E92(p.reference||'—')}</b></div></div><div class="nm92-pdf-kpis"><div class="nm92-pdf-kpi"><small>RECIBIDO AHORA</small><b>${M92(received)}</b><span>Entrada nueva</span></div><div class="nm92-pdf-kpi"><small>APLICADO A FACTURA</small><b>${M92(applied)}</b><span>Reduce la deuda</span></div><div class="nm92-pdf-kpi"><small>SALDO USADO</small><b>${M92(creditUsed)}</b><span>Crédito previo</span></div><div class="nm92-pdf-kpi"><small>NUEVO SALDO A FAVOR</small><b>${M92(creditGen)}</b><span>Sobrepago</span></div><div class="nm92-pdf-kpi"><small>PENDIENTE FACTURA</small><b>${M92(remaining)}</b><span>Después del pago</span></div><div class="nm92-pdf-kpi"><small>SALDO DISPONIBLE</small><b>${M92(available)}</b><span>Para próximas facturas</span></div></div><div class="nm92-pdf-section" style="margin-top:5mm"><h3>Detalle del comprobante</h3><table class="nm92-pdf-table"><tbody><tr><td>Total de la factura</td><td style="text-align:right"><b>${M92(x.total)}</b></td></tr><tr><td>Pagado antes de esta operación</td><td style="text-align:right"><b>${M92(before)}</b></td></tr><tr><td>Aplicado en esta operación</td><td style="text-align:right"><b>${M92(applied)}</b></td></tr><tr><td>Saldo pendiente</td><td style="text-align:right"><b>${M92(remaining)}</b></td></tr></tbody></table></div><div class="nm92-pdf-alert"><small>Nota</small><b>Los saldos a favor quedan vinculados al paciente o cliente y pueden aplicarse posteriormente a otra factura.</b></div></section></div>`;
  try{await saveExecPdf92(node.firstElementChild,`${String(no).replace(/[^a-zA-Z0-9_-]/g,'_')}_${String(x.number||'Factura').replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`,'portrait')}catch(e){console.error(e);notify?.('No se pudo generar el recibo PDF.','danger')}
 };
@@ -15921,5 +15922,52 @@ function invoice(id){const b=getBillingData(),x=b.invoices.find(i=>String(i.id)=
 window.downloadInvoicePDF=async function(id){try{const x=invoice(id);await save(x.node,x.filename,{orientation:'landscape'});window.notify?.('Factura A4 descargada en una página.','success')}catch(e){console.error(e);window.notify?.('No se pudo generar la factura: '+e.message,'danger')}};
 window.previewInvoicePDF=async function(id){try{const x=invoice(id);return await preview(x.node,x.filename,{orientation:'landscape'})}catch(e){console.error(e);window.notify?.('No se pudo preparar el PDF: '+e.message,'danger')}};
 window.NMBillingA4V121={build,save,preview};
+})();
+</script>
+
+<script id="nm-receipt-a4-v123">
+(function(){
+'use strict';
+const clean=v=>String(v??'').replace(/[\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim();
+const money=v=>'RD$ '+Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+async function receiptLogo(src){
+ if(!src)return null;
+ try{return await new Promise(resolve=>{const img=new Image(),timer=setTimeout(()=>resolve(null),4000);img.onload=()=>{clearTimeout(timer);try{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0);const a=g.getImageData(0,0,c.width,c.height).data;let x0=c.width,y0=c.height,x1=0,y1=0;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){const k=(y*c.width+x)*4;if(a[k+3]>30&&Math.min(a[k],a[k+1],a[k+2])<235){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)}}if(x1<=x0||y1<=y0)return resolve(null);const out=document.createElement('canvas');out.width=x1-x0+1;out.height=y1-y0+1;out.getContext('2d').drawImage(c,x0,y0,out.width,out.height,0,0,out.width,out.height);resolve({data:out.toDataURL('image/png'),width:out.width,height:out.height})}catch(_){resolve(null)}};img.onerror=()=>{clearTimeout(timer);resolve(null)};img.src=src})}catch(_){return null}
+}
+async function build(data){
+ // Obtain jsPDF's initialized API from the bundled generator, without constructor guessing.
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
+ const worker=html2pdf().set({margin:0,canvas,jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true}}).toPdf();
+ const pdf=await worker.get('pdf');if(typeof pdf?.addImage!=='function')throw new Error('Generador PDF no disponible.');
+ const n=pdf.internal.getNumberOfPages();pdf.addPage('a4','portrait');for(let i=0;i<n;i++)pdf.deletePage(1);pdf.setPage(1);
+ const x=data.invoice||{},p=data.payment||{},green=[49,86,38],gray=[101,112,98],ops=[];let y=16;
+ const txt=(s,x,y,size=10,bold=false,color=[38,49,38],align='left')=>ops.push({kind:'text',s:clean(s),x,y,size,bold,color,align});
+ const line=(y)=>ops.push({kind:'line',y});
+ const rect=(x,y,w,h,color)=>ops.push({kind:'rect',x,y,w,h,color});
+ const wrap=(v,x,y,w,size=10,bold=false,color)=>{pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);const lines=pdf.splitTextToSize(clean(v)||'—',w);lines.forEach((s,i)=>txt(s,x,y+i*size*.42,size,bold,color));return Math.max(1,lines.length)*size*.42};
+ const logo=await receiptLogo(data.logo);
+ if(logo){const w=Math.min(52,logo.width/logo.height*22),h=w*logo.height/logo.width;ops.push({kind:'logo',logo,x:14,y:15,w,h})}else txt('NutriMachata',14,23,21,true,green);
+ txt(data.received>.009?'RECIBO DE PAGO':'APLICACIÓN DE SALDO',196,21,16,true,green,'right');
+ wrap(data.receiptNumber,124,28,72,11,true,green);
+ let date=clean(p.datetime||p.date);const parsed=new Date(date);if(date&&!Number.isNaN(parsed.getTime()))date=parsed.toLocaleString('es-DO',{dateStyle:'medium',timeStyle:'short'});
+ wrap(date||'Fecha no registrada',124,34,72,8,false,gray);y=46;line(y);
+ txt('RECIBIDO DE',14,y+9,8,true,gray);y+=16;y+=wrap(x.patient||'Cliente / paciente',14,y,182,13,true);
+ if(x.rnc){y+=2;y+=wrap('RNC / Cédula: '+x.rnc,14,y,182,9,false,gray)}
+ y+=6;txt('FACTURA',14,y,8,true,gray);txt('MÉTODO DE PAGO',106,y,8,true,gray);y+=6;
+ const a=wrap(x.number||'—',14,y,84,11,true),b=wrap(p.method||'Otro',106,y,90,11,true);y+=Math.max(a,b)+4;
+ txt('REFERENCIA',14,y,8,true,gray);y+=5;y+=wrap(p.reference||'Sin referencia',14,y,182,10);y+=6;
+ rect(14,y,182,24,green);txt(data.received>.009?'MONTO RECIBIDO':'SALDO APLICADO',19,y+7,8,true,[255,255,255]);txt(money(data.received>.009?data.received:data.creditUsed),19,y+18,22,true,[255,255,255]);y+=34;
+ txt('DETALLE DEL COMPROBANTE',14,y,10,true,green);y+=5;line(y);y+=8;
+ const rows=[['Total de la factura',x.total],['Pagado antes de esta operación',data.before],['Aplicado a la factura en esta operación',data.applied],['Saldo a favor utilizado',data.creditUsed],['Nuevo saldo a favor generado',data.creditGenerated],['Saldo pendiente de la factura',data.remaining],['Saldo a favor disponible',data.available]];
+ for(let i=0;i<rows.length;i++){const [label,value]=rows[i],bold=i===5;const h=wrap(label,17,y,112,10,bold);txt(money(value),193,y,11,bold,bold?green:undefined,'right');y+=Math.max(h,5)+4;line(y-3);}
+ y+=7;txt('NOTA',14,y,8,true,gray);y+=5;y+=wrap('Conserva este recibo como comprobante de tu pago. Los saldos a favor quedan vinculados al paciente o cliente y pueden aplicarse a futuras facturas.',14,y,182,9,false,gray);
+ // Long names and references retain all text and fit above the fixed footer.
+ const factor=Math.min(1,258/Math.max(1,y-14)),Y=v=>14+(v-14)*factor;
+ for(const o of ops){if(o.kind==='text'){pdf.setFont('helvetica',o.bold?'bold':'normal');pdf.setFontSize(o.size*factor);pdf.setTextColor(...(o.color||[38,49,38]));pdf.text(o.s,o.x,Y(o.y),{align:o.align})}else if(o.kind==='line'){pdf.setDrawColor(219,227,214);pdf.setLineWidth(.25);pdf.line(14,Y(o.y),196,Y(o.y))}else if(o.kind==='rect'){pdf.setFillColor(...o.color);pdf.rect(o.x,Y(o.y),o.w,o.h*factor,'F')}else if(o.kind==='logo'){pdf.addImage(o.logo.data,'PNG',o.x,Y(o.y),o.w,o.h*factor)}}
+ pdf.setDrawColor(219,227,214);pdf.line(14,281,196,281);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...gray);pdf.text('NutriMachata',14,287);pdf.text('Página 1 de 1',196,287,{align:'right'});
+ pdf.setProperties({title:clean(data.receiptNumber)+' · '+clean(x.number),subject:'Recibo de pago A4',creator:'NutriMachata'});return pdf;
+}
+async function save(data){const pdf=await build(data);const name=(clean(data.receiptNumber)||'Recibo')+'_'+(clean(data.invoice?.number)||'Factura');pdf.save(name.replace(/[^a-zA-Z0-9_-]/g,'_')+'.pdf');return true}
+window.NMReceiptA4V123={build,save};
 })();
 </script>
