@@ -3601,6 +3601,7 @@ function doLogout() {
 //  APP INIT
 // ═══════════════════════════════════════════════
 const ADMIN_NAV = [
+  {id:'glp1',icon:'<span style="font-size:18px">💉</span>',label:'GLP-1',section:'Seguimiento clínico'},
   { id: 'dashboard',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`, label: 'Dashboard',           section: 'Principal' },
   { id: 'patients',   icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`, label: 'Pacientes',           section: null },
   { id: 'historias',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`, label: 'Historias Clínicas',  section: null },
@@ -3679,6 +3680,7 @@ function initApp() {
 //  ROUTER
 // ═══════════════════════════════════════════════
 const PAGES = {
+  glp1: {title:'GLP-1',subtitle:'Seguimiento de aplicaciones y próximas dosis',action:null},
   dashboard: { title: 'Dashboard', subtitle: 'Resumen general del sistema', action: 'Nueva Cita', actionPage: 'modal-appointment' },
   patients: { title: 'Pacientes', subtitle: 'Gestión de expedientes clínicos', action: 'Nuevo Paciente', actionPage: 'new-patient' },
   evaluations: { title: 'Evaluaciones', subtitle: 'Registro de evaluaciones nutricionales', action: '+ Nueva Evaluación', actionPage: 'new-eval' },
@@ -15278,7 +15280,7 @@ window.NMV95IntegralFixes=true;
   const isDoctor=()=>['doctor','doctora','nutricionista'].includes(String(DB?.currentRole||'').toLowerCase());
   window.NMRoleV96={isAdmin,isDoctor};
 
-  const doctorNavIds=['patients','historias','evaluations','consents','diets','agenda','analisis'];
+  const doctorNavIds=['patients','historias','evaluations','consents','diets','agenda','analisis','glp1'];
   window.DOCTOR_NAV_V96=ADMIN_NAV.filter(x=>doctorNavIds.includes(x.id)).map((x,i)=>({...x,section:i===0?'Atención clínica':null}));
   PAGES.team={title:'Equipo médico',subtitle:'Doctores y asignación de pacientes',action:null};
   ADMIN_NAV.splice(ADMIN_NAV.findIndex(x=>x.id==='settings'),0,{id:'team',icon:'<span style="font-size:17px">🩺</span>',label:'Equipo médico',section:'Sistema'});
@@ -15850,8 +15852,21 @@ function installNav(){
  }
  PAGES.glp1={title:'GLP-1',subtitle:'Seguimiento de aplicaciones y próximas dosis',action:null};
 }
+function syncGLPNav(){
+ const sidebar=document.getElementById('sidebar-nav');
+ if(!sidebar)return;
+ const existing=document.getElementById('nav-glp1');
+ if(!canGLP()){if(existing)existing.remove();return;}
+ if(existing)return;
+ const button=document.createElement('button');
+ button.type='button';button.className='nav-item';button.id='nav-glp1';
+ button.innerHTML='<span class="nav-icon">'+icon()+'</span>GLP-1';
+ button.onclick=()=>window.navigate('glp1');
+ sidebar.insertBefore(button,sidebar.firstChild);
+}
 installNav();
-const oldInit=window.initApp; window.initApp=function(){installNav();return oldInit?.apply(this,arguments)}; try{initApp=window.initApp}catch(_){ }
+const oldInit=window.initApp; window.initApp=function(){installNav();const result=oldInit?.apply(this,arguments);syncGLPNav();return result;}; try{initApp=window.initApp}catch(_){ }
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncGLPNav,{once:true});else syncGLPNav();
 const oldNav=window.navigate; window.navigate=function(page){if(page==='glp1'){if(!canGLP()){notify('Este módulo es clínico.','warning');return oldNav('portal');}return renderGLP1();}return oldNav(page)}; try{navigate=window.navigate}catch(_){ }
 async function load(){
  const [catalog,enroll,apps,patients,locations]=await Promise.all([
@@ -15861,6 +15876,8 @@ async function load(){
 function patient(id){return NMGLP1.patients.find(x=>x.id===id)||{}} function product(id){return NMGLP1.catalog.find(x=>x.id===id)||{}} function loc(id){return NMGLP1.locations.find(x=>x.id===id)?.nombre||'Sin localidad'}
 function alerts(){const active=NMGLP1.enroll.filter(x=>x.estado==='activo'&&x.proxima_aplicacion);return {today:active.filter(x=>x.proxima_aplicacion===today()),late:active.filter(x=>x.proxima_aplicacion<today()),next:active.filter(x=>x.proxima_aplicacion>today()).sort((a,b)=>a.proxima_aplicacion.localeCompare(b.proxima_aplicacion)).slice(0,12)}}
 window.renderGLP1=async function(){
+ if(!canGLP()){notify('Este módulo es clínico.','warning');return;}
+ NMRuntime.nextNavigation();NMRuntime.clearPageTimers();if(window.innerWidth<=768)closeSidebar();
  currentPage='glp1';document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('nav-glp1')?.classList.add('active');document.getElementById('page-title').textContent='GLP-1';document.getElementById('page-subtitle').textContent='Aplicaciones, seguimiento y recordatorios';document.getElementById('topbar-action').style.display='none';const root=document.getElementById('page-content');root.innerHTML='<div class="glp1-panel">Cargando seguimiento GLP-1...</div>';
  try{await load();const a=alerts(),active=NMGLP1.enroll.filter(x=>x.estado==='activo');root.innerHTML=`<div class="glp1-shell"><section class="glp1-hero"><h2>Seguimiento GLP-1</h2><p>Controla tratamientos, aplicaciones registradas y próximas fechas indicadas por el profesional.</p><div class="glp1-actions">${isAdminGLP()?'<button class="glp1-btn primary" onclick="glp1NewProduct()">＋ Añadir GLP-1</button>':''}<button class="glp1-btn primary" onclick="glp1AssignPatient()">＋ Añadir paciente</button></div></section><div class="glp1-kpis"><div class="glp1-kpi"><small>Presentaciones activas</small><strong>${NMGLP1.catalog.length}</strong></div><div class="glp1-kpi"><small>Pacientes activos</small><strong>${new Set(active.map(x=>x.paciente_id)).size}</strong></div><div class="glp1-kpi"><small>Aplicaciones hoy</small><strong>${a.today.length}</strong></div><div class="glp1-kpi"><small>Alertas atrasadas</small><strong>${a.late.length}</strong></div></div><section><div class="glp1-toolbar"><div><h2 style="margin:0">GLP-1 registrados</h2><small style="color:#748071">Entra a una tarjeta para ver sus pacientes.</small></div></div><div class="glp1-grid" style="margin-top:14px">${NMGLP1.catalog.length?NMGLP1.catalog.map(c=>{const e=active.filter(x=>x.glp1_id===c.id);const ap=NMGLP1.apps.filter(x=>x.glp1_id===c.id);return `<article class="glp1-card" onclick="glp1OpenProduct('${c.id}')"><span class="dose">${esc(c.presentacion||c.dosis_referencia||'GLP-1')}</span><h3>${esc(c.nombre)}</h3><div class="glp1-meta"><span>👥 ${new Set(e.map(x=>x.paciente_id)).size} pacientes</span><span>💉 ${ap.length} aplicaciones</span></div></article>`}).join(''):'<div class="glp1-empty glp1-panel" style="grid-column:1/-1">Aún no hay GLP-1 creados.</div>'}</div></section>${renderAlertBlock(a)}</div>`}catch(e){console.error(e);root.innerHTML='<div class="glp1-panel">No se pudo cargar GLP-1. Ejecuta primero el SQL v123 en Supabase.</div>'}
 };
