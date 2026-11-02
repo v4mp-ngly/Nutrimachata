@@ -36,3 +36,5 @@ El modulo GLP-1 sigue usando las tablas ya creadas en Supabase. No vuelvas a eje
 - Resumen GLP-1 en Dashboard y acceso a WhatsApp.
 - Ejecutar `NutriMachata_v129_GLP1_PRO_SUPABASE.sql` una sola vez en Supabase antes de usar las nuevas cantidades.
 - La migración no inventa stock para tratamientos anteriores: se debe registrar la cantidad real disponible con “Añadir frasco”.
+
+- Deploy v129.1
