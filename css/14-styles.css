@@ -1,0 +1,41 @@
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'DM Sans',sans-serif;background:white;color:#1A1A1A;font-size:11px}
+.page{width:277mm;min-height:188mm;margin:0 auto;padding:9mm 11mm 7mm;display:flex;flex-direction:column;gap:0}
+.header-band{background:${C2};border-radius:10px;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:16px}
+.header-left{display:flex;align-items:center;gap:12px}
+.clinic-name{font-family:'Playfair Display',serif;font-size:19px;font-weight:500;color:white;letter-spacing:0.3px;line-height:1.1}
+.clinic-sub{font-size:9.5px;color:rgba(255,255,255,0.6);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
+.header-right{text-align:right;color:rgba(255,255,255,0.7);font-size:9.5px;line-height:1.85}
+.header-right strong{color:white;font-weight:500}
+.plan-strip{background:${C6};border-left:4px solid ${C3};border-radius:0 6px 6px 0;padding:6px 14px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.plan-name{font-family:'Playfair Display',serif;font-size:13px;font-weight:500;color:${C2}}
+.plan-meta{font-size:9.5px;color:#555;display:flex;gap:12px;align-items:center}
+.meta-pill{background:${C3};color:white;border-radius:20px;padding:2px 9px;font-size:9.5px;font-weight:600}
+.patient-row{display:grid;grid-template-columns:2fr 1fr 2fr;gap:7px;margin-bottom:9px}
+.info-chip{background:${C7};border:1px solid ${C5};border-radius:6px;padding:5px 9px}
+.chip-label{font-size:8px;font-weight:700;color:${C4};text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.chip-value{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:${C2}}
+.chip-value.name-val{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600}
+table{width:100%;border-collapse:collapse;margin-bottom:9px;table-layout:fixed}
+table thead tr{background:${C2}}
+table thead th{color:white;font-family:'DM Sans',sans-serif;font-size:8.5px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:6px 5px;text-align:center;border:none}
+table thead th:first-child{text-align:left;padding-left:10px;border-radius:6px 0 0 0}
+table thead th:last-child{border-radius:0 6px 0 0}
+table tbody tr:nth-child(odd) td{background:${C7}}
+table tbody tr:nth-child(even) td{background:white}
+table tbody td{padding:6px 6px;font-size:9.5px;color:#222;line-height:1.55;vertical-align:top;border-bottom:1px solid ${C5};border-right:1px solid ${C5}}
+table tbody td:first-child{font-weight:700;color:${C2};font-size:9.5px;border-right:2px solid ${C3};vertical-align:middle;padding-left:10px;white-space:nowrap}
+.meal-icon{font-size:12px;display:block;margin-bottom:1px}
+table tbody tr:last-child td{border-bottom:2px solid ${C3}}
+.indicaciones{background:${C6};border-radius:6px;border-left:3px solid ${C3};padding:7px 12px;margin-bottom:9px}
+.ind-title{font-size:8.5px;font-weight:700;color:${C3};text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.ind-body{font-size:10px;color:#333;line-height:1.7}
+.sig-row{display:flex;justify-content:flex-end;margin-bottom:8px}
+.sig-line{border-bottom:1px solid #aaa;width:160px;margin-bottom:3px}
+.sig-label{font-size:8.5px;color:#888;text-align:center}
+.footer-band{background:${C7};border-top:1.5px solid ${C5};padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-radius:0 0 8px 8px;margin-top:auto}
+.footer-left{font-size:8.5px;color:#555;line-height:1.75}
+.footer-left strong{color:${C2}}
+.footer-right{font-size:8.5px;color:#999;text-align:right;line-height:1.75}
+@media print{html,body{width:297mm}@page{size:A4 landscape;margin:0}.page{padding:6mm 9mm 5mm}}
