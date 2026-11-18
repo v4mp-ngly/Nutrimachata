@@ -1,0 +1,9 @@
+@page { size: A4 portrait; margin: 9mm 8mm 10mm; }
+    html,body { margin:0!important; padding:0!important; background:#fff!important; }
+    body { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+    .clinical-report { width:100%!important; max-width:none!important; margin:0!important; border:0!important; box-shadow:none!important; overflow:visible!important; }
+    .cr-page { width:auto!important; min-height:auto!important; padding:0!important; margin:0!important; overflow:visible!important; break-after:page; page-break-after:always; }
+    .cr-page:last-child { break-after:auto; page-break-after:auto; }
+    .cr-head,.cr-patient,.cr-metric,.cr-box,.chart-card-pro,.cr-comparison,tr { break-inside:avoid; page-break-inside:avoid; }
+    .report-screen-only,.report-actions,button { display:none!important; }
+    img { max-width:100%!important; }

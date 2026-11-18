@@ -1,0 +1,23 @@
+/* NutriMachata v134 · indicador de guardado, aviso de borrador y localidades del equipo médico (solo elementos nuevos) */
+#nm134-save-status{position:fixed;right:18px;bottom:18px;z-index:999998;display:flex;align-items:center;gap:9px;max-width:min(92vw,460px);padding:10px 16px;border-radius:999px;background:#fff;color:#16240f;border:1px solid rgba(23,79,11,.14);box-shadow:0 14px 34px -14px rgba(9,59,8,.45);font:600 12.5px/1.3 'DM Sans',Montserrat,system-ui,sans-serif;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .25s ease,transform .25s ease}
+#nm134-save-status.show{opacity:1;transform:none}
+#nm134-save-status .nm134-dot{width:9px;height:9px;border-radius:50%;flex:none;background:#79ad27}
+#nm134-save-status.is-saving .nm134-dot{background:#C47A1A;animation:nm134pulse 1s ease-in-out infinite}
+#nm134-save-status.is-ok{background:#174f0b;color:#fff;border-color:#174f0b}#nm134-save-status.is-ok .nm134-dot{background:#b8dc7a}
+#nm134-save-status.is-err{background:#f9e1da;color:#7d2c16;border-color:#e7b3a4}#nm134-save-status.is-err .nm134-dot{background:#C44A2A}
+@keyframes nm134pulse{50%{opacity:.35;transform:scale(.8)}}
+.nm134-draft{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fbecd6;border:1px solid #ecc996;color:#5c3a0c;font-size:13px}
+.nm134-draft small{display:block;font-size:11.5px;opacity:.85;margin-top:2px}.nm134-draft-actions{display:flex;gap:8px}
+.nm134-loc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.nm134-loc-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:#edf7df;color:#2c6612;font-size:11.5px;font-weight:700}
+.nm134-loc-chip.off{background:#f1f1ee;color:#777}
+.nm134-loc-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:6px}
+.nm134-loc-pick label{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid rgba(23,79,11,.16);border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;margin:0}
+.nm134-loc-pick input{accent-color:#3F5A00;width:16px;height:16px}
+.nm134-loc-pick label:has(input:checked){background:#edf7df;border-color:#79ad27}
+.nm134-suggest{font-size:11.5px;color:#2c6612;font-weight:700;margin-top:4px}
+@media (prefers-reduced-motion:reduce){#nm134-save-status,#nm134-save-status .nm134-dot{animation:none;transition:none}}
+@media print{#nm134-save-status,.nm134-draft{display:none!important}}
+#nm134-doc-locs .nm134-loc-pick label{text-transform:none!important;letter-spacing:0!important;justify-content:flex-start!important;font-size:13px!important;color:#16240f!important;background:#fff}
+#nm134-doc-locs .nm134-loc-pick label:has(input:checked){background:#edf7df}
+#nm134-doc-locs .nm134-loc-pick input[type=checkbox]{display:inline-block!important;appearance:auto!important;-webkit-appearance:checkbox!important;position:static!important;opacity:1!important;margin:0!important;flex:none}

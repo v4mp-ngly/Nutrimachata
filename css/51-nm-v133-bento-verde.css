@@ -1,0 +1,223 @@
+/* NutriMachata · Propuesta v133 "Bento Verde"
+   Rediseño del Dashboard con la paleta oficial de NutriMachata (verdes oliva, beige y
+   los colores de estado de la app). Solo estilos: mismos datos, botones y funciones.
+   Adaptable: la rejilla responde al ANCHO DISPONIBLE del Dashboard (container queries),
+   así funciona igual en monitor grande, laptop, tablet y teléfono.
+   Activación: clase body.nm-bento */
+body.nm-bento{
+  --g-950:#093b08;--g-900:#0d4b0b;--g-800:#174f0b;--g-600:#3F5A00;--g-500:#5b8f16;--g-400:#79ad27;
+  --g-300:#b8dc7a;--g-200:#d4e8b0;--g-100:#edf7df;--g-50:#f5faee;
+  --bg:#f7f8f4;--card:#ffffff;--ink:#16240f;--muted:#5d6858;--line:rgba(23,79,11,.10);
+  --warn:#C47A1A;--warn-soft:#f6dcb4;--danger:#C44A2A;--info:#2A6A8C;--ok:#2D7A4A;
+  --r-xl:28px;--r-lg:22px;--r-md:16px;
+  --sh:0 1px 2px rgba(13,75,11,.05),0 10px 30px -12px rgba(13,75,11,.18);
+  --sh-hover:0 2px 4px rgba(13,75,11,.06),0 22px 40px -14px rgba(13,75,11,.30);
+  --ease:cubic-bezier(.2,.7,.2,1)}
+body.nm-bento,body.nm-bento .app-layout,body.nm-bento .main-content{background:var(--bg)!important}
+body.nm-bento .page-content{background:radial-gradient(1200px 420px at 75% -120px,rgba(121,173,39,.16),transparent 70%),var(--bg)!important}
+
+/* ---------- Marco: barra superior de vidrio y barra lateral flotante (escritorio) ---------- */
+body.nm-bento .topbar{position:sticky!important;top:0;z-index:50;background:rgba(247,248,244,.72)!important;backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)!important;box-shadow:none!important}
+body.nm-bento #page-title{font-family:Outfit,'DM Sans',sans-serif!important;font-weight:700!important;letter-spacing:-.02em;color:var(--ink)!important}
+body.nm-bento .topbar input{border-radius:999px!important;background:#fff!important;border:1px solid var(--line)!important}
+body.nm-bento .topbar input:focus{outline:none;box-shadow:0 0 0 4px rgba(121,173,39,.22)!important;border-color:var(--g-400)!important}
+body.nm-bento #topbar-action{border-radius:999px!important;background:var(--g-800)!important}
+@media (min-width:769px){
+  body.nm-bento .sidebar{top:12px!important;left:12px!important;bottom:12px!important;height:auto!important;border-radius:26px!important;display:flex!important;flex-direction:column;overflow:hidden;box-shadow:0 24px 50px -18px rgba(9,59,8,.55)!important;background:linear-gradient(180deg,var(--g-900),var(--g-950))!important}
+  body.nm-bento .sidebar-nav{flex:1;min-height:0;overflow-y:auto!important;scrollbar-width:thin}
+  body.nm-bento .main-content{margin-left:calc(var(--nm-sidebar-w,218px) + 24px)!important}
+  body.nm-bento .sidebar .nav-item{border-radius:14px!important;margin:2px 12px!important;width:calc(100% - 24px)!important}
+  body.nm-bento .sidebar .nav-item.active{background:var(--g-300)!important;color:var(--g-900)!important;box-shadow:none!important;font-weight:700}
+  body.nm-bento .sidebar .nav-item.active svg{color:var(--g-900)!important;stroke:var(--g-900)!important}
+  body.nm-bento .sidebar-user .user-card{margin:10px!important;border-radius:18px!important;background:rgba(255,255,255,.07)!important}
+}
+
+/* ---------- Rejilla bento ---------- */
+body.nm-bento .nm115-dashboard{container:nmdash/inline-size;display:grid!important;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px!important;padding:8px 0 32px!important;align-items:stretch}
+body.nm-bento .nm115-dashboard>*{margin:0!important;min-width:0}
+body.nm-bento .nm115-hero,body.nm-bento .nm115-kpi-strip,body.nm-bento .nm115-activity-grid,body.nm-bento .nm115-main-grid{display:contents!important}
+body.nm-bento .nm115-dashboard h2,body.nm-bento .nm115-dashboard h3,body.nm-bento .nm115-dashboard b,body.nm-bento .nm115-dashboard strong{font-family:Outfit,'DM Sans',sans-serif!important}
+body.nm-bento .nm115-dashboard b,body.nm-bento .nm115-dashboard strong{font-variant-numeric:tabular-nums}
+
+/* orden */
+body.nm-bento .nm115-hero-copy{order:1}body.nm-bento .nm115-today{order:2}body.nm-bento .nm115-kpi-strip>button{order:3}
+body.nm-bento .nm115-activity-grid>article:nth-child(1){order:4}body.nm-bento #nm63-dashboard-finance{order:5}
+body.nm-bento .nm115-trend{order:6}body.nm-bento .nm115-pulse{order:7}
+body.nm-bento .nm115-activity-grid>article:nth-child(2){order:8}body.nm-bento #nm129-dashboard-glp{order:9}body.nm-bento .nm115-quick{order:10}
+
+/* posiciones (escritorio ≥1100 px de ancho disponible) */
+body.nm-bento .nm115-hero-copy{grid-column:1/span 8}
+body.nm-bento .nm115-today{grid-column:9/span 4}
+body.nm-bento .nm115-kpi-strip>button{grid-column:span 3}
+body.nm-bento .nm115-activity-grid>article:nth-child(1){grid-column:1/span 5}
+body.nm-bento #nm63-dashboard-finance{grid-column:6/span 7}
+body.nm-bento .nm115-trend{grid-column:1/span 7}
+body.nm-bento .nm115-pulse{grid-column:8/span 5}
+body.nm-bento .nm115-activity-grid>article:nth-child(2){grid-column:1/span 6}
+body.nm-bento #nm129-dashboard-glp{grid-column:7/span 6}
+body.nm-bento .nm115-quick{grid-column:1/-1}
+
+/* ---------- Saludo ---------- */
+body.nm-bento .nm115-hero::before,body.nm-bento .nm115-hero::after{display:none!important}
+body.nm-bento .nm115-hero-copy{background:transparent!important;padding:18px 4px 6px!important;color:var(--ink)!important;align-self:center}
+body.nm-bento .nm115-overline{display:inline-flex!important;align-items:center;gap:8px;color:var(--g-600)!important;font-size:11.5px!important;letter-spacing:.16em!important;font-weight:700;background:var(--g-100);padding:6px 12px;border-radius:999px}
+body.nm-bento .nm115-overline::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--g-400);box-shadow:0 0 0 4px rgba(121,173,39,.25);animation:nmPulse 2.4s var(--ease) infinite}
+body.nm-bento .nm115-hero-copy h2{color:var(--ink)!important;font-size:clamp(30px,4.2cqi,56px)!important;line-height:1.02!important;font-weight:800!important;letter-spacing:-.035em!important;margin:14px 0 10px!important}
+body.nm-bento .nm115-hero-copy h2::first-line{color:var(--g-800)}
+body.nm-bento .nm115-hero-copy p{color:var(--muted)!important;font-size:clamp(14px,1.3cqi,16px)!important;max-width:58ch;margin:0 0 22px!important}
+body.nm-bento .nm115-hero-actions{flex-wrap:wrap;gap:10px!important}
+body.nm-bento .nm115-hero-actions button{height:48px!important;border-radius:999px!important;padding:0 24px!important;font-size:14px!important;font-weight:700!important;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+body.nm-bento .nm115-hero-actions button:hover{transform:translateY(-2px)}
+body.nm-bento .nm115-btn-primary{background:var(--g-800)!important;color:#fff!important;border:0!important;box-shadow:0 10px 24px -10px rgba(23,79,11,.7)!important}
+body.nm-bento .nm115-btn-primary *{color:#fff!important;stroke:#fff!important}
+body.nm-bento .nm115-btn-ghost{background:#fff!important;color:var(--g-800)!important;border:1px solid var(--line)!important}
+
+/* ---------- Hoy: degradado de malla verde ---------- */
+body.nm-bento .nm115-today{position:relative!important;inset:auto!important;transform:none!important;width:auto!important;min-height:0!important;border:0!important;border-radius:var(--r-xl)!important;padding:24px 26px!important;color:#fff!important;overflow:hidden;
+  background:radial-gradient(120% 90% at 100% 0%,var(--g-400) 0%,transparent 55%),radial-gradient(90% 80% at 0% 100%,var(--g-500) 0%,transparent 60%),linear-gradient(140deg,var(--g-800),var(--g-950))!important;box-shadow:0 24px 48px -20px rgba(13,75,11,.65)!important}
+body.nm-bento .nm115-today::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(120deg,rgba(255,255,255,.035) 0 2px,transparent 2px 14px);pointer-events:none}
+body.nm-bento .nm115-today strong{font-size:clamp(56px,7cqi,92px)!important;line-height:.9!important;color:#fff!important;font-weight:800!important;display:block;margin:10px 0 4px!important;letter-spacing:-.04em;text-shadow:0 6px 30px rgba(184,220,122,.45)}
+body.nm-bento .nm115-today p,body.nm-bento .nm115-today span{color:rgba(255,255,255,.85)!important}
+body.nm-bento .nm115-today-line{border-color:rgba(255,255,255,.18)!important}
+
+/* ---------- KPI: escala tonal de verdes ---------- */
+body.nm-bento .nm115-kpi-strip>button{position:relative;overflow:hidden;border:1px solid var(--line)!important;border-radius:var(--r-lg)!important;padding:22px 22px 20px!important;text-align:left;min-height:0!important;height:auto!important;display:flex!important;flex-direction:column;gap:12px;box-shadow:var(--sh)!important;transition:transform .25s var(--ease),box-shadow .25s var(--ease);background:var(--card)!important}
+body.nm-bento .nm115-kpi-strip>button:hover{transform:translateY(-4px);box-shadow:var(--sh-hover)!important}
+body.nm-bento .nm115-kpi-strip>button:focus-visible{outline:3px solid var(--g-400);outline-offset:3px}
+body.nm-bento .nm115-kpi-strip>button::after{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(121,173,39,.22),transparent 70%)}
+body.nm-bento .nm115-kpi-strip>button:nth-child(1){background:var(--g-800)!important;border-color:transparent!important}
+body.nm-bento .nm115-kpi-strip>button:nth-child(1) *{color:#fff!important}
+body.nm-bento .nm115-kpi-strip>button:nth-child(1)::after{background:radial-gradient(circle,rgba(184,220,122,.35),transparent 70%)}
+body.nm-bento .nm115-kpi-strip>button:nth-child(2){background:var(--g-100)!important}
+body.nm-bento .nm115-kpi-strip>button:nth-child(3){background:linear-gradient(160deg,var(--g-200),var(--g-100))!important}
+body.nm-bento .nm115-kpi-strip>button span{font-size:12.5px!important;font-weight:700!important;letter-spacing:.02em!important;text-transform:none!important;color:var(--g-600)!important}
+body.nm-bento .nm115-kpi-strip>button b{font-size:clamp(34px,4cqi,54px)!important;font-weight:800!important;line-height:1!important;color:var(--ink)!important;letter-spacing:-.035em}
+body.nm-bento .nm115-kpi-strip>button small{color:var(--muted)!important;font-size:12.5px!important}
+
+/* ---------- Paneles ---------- */
+body.nm-bento .nm115-panel,body.nm-bento #nm129-dashboard-glp,body.nm-bento .nm115-quick{border-radius:var(--r-xl)!important;background:var(--card)!important;border:1px solid var(--line)!important;box-shadow:var(--sh)!important;padding:24px 26px!important}
+body.nm-bento .nm115-panel h3,body.nm-bento #nm129-dashboard-glp h3{font-size:clamp(18px,1.8cqi,22px)!important;font-weight:700!important;letter-spacing:-.02em;color:var(--ink)!important}
+body.nm-bento .nm115-panel-head span,body.nm-bento .nm129-dash-head span,body.nm-bento .nm115-kicker{color:var(--g-500)!important;letter-spacing:.14em!important}
+body.nm-bento .nm115-row{border-radius:var(--r-md)!important;padding:12px!important;margin:2px -12px!important;border:0!important;transition:background .2s}
+body.nm-bento .nm115-row:hover{background:var(--g-50)!important}
+body.nm-bento .nm115-pulse-grid>div,body.nm-bento .nm129-dash-kpis>div{border-radius:var(--r-md)!important;background:var(--g-50)!important;border:1px solid var(--line)!important}
+
+/* ---------- Finanzas: verde profundo ---------- */
+body.nm-bento #nm63-dashboard-finance{border-radius:var(--r-xl)!important;border:0!important;padding:24px 26px!important;color:#fff!important;background:radial-gradient(80% 120% at 100% 0%,rgba(121,173,39,.35),transparent 60%),linear-gradient(160deg,var(--g-900),var(--g-950))!important;box-shadow:0 24px 50px -24px rgba(9,59,8,.7)!important}
+body.nm-bento #nm63-dashboard-finance h3{color:#fff!important;font-size:clamp(18px,1.8cqi,22px)!important}
+body.nm-bento #nm63-dashboard-finance p{color:rgba(255,255,255,.6)!important}
+body.nm-bento .nm63-finance-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;background:transparent!important;border:0!important;padding:0!important;margin-top:14px}
+body.nm-bento .nm63-finance-card{background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:var(--r-md)!important;padding:14px 16px!important}
+body.nm-bento .nm63-finance-card:first-child{grid-column:1/-1;background:var(--g-300)!important;border:0!important}
+body.nm-bento .nm63-finance-card:first-child small,body.nm-bento .nm63-finance-card:first-child b{color:var(--g-950)!important}
+body.nm-bento .nm63-finance-card:first-child b{font-size:clamp(28px,3.4cqi,42px)!important;letter-spacing:-.03em}
+body.nm-bento .nm63-finance-card small{color:rgba(255,255,255,.62)!important;letter-spacing:.12em}
+body.nm-bento .nm63-finance-card b{color:#fff!important;font-size:clamp(18px,2cqi,24px)!important;font-weight:700!important}
+body.nm-bento .nm63-finance-card.warn b{color:var(--warn-soft)!important}
+body.nm-bento .nm63-close-alert{background:rgba(196,122,26,.22)!important;color:var(--warn-soft)!important;border:0!important;border-radius:999px!important}
+
+/* ---------- Acciones rápidas ---------- */
+body.nm-bento .nm115-quick{display:flex!important;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;background:linear-gradient(120deg,var(--g-100),var(--g-50))!important}
+body.nm-bento .nm115-quick h3{font-size:clamp(20px,2.4cqi,28px)!important;font-weight:800!important;color:var(--g-800)!important}
+body.nm-bento .nm115-quick-actions{display:flex!important;flex-wrap:wrap;gap:10px!important}
+body.nm-bento .nm115-quick-actions button{border-radius:999px!important;height:46px!important;background:#fff!important;border:1px solid var(--line)!important;padding:0 20px!important;font-weight:700!important;transition:transform .2s var(--ease),background .2s}
+body.nm-bento .nm115-quick-actions button:hover{transform:translateY(-2px);background:var(--g-800)!important;color:#fff!important}
+body.nm-bento .nm115-quick-actions button:hover *{color:#fff!important;stroke:#fff!important}
+
+/* ---------- Entrada escalonada (respeta "reducir movimiento") ---------- */
+@keyframes nmRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes nmPulse{0%,100%{box-shadow:0 0 0 4px rgba(121,173,39,.25)}50%{box-shadow:0 0 0 8px rgba(121,173,39,.05)}}
+body.nm-bento .nm115-dashboard>*,body.nm-bento .nm115-hero>*,body.nm-bento .nm115-kpi-strip>*,body.nm-bento .nm115-activity-grid>*,body.nm-bento .nm115-main-grid>*{animation:nmRise .55s var(--ease) both}
+body.nm-bento .nm115-kpi-strip>button:nth-child(2){animation-delay:.05s}body.nm-bento .nm115-kpi-strip>button:nth-child(3){animation-delay:.1s}body.nm-bento .nm115-kpi-strip>button:nth-child(4){animation-delay:.15s}
+@media (prefers-reduced-motion:reduce){body.nm-bento *{animation:none!important;transition:none!important}}
+
+/* ---------- Adaptable al ancho disponible ---------- */
+@container nmdash (max-width:1099px){
+  body.nm-bento .nm115-hero-copy{grid-column:1/span 7}
+  body.nm-bento .nm115-today{grid-column:8/span 5}
+  body.nm-bento .nm115-kpi-strip>button{grid-column:span 6}
+  body.nm-bento .nm115-activity-grid>article:nth-child(1),body.nm-bento #nm63-dashboard-finance,body.nm-bento .nm115-trend,body.nm-bento .nm115-pulse,body.nm-bento .nm115-activity-grid>article:nth-child(2),body.nm-bento #nm129-dashboard-glp{grid-column:1/-1}
+}
+@container nmdash (max-width:719px){
+  body.nm-bento .nm115-hero-copy,body.nm-bento .nm115-today{grid-column:1/-1}
+  body.nm-bento .nm115-hero-copy{padding-top:6px!important}
+  body.nm-bento .nm115-hero-actions button{flex:1 1 140px}
+  body.nm-bento .nm115-today{padding:20px!important}
+  body.nm-bento .nm115-kpi-strip>button{grid-column:span 6;padding:16px!important}
+  body.nm-bento .nm115-panel,body.nm-bento #nm63-dashboard-finance,body.nm-bento #nm129-dashboard-glp,body.nm-bento .nm115-quick{padding:18px!important;border-radius:var(--r-lg)!important}
+  body.nm-bento .nm129-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  body.nm-bento .nm115-pulse-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  body.nm-bento .nm115-quick-actions{width:100%}
+  body.nm-bento .nm115-quick-actions button{flex:1 1 140px;justify-content:center}
+}
+@container nmdash (max-width:400px){
+  body.nm-bento .nm115-dashboard{gap:12px!important}
+  body.nm-bento .nm63-finance-grid{grid-template-columns:1fr!important}
+  body.nm-bento .nm129-dash-list>div{flex-direction:column;align-items:flex-start!important;gap:4px}
+}
+
+/* ---------- Barra superior en tablet y teléfono (antes el título y el buscador se encimaban) ---------- */
+@media (max-width:1100px){
+  body.nm-bento .topbar{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto auto auto;grid-template-areas:"menu title notif refresh action" "search search search search search";align-items:center;gap:10px 8px!important;padding:10px 14px 12px!important;height:auto!important}
+  body.nm-bento .topbar-right{display:contents!important}
+  body.nm-bento #menu-toggle{grid-area:menu}
+  body.nm-bento .topbar-left{grid-area:title;min-width:0}
+  body.nm-bento #page-title{font-size:20px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0!important}
+  body.nm-bento #page-subtitle{display:none!important}
+  body.nm-bento #notif-btn{grid-area:notif}
+  body.nm-bento .topbar-right>button.topbar-btn:not(#menu-toggle):not(#notif-btn){grid-area:refresh}
+  body.nm-bento #topbar-action{grid-area:action;height:40px!important;padding:0 14px!important;font-size:12.5px!important;white-space:nowrap}
+  body.nm-bento .topbar-btn{width:40px!important;height:40px!important;min-width:40px!important;margin:0!important}
+  body.nm-bento .nm-global-search-wrap{grid-area:search;width:100%!important;max-width:none!important;margin:0!important;position:relative}
+  body.nm-bento .nm-global-search-wrap input{width:100%!important;height:44px!important;padding-left:38px!important}
+}
+@media (max-width:380px){body.nm-bento #topbar-action{padding:0 10px!important;font-size:12px!important}}
+@media (min-width:769px) and (max-width:1100px){body.nm-bento #menu-toggle{display:none!important}body.nm-bento .topbar{grid-template-columns:0 minmax(0,1fr) auto auto auto}}
+
+/* =====================================================================
+   Resto de módulos: mismo lenguaje visual (tarjetas, tablas, campos,
+   pestañas y botones) sin cambiar su estructura.
+   ===================================================================== */
+body.nm-bento .page-content .card,body.nm-bento .page-content .kpi-card,body.nm-bento .page-content .table-container,body.nm-bento .page-content .settings-section,body.nm-bento .page-content .glp1-panel,body.nm-bento .page-content .glp1-kpi{border-radius:var(--r-lg)!important;border:1px solid var(--line)!important;box-shadow:var(--sh)!important;background:var(--card)}
+body.nm-bento .page-content .kpi-card{transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+body.nm-bento .page-content .kpi-card:hover{transform:translateY(-3px);box-shadow:var(--sh-hover)!important}
+body.nm-bento .page-content .kpi-value,body.nm-bento .page-content .card-title,body.nm-bento .page-content h2,body.nm-bento .page-content h3{font-family:Outfit,'DM Sans',sans-serif}
+body.nm-bento .page-content .kpi-value{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+body.nm-bento .page-content table thead th{background:var(--g-50)!important;color:var(--g-600)!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line)!important}
+body.nm-bento .page-content table tbody tr{transition:background .15s}
+body.nm-bento .page-content table tbody tr:hover{background:var(--g-50)!important}
+body.nm-bento .form-control,body.nm-bento .form-select,body.nm-bento .page-content input[type="search"]{border-radius:14px!important;border-color:rgba(23,79,11,.16)!important}
+body.nm-bento .form-control:focus,body.nm-bento .form-select:focus{border-color:var(--g-400)!important;box-shadow:0 0 0 4px rgba(121,173,39,.18)!important;outline:none}
+body.nm-bento .btn{border-radius:999px!important;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+body.nm-bento .btn:hover{transform:translateY(-1px)}
+body.nm-bento .btn-olive,body.nm-bento .btn-primary{background:var(--g-800)!important;border-color:var(--g-800)!important;box-shadow:0 8px 20px -10px rgba(23,79,11,.6)}
+body.nm-bento .btn:focus-visible{outline:3px solid var(--g-400);outline-offset:2px}
+body.nm-bento .bill-tab{border-radius:999px!important;border:1px solid var(--line)!important;background:#fff!important;transition:background .2s,color .2s}
+body.nm-bento .bill-tab.active{background:var(--g-800)!important;color:#fff!important;border-color:var(--g-800)!important}
+body.nm-bento .badge{border-radius:999px!important}
+body.nm-bento .modal{border-radius:var(--r-lg)!important}
+@media (max-width:768px){
+  body.nm-bento .page-content{padding:14px!important}
+  body.nm-bento .page-content .table-container,body.nm-bento .page-content .table-responsive{overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media (prefers-reduced-motion:reduce){body.nm-bento .btn:hover,body.nm-bento .page-content .kpi-card:hover{transform:none}}
+
+/* ---------- Ningún módulo puede ensanchar la pantalla en teléfono ---------- */
+body.nm-bento .app-layout{max-width:100vw}
+body.nm-bento .main-content{min-width:0!important;max-width:100%}
+body.nm-bento .page-content{min-width:0;max-width:100%}
+body.nm-bento .page-content .table-container,body.nm-bento .page-content .table-responsive{overflow-x:auto!important;-webkit-overflow-scrolling:touch;max-width:100%}
+body.nm-bento .ai-input-row{flex-wrap:wrap}
+body.nm-bento .ai-input-row .ai-input{min-width:0!important;flex:1 1 180px!important;width:auto!important}
+@media (max-width:768px){
+  body.nm-bento .bill-workspace{grid-template-columns:minmax(0,1fr)!important}
+  body.nm-bento .bill-workspace>*{min-width:0}
+  body.nm-bento .page-content [style*="grid-template-columns"][style*="px"]{grid-template-columns:minmax(0,1fr)!important}
+  body.nm-bento .page-content [style*="grid-template-columns"]>*{min-width:0}
+}
+@media (max-width:1180px){
+  body.nm-bento .bill-workspace{grid-template-columns:minmax(0,1fr)!important}
+  body.nm-bento .bill-workspace>*{min-width:0}
+  body.nm-bento .page-content [style*="grid-template-columns"][style*="px"]{grid-template-columns:minmax(0,1fr)!important}
+  body.nm-bento .page-content [style*="grid-template-columns"]>*{min-width:0}
+}

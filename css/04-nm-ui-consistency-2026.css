@@ -1,0 +1,84 @@
+:root{
+  --nm-green-900:#174807;
+  --nm-green-800:#214f0b;
+  --nm-green-700:#3f6e11;
+  --nm-green-600:#5e8c2a;
+  --nm-green-500:#79ad46;
+  --nm-green-100:#edf6e5;
+  --nm-surface:#ffffff;
+  --nm-bg:#f7f8f5;
+  --nm-border:#e4e9df;
+  --nm-text:#20241f;
+  --nm-muted:#7a8276;
+  --nm-success:#2d7a4a;
+  --nm-warning:#b97816;
+  --nm-danger:#b9472c;
+  --nm-info:#2f6f96;
+  --nm-radius-sm:8px;
+  --nm-radius:10px;
+  --nm-radius-lg:14px;
+  --nm-shadow:0 8px 24px rgba(31,61,18,.06);
+}
+body{background:var(--nm-bg)!important;color:var(--nm-text)}
+.page-content{max-width:1600px;margin:0 auto}
+.card,.dash-card,.kpi-card,.chart-card,.portal-card,.portal-card-w,.soft-section,.patient-directory,.patient-toolbar{
+  border:1px solid var(--nm-border)!important;
+  border-radius:var(--nm-radius-lg)!important;
+  box-shadow:var(--nm-shadow)!important;
+  background:var(--nm-surface)!important;
+}
+.card-header,.dash-card-header,.modal-header{
+  background:linear-gradient(180deg,#fff,#fbfcfa)!important;
+  border-bottom:1px solid var(--nm-border)!important;
+}
+.btn,.topbar-btn,.cal-nav-btn,.modal-close,.role-btn,.tab-btn,.ai-send-btn{
+  min-height:40px;
+  border-radius:var(--nm-radius)!important;
+  font-weight:600!important;
+  transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s!important;
+}
+.btn-sm{min-height:34px;padding:7px 12px!important;font-size:12px!important}
+.btn-lg{min-height:46px;padding:12px 20px!important}
+.btn-olive,.btn-primary{
+  background:linear-gradient(135deg,var(--nm-green-600),var(--nm-green-700))!important;
+  color:#fff!important;
+  box-shadow:0 6px 16px rgba(94,140,42,.18)!important;
+}
+.btn-olive:hover,.btn-primary:hover{background:var(--nm-green-800)!important;transform:translateY(-1px)}
+.btn-outline{background:#fff!important;border:1px solid var(--nm-border)!important;color:#42483f!important}
+.btn-outline:hover{border-color:var(--nm-green-600)!important;color:var(--nm-green-800)!important;background:#f8fbf5!important}
+.btn-danger{background:var(--nm-danger)!important;color:#fff!important}
+.btn-ghost{background:transparent!important;color:#5f665b!important}
+.btn-icon,.topbar-btn,.cal-nav-btn,.modal-close{width:40px;height:40px;padding:0!important;justify-content:center!important}
+.form-control,.form-select,.form-textarea,input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
+  border-radius:var(--nm-radius)!important;
+  border:1px solid #dfe5da!important;
+  background:#fff!important;
+}
+.form-control:focus,.form-select:focus,.form-textarea:focus,input:focus,select:focus,textarea:focus{
+  border-color:var(--nm-green-600)!important;
+  box-shadow:0 0 0 3px rgba(94,140,42,.11)!important;
+  outline:none!important;
+}
+.modal-overlay{backdrop-filter:blur(6px);background:rgba(22,34,17,.42)!important}
+.modal{border-radius:18px!important;border:1px solid var(--nm-border)!important;box-shadow:0 24px 70px rgba(20,45,10,.18)!important}
+.modal-header{padding:20px 24px!important;align-items:center!important}
+.modal-body{padding:24px!important}.modal-footer{padding:16px 24px!important;border-top:1px solid var(--nm-border)!important}
+.modal-title{font-family:'DM Sans',sans-serif!important;font-size:20px!important;color:var(--nm-green-800)!important}
+.badge{border-radius:999px!important;padding:4px 9px!important;font-weight:700!important}
+.badge-success{background:#eaf6ee!important;color:var(--nm-success)!important}
+.badge-warning{background:#fff4de!important;color:var(--nm-warning)!important}
+.badge-danger{background:#fdece7!important;color:var(--nm-danger)!important}
+.badge-info{background:#eaf3f9!important;color:var(--nm-info)!important}
+.badge-neutral{background:#f0f2ef!important;color:#60675d!important}
+.badge-olive{background:var(--nm-green-100)!important;color:var(--nm-green-800)!important}
+thead th{background:#f8faf7!important;color:#697165!important;border-bottom:1px solid var(--nm-border)!important}
+tbody td{border-bottom:1px solid #edf0eb!important}tbody tr:hover{background:#f8fbf5!important}
+.section-title,.card-title,.dash-card-title,.wizard-section-title{color:var(--nm-green-800)!important}
+.tab-bar{background:#eef1ec!important;border:1px solid #e5e9e2!important}.tab-btn.active{background:#fff!important;color:var(--nm-green-800)!important;box-shadow:0 2px 8px rgba(31,61,18,.06)!important}
+.nav-item{border-radius:10px!important}.nav-item.active{background:linear-gradient(90deg,rgba(121,174,45,.72),rgba(94,140,42,.45))!important}
+.status-paid,.estado-pagada,.invoice-status-paid{background:#eaf6ee!important;color:var(--nm-success)!important}
+.status-pending,.estado-pendiente,.invoice-status-pending{background:#fff4de!important;color:var(--nm-warning)!important}
+.status-overdue,.estado-vencida,.invoice-status-overdue{background:#fdece7!important;color:var(--nm-danger)!important}
+.status-partial,.estado-parcial,.invoice-status-partial{background:#eaf3f9!important;color:var(--nm-info)!important}
+@media(max-width:768px){.btn{min-height:42px}.modal{border-radius:18px 18px 0 0!important}.modal-body{padding:18px 16px!important}.modal-header,.modal-footer{padding-left:16px!important;padding-right:16px!important}}
