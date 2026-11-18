@@ -1,0 +1,16 @@
+{
+  "name": "nutrimachata-pruebas",
+  "private": true,
+  "description": "Pruebas automatizadas de NutriMachata contra un Supabase simulado. No se publican ni se usan en producción.",
+  "scripts": {
+    "test": "node run-all.js ..",
+    "visual": "node visual.js ../_original .. ./capturas"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0",
+    "chart.js": "4.4.1",
+    "html2pdf.js": "0.10.1",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0"
+  }
+}

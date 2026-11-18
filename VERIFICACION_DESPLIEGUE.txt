@@ -1,0 +1,21 @@
+NutriMachata v129 GLP-1 PRO - verificacion de despliegue
+
+IMPORTANTE PARA GITHUB PAGES:
+Subir TODO el contenido de esta carpeta manteniendo index.html, js/ y css/ al mismo nivel.
+No subir solamente index.html.
+
+Verificacion realizada:
+- Referencias locales de index.html: 97
+- Archivos locales faltantes: 0
+- Diferencias de mayusculas/minusculas: 0
+- Los JS reportados como 404 estan incluidos en js/.
+
+Si GitHub Pages conserva 404 despues de reemplazar todos los archivos, esperar la finalizacion del deployment y hacer recarga forzada del navegador.
+
+----------------------------------------------------------------
+NutriMachata v131 - despliegue
+- Subir TODO el contenido (index.html, css/, js/, build/, sql/ y documentos) manteniendo la estructura.
+- index.html carga css/app.bundle.css?v=131 y js/app.bundle.js?v=131 (versión de caché actualizada).
+- Los bundles se regeneran con: node build/build-bundle.mjs   (verificación: --check)
+- Los archivos sql/ son opcionales y NO se ejecutan solos. Revisar INFORME_CORRECCIONES_v131.md antes.
+- Tras publicar: recarga forzada (Ctrl+Shift+R / Cmd+Shift+R).
