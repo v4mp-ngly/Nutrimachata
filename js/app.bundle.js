@@ -2054,7 +2054,19 @@ function navigate(page) {
     case 'my-appointments': renderMyAppointments(); break;
     case 'my-measures': renderMyMeasures(); break;
     case 'analisis': renderAnalisis(); break;
-    default: document.getElementById('page-content').innerHTML = '<p>Página no encontrada</p>';
+    default: {
+      // v134.1: vistas internas (expediente / detalle de evaluación). Una recarga de datos o una
+      // reconexión volvía a llamar navigate(currentPage) con estos nombres y mostraba "Página no encontrada".
+      const pg = String(page || '');
+      let pid = '';
+      if (pg.startsWith('paciente-eval-detail-')) pid = pg.slice('paciente-eval-detail-'.length).slice(0, 36);
+      else if (pg.startsWith('paciente-')) pid = pg.slice('paciente-'.length);
+      const p = pid ? DB.patients.find(x => String(x.id) === pid || String(x.id) === pg.slice('paciente-eval-detail-'.length).split('-')[0]) : null;
+      if (p && typeof openHistoriaClinica === 'function') { openHistoriaClinica(p.id); return; }
+      if (pg.startsWith('eval-detail-')) { navigate('evaluations'); return; }
+      if (pg.startsWith('paciente-')) { navigate(typeof _hcOriginPage === 'string' && _hcOriginPage && !_hcOriginPage.startsWith('paciente-') ? _hcOriginPage : 'historias'); return; }
+      document.getElementById('page-content').innerHTML = '<p>Página no encontrada</p>';
+    }
   }
 }
 
