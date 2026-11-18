@@ -1,4 +1,0 @@
-.nm-antecedent-pill{display:inline-flex;align-items:center;gap:8px;cursor:default!important}
-.nm-antecedent-pill input[type="checkbox"]{display:inline-block!important;width:18px!important;height:18px!important;margin:0!important;flex:0 0 18px;accent-color:var(--olive);pointer-events:auto}
-.nm-antecedent-pill label{cursor:pointer;display:inline-block;margin:0;line-height:1.25;user-select:none;-webkit-user-select:none}
-.nm-antecedent-pill.checked{background:rgba(94,140,42,.12)!important;border-color:var(--olive)!important;color:var(--olive-dark)!important;font-weight:600!important}

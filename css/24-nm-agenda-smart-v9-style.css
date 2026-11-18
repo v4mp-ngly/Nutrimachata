@@ -1,2 +1,0 @@
-@media(max-width:900px){.nm-agenda-tools{grid-template-columns:1fr!important}.calendar-header{align-items:flex-start!important;gap:10px!important;flex-direction:column!important}.calendar-header>div:last-child{flex-wrap:wrap}}
-.nm-agenda-kpi{padding:7px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white);font-size:11px;color:var(--gray-500)}.nm-agenda-kpi b{color:var(--black);margin-left:4px}.nm-apt-actions{display:flex;gap:7px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--gray-100);background:var(--gray-50)}

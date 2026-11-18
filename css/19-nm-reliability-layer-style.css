@@ -1,6 +1,0 @@
-#nm-connection-banner{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:12000;display:none;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;font:600 12px 'DM Sans',sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.14);max-width:min(92vw,620px)}
-#nm-connection-banner.offline{display:flex;background:#fff3df;color:#8a4c00;border:1px solid #f0c98c}
-#nm-connection-banner.error{display:flex;background:#fdeceb;color:#9b271d;border:1px solid #efb3ad}
-#nm-connection-banner.ok{display:flex;background:#eaf6ee;color:#25683f;border:1px solid #b9dfc6}
-.nm-action-busy{pointer-events:none!important;opacity:.68!important;cursor:wait!important}
-[data-nm-dead-action="1"]{display:none!important}
