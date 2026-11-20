@@ -1071,6 +1071,7 @@ function mapPaciente(p, evals, dietas, hc) {
     activo: p.activo !== false,
     // v131: necesario para Facturación/Localidades; antes se perdía y toda factura avisaba "Paciente sin localidad".
     localidad_id: p.localidad_id || null,
+    auth_user_id: p.auth_user_id || null, // v136: para saber si ya tiene acceso al portal
     color: p.color || getPatientColor(safeName),
     initials: p.initials || safeName.split(/\s+/).filter(Boolean).map(n=>n[0]).join('').toUpperCase().slice(0,2) || 'P',
     created: p.created_at ? p.created_at.substring(0,10) : '',
@@ -3456,18 +3457,7 @@ async function finishWizard() {
           <div style="font-size:14px;opacity:0.8">${newPatient.nombre}</div>
         </div>
         <div class="card" style="padding:24px;margin-bottom:16px">
-          <div style="font-size:13px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px">Credenciales generadas automáticamente</div>
-          <div style="background:var(--beige);border-radius:var(--radius);padding:16px;margin-bottom:10px">
-            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Email / Usuario</div>
-            <div style="font-size:15px;font-weight:600;font-family:'DM Mono',monospace;color:var(--black)">${autoEmail}</div>
-          </div>
-          <div style="background:var(--beige);border-radius:var(--radius);padding:16px;margin-bottom:16px">
-            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Contraseña</div>
-            <div style="font-size:15px;font-weight:600;font-family:'DM Mono',monospace;color:var(--black)">${autoPass}</div>
-          </div>
-          <div style="background:rgba(94,140,42,0.08);border:1px solid var(--olive-pale);border-radius:var(--radius);padding:12px;font-size:12px;color:var(--olive-dark);margin-bottom:16px">
-            ⚠️ Anote o comparta estas credenciales con el paciente para que acceda a su portal
-          </div>
+          <div id="nm136-portal-card" data-pid="${newPatient.id}" data-email="${autoEmail}"><!-- v136: el acceso real al portal se crea aquí (antes se mostraba una contraseña que no existía en Supabase Auth) --></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-olive" style="flex:1" onclick="navigate('historias')">Ver Historias Clínicas</button>
             <button class="btn btn-outline" style="flex:1" onclick="openHistoriaClinica('${newPatient.id}')">Ver HC</button>
@@ -3475,7 +3465,7 @@ async function finishWizard() {
           </div>
         </div>
       </div>
-    `;
+    `;  try { window.NM136PortalCard?.(document.getElementById('nm136-portal-card')); } catch (_) {}
 }
 
 function downloadHistoriaClinica(patientId) {
@@ -10876,7 +10866,8 @@ try{
       const beforeOnline=typeof SUPA_ONLINE!=='undefined'?SUPA_ONLINE:true;
       const result=await rawSupa(path,method,body);
       const write=String(method||'GET').toUpperCase()!=='GET';
-      if(write&&!IS_LOCAL&&(result===null||SUPA_ONLINE===false)){
+      // v135: una función RPC que no devuelve nada (void) responde 204 sin cuerpo y SÍ guardó; antes se mostraba un error falso.
+      if(write&&!IS_LOCAL&&((result===null&&!String(path||'').startsWith('rpc/'))||SUPA_ONLINE===false)){
         const err=new Error(!navigator.onLine?'No hay conexión a internet.':'La base de datos no confirmó el guardado.');
         logError('Persistencia Supabase',err,{path,method,beforeOnline});
         throw err;
@@ -15503,7 +15494,7 @@ const voided=x=>/anulad|archivad/i.test(String(x?.status||''));
 function locList(){return window.NM121?.locations||[]}
 async function ensureLocs(){if(locList().length)return;try{const r=await supa('localidades?select=id,nombre,codigo,activo&order=nombre.asc','GET');window.NM121=window.NM121||{};window.NM121.locations=r||[]}catch(_){}}
 function locKey(x){return x?.localityId?String(x.localityId):NONE}
-function locName(x){if(!x?.localityId)return 'Sin localidad';return x.localityName||locList().find(l=>String(l.id)===String(x.localityId))?.nombre||'Localidad'}
+function locName(x){if(!x?.localityId)return 'Sin localidad';return x.localityName||locList().find(l=>String(l.id)===String(x.localityId))?.nombre||(window.NM135AllLocations||[]).find(l=>String(l.id)===String(x.localityId))?.nombre||'Localidad'}
 const methodKey=m=>{m=String(m||'').toLowerCase();return /efect/.test(m)?'Efectivo':/tarj/.test(m)?'Tarjeta':/transf/.test(m)?'Transferencia':/dep/.test(m)?'Depósito':/cheq/.test(m)?'Cheque':'Otro'};
 
 function compute(from,to){
@@ -15607,6 +15598,53 @@ window.renderBillingTab=function(tab,btn){
 try{renderBillingTab=window.renderBillingTab}catch(_){}
 /* La etiqueta de la pestaña refleja el contenido nuevo */
 new MutationObserver(()=>{const b=document.querySelector('.bill-tabs [data-btab="locations122"]');if(b&&b.textContent!=='Ingresos por localidad')b.textContent='Ingresos por localidad'}).observe(document.documentElement,{childList:true,subtree:true});
+/* Localidades siempre cargadas en Facturación: antes solo se cargaban al abrir Configuración, por eso el filtro de
+   Facturas mostraba solo "Todas / Sin localidad" y las facturas nuevas guardaban la localidad sin su nombre. */
+let locLoading=null;
+async function loadLocsFresh(){if(locLoading)return locLoading;locLoading=(async()=>{try{const r=await supa('localidades?select=id,nombre,codigo,activo&order=nombre.asc','GET');window.NM121=window.NM121||{};
+  // NM121.locations guarda solo las activas (así lo usa el resto del sistema); las inactivas se usan para nombres históricos.
+  window.NM121.locations=(r||[]).filter(l=>l.activo!==false);window.NM135AllLocations=r||[]}catch(e){console.warn('[Localidades] no se pudieron cargar',e)}finally{setTimeout(()=>{locLoading=null},30000)}})();return locLoading}
+window.NM135EnsureLocations=loadLocsFresh;
+function refreshInvoiceLocFilter(){const sel=document.getElementById('nm122-location-select');if(!sel)return;const v=sel.value;const ls=(window.NM121?.locations||[]);
+  const want='<option value="">Todas las localidades</option><option value="__none">Sin localidad</option>'+ls.map(l=>`<option value="${E(l.id)}">${E(l.nombre)}</option>`).join('');
+  if(sel.dataset.nm135!==String(ls.length)){sel.innerHTML=want;sel.value=v;sel.dataset.nm135=String(ls.length)}}
+const prevBilling=window.renderBilling;
+if(typeof prevBilling==='function'){window.renderBilling=function(){const r=prevBilling.apply(this,arguments);loadLocsFresh().then(()=>setTimeout(refreshInvoiceLocFilter,150));return r};try{renderBilling=window.renderBilling}catch(_){}}
+const prevTab2=window.renderBillingTab;
+window.renderBillingTab=function(tab){const r=prevTab2.apply(this,arguments);if(tab==='invoices')loadLocsFresh().then(()=>setTimeout(refreshInvoiceLocFilter,120));return r};
+try{renderBillingTab=window.renderBillingTab}catch(_){}
+const prevInv=window.openInvoiceModal;
+if(typeof prevInv==='function'){window.openInvoiceModal=function(){loadLocsFresh();return prevInv.apply(this,arguments)};try{openInvoiceModal=window.openInvoiceModal}catch(_){}}
+
+/* Asignar o cambiar la localidad del paciente desde la factura */
+function patientOf(id){return (Array.isArray(DB?.patients)?DB.patients:[]).find(p=>String(p.id)===String(id))}
+function injectInvoiceLoc(){
+  const box=document.querySelector('#invoice-modal #inv-party-selected .nm122-invoice-loc:not([data-nm135])');if(!box)return;
+  if((document.getElementById('inv-party-type')?.value||'patient')!=='patient')return;
+  const pid=document.getElementById('inv-party-id')?.value;const p=patientOf(pid);if(!p)return;
+  box.dataset.nm135='1';const cur=String(p.localidad_id||'');
+  const draw=()=>{const ls=(window.NM121?.locations||[]).slice();const all=window.NM135AllLocations||[];if(cur&&!ls.some(l=>String(l.id)===cur)){const c=all.find(l=>String(l.id)===cur);if(c)ls.push(c)}
+    box.innerHTML=`<label class="nm135-invloc"><span>📍 Localidad del paciente</span><select id="nm135-inv-loc" class="form-select">${cur?'':'<option value="">Sin localidad — elegir…</option>'}${ls.map(l=>`<option value="${E(l.id)}" ${String(l.id)===cur?'selected':''}>${E(l.nombre)}${l.activo===false?' (inactiva)':''}</option>`).join('')}</select></label><small id="nm135-inv-loc-hint">${cur?'Si la cambias, se actualiza en el expediente del paciente al guardar la factura.':'Elige la sede: se guardará en el expediente del paciente al crear la factura.'}</small>`;
+    box.querySelector('select').onchange=e=>{const h=box.querySelector('#nm135-inv-loc-hint');const v=e.target.value;h.textContent=v===cur?(cur?'Si la cambias, se actualiza en el expediente del paciente al guardar la factura.':'Elige la sede: se guardará en el expediente del paciente al crear la factura.'):'✓ Se asignará esta localidad al paciente al guardar.';h.classList.toggle('on',v!==cur)}};
+  if((window.NM121?.locations||[]).length)draw();else{box.innerHTML='<span>📍 Cargando localidades…</span>';loadLocsFresh().then(draw)}
+}
+new MutationObserver(()=>{if(document.getElementById('invoice-modal'))injectInvoiceLoc()}).observe(document.body,{childList:true,subtree:true});
+const prevSaveInv=window.saveInvoice;
+if(typeof prevSaveInv==='function'){
+  const w=async function(){
+    const sel=document.getElementById('nm135-inv-loc');const pid=document.getElementById('inv-party-id')?.value;const type=document.getElementById('inv-party-type')?.value||'patient';
+    const p=type==='patient'?patientOf(pid):null;
+    if(sel&&p&&sel.value&&sel.value!==String(p.localidad_id||'')){
+      const name=sel.options[sel.selectedIndex]?.textContent||'Localidad';
+      try{await supa('rpc/nm_asignar_localidad_paciente','POST',{p_paciente_id:p.id,p_localidad_id:sel.value,p_origen:'facturacion'});}
+      catch(e){console.error('[Localidad desde factura]',e);notify?.('No se pudo asignar la localidad al paciente: '+(e.message||e)+'. La factura no se guardó; inténtalo de nuevo.','danger');return false}
+      p.localidad_id=sel.value;const px=(window.NM121?.patients||[]).find(x=>String(x.id)===String(p.id));if(px)px.localidad_id=sel.value;
+      notify?.(`Localidad asignada a ${p.nombre||'el paciente'}: ${name}.`,'success');
+    }
+    return prevSaveInv.apply(this,arguments);
+  };
+  window.saveInvoice=w;try{saveInvoice=w}catch(_){}
+}
 window.NMV135IngresosLocalidad=true;
 })();
 }catch(nmModuleError){console.error('[NutriMachata] El módulo 69-nm-v135-ingresos-localidad.js no pudo iniciar:',nmModuleError);}
@@ -15759,4 +15797,150 @@ new MutationObserver(()=>{const c=document.getElementById('prd-category');if(!c|
 window.NMV135Inventario=true;
 })();
 }catch(nmModuleError){console.error('[NutriMachata] El módulo 70-nm-v135-inventario.js no pudo iniciar:',nmModuleError);}
+
+
+/* ===== 71-nm-v136-seguridad.js ===== */
+try{
+/* NutriMachata v136 · Seguridad urgente
+   1. Acceso real al portal del paciente (función Edge nm-crear-acceso-paciente):
+      - Al registrar un paciente ya no se muestra una contraseña inventada que no existía en Supabase Auth.
+      - Se crea el acceso de verdad (correo confirmado, rol paciente, vinculado al expediente) o se explica qué falta.
+      - Botón "Acceso al portal" en el expediente para crear el acceso o restablecer la contraseña.
+   2. IA Nutricional desde el servidor (función Edge nm-ia-nutricional):
+      - La clave de Anthropic ya no se escribe ni se guarda en el navegador; se borra la que hubiera quedado.
+      - El paciente elegido ahora sí se usa (antes parseInt() de un UUID lo perdía siempre).
+      - La respuesta de ejemplo ya no se presenta como si fuera de la IA: se rotula como ejemplo. */
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STAFF=['admin','doctor','doctora','nutricionista'];
+const isStaff=()=>STAFF.includes(String(DB?.currentRole||'').toLowerCase());
+const fakeEmail=e=>!e||/@paciente\.com$/i.test(String(e));
+const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+async function callFn(name,body){
+  await ensureSupaSession();
+  const token=supaAccessToken();
+  let res;
+  try{res=await nmFetchTimeout(SUPA_URL.replace(/\/$/,'')+'/functions/v1/'+name,{method:'POST',headers:{apikey:SUPA_ANON,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body||{})},45000)}
+  catch(e){const err=new Error(navigator.onLine===false?'Sin conexión a Internet.':'No se pudo contactar el servidor. Inténtalo de nuevo.');err.kind='network';throw err}
+  const data=await res.json().catch(()=>({}));
+  if(res.status===404&&!data?.error){const err=new Error('missing');err.missing=true;throw err}
+  if(!res.ok){const err=new Error(data?.error||data?.message||('Error '+res.status));err.status=res.status;err.data=data;throw err}
+  return data;
+}
+window.NM136CallFn=callFn;
+
+/* ================= 1. Acceso al portal del paciente ================= */
+const GUIDE='Para activarlo, publica la función <b>nm-crear-acceso-paciente</b> en Supabase (ver <i>GUIA_FUNCIONES_SEGURAS_v136.md</i>).';
+function credBox(email,password,pacName){
+  const msg=`Hola${pacName?' '+pacName.split(' ')[0]:''}, este es tu acceso al portal de NutriMachata:\nUsuario: ${email}\nContraseña: ${password}\nTe recomendamos cambiar la contraseña al entrar.`;
+  return `<div class="nm136-cred"><div><small>Usuario</small><b>${E(email)}</b></div><div><small>Contraseña</small><b class="mono">${E(password)}</b></div></div>
+    <div class="nm136-note ok">✓ Acceso creado en Supabase y vinculado al expediente. La contraseña se muestra <b>solo ahora</b>: cópiala o envíala.</div>
+    <div class="nm136-row"><button type="button" class="btn btn-outline btn-sm" data-copy="${E(msg)}">Copiar acceso</button><button type="button" class="btn btn-outline btn-sm" data-wa="${E(msg)}">Enviar por WhatsApp</button></div>`;
+}
+function bindCred(root,phone){
+  root.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>navigator.clipboard?.writeText(b.dataset.copy).then(()=>notify('Acceso copiado.','success')).catch(()=>notify('No se pudo copiar.','warning')));
+  root.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>{const n=String(phone||'').replace(/\D/g,'');window.open(`https://wa.me/${n.length===10?'1'+n:n}?text=${encodeURIComponent(b.dataset.wa)}`,'_blank','noopener')});
+}
+async function createAccess(pid,email,mode){return callFn('nm-crear-acceso-paciente',{paciente_id:pid,email,modo:mode||'crear'})}
+function formHTML(email,mode){return `<div class="nm136-form"><label>Correo real del paciente<input type="email" class="form-control" data-email value="${E(fakeEmail(email)?'':email)}" placeholder="paciente@correo.com" autocomplete="off"></label><button type="button" class="btn btn-olive btn-sm" data-go>${mode==='restablecer'?'Restablecer contraseña':'Crear acceso al portal'}</button></div>`}
+/* Tarjeta en la pantalla final del registro clínico */
+window.NM136PortalCard=function(el){
+  if(!el)return;const pid=el.dataset.pid;const p=(DB.patients||[]).find(x=>String(x.id)===String(pid));let email=el.dataset.email||p?.email||'';
+  el.className='nm136-portal';
+  const head='<div class="nm136-title">Acceso al portal del paciente</div>';
+  const run=async(mail)=>{
+    el.innerHTML=head+'<div class="nm136-note">Creando el acceso en Supabase…</div>';
+    try{const r=await createAccess(pid,mail,'crear');if(p){p.email=r.email;p.auth_user_id=r.user_id}el.innerHTML=head+credBox(r.email,r.password,p?.nombre||'');bindCred(el,p?.telefono)}
+    catch(e){
+      if(e.missing){el.innerHTML=head+`<div class="nm136-note warn">El acceso al portal todavía no está activado en tu Supabase, así que <b>no se generó ninguna contraseña</b>. ${GUIDE}</div>`;return}
+      if(e.data?.ya_tiene_acceso){el.innerHTML=head+'<div class="nm136-note ok">Este paciente ya tiene acceso al portal. Puedes restablecer su contraseña desde su expediente › Acceso al portal.</div>';return}
+      el.innerHTML=head+`<div class="nm136-note warn">${E(e.message)}</div>`+formHTML(mail,'crear');wire()}
+  };
+  const wire=()=>{const go=el.querySelector('[data-go]');if(!go)return;go.onclick=()=>{const m=el.querySelector('[data-email]').value.trim().toLowerCase();if(!EMAIL.test(m)||fakeEmail(m))return notify('Escribe el correo real del paciente.','warning');run(m)}};
+  if(fakeEmail(email)){el.innerHTML=head+'<div class="nm136-note">El paciente se registró sin correo real. Escríbelo para crear su acceso al portal (o hazlo luego desde su expediente).</div>'+formHTML('', 'crear');wire();return}
+  run(email);
+};
+/* Ventana desde el expediente */
+window.NM136OpenPortalAccess=function(pid){
+  if(!isStaff())return notify('Solo el personal clínico puede gestionar accesos.','warning');
+  const p=(DB.patients||[]).find(x=>String(x.id)===String(pid));if(!p)return;
+  const has=!!(p.auth_user_id||p.authUserId);const mode=has?'restablecer':'crear';
+  document.getElementById('nm136-access-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm136-access-modal" style="z-index:10060"><div class="modal" style="max-width:560px"><div class="modal-header"><div><div class="modal-title">Acceso al portal</div><div class="modal-subtitle">${E(p.nombre)} · ${has?'ya tiene acceso':'sin acceso todavía'}</div></div><button type="button" class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body" id="nm136-access-body">
+    <div class="nm136-note">${has?'Se asignará una contraseña nueva. La anterior dejará de funcionar.':'Se creará el usuario del paciente con el correo confirmado, para que entre de inmediato.'}</div>${formHTML(p.email,mode)}</div></div></div>`);
+  const body=document.getElementById('nm136-access-body');
+  body.querySelector('[data-go]').onclick=async function(){
+    const m=body.querySelector('[data-email]').value.trim().toLowerCase();if(!EMAIL.test(m)||fakeEmail(m))return notify('Escribe el correo real del paciente.','warning');
+    if(has&&!confirm('¿Asignar una contraseña nueva a '+p.nombre+'?'))return;
+    this.disabled=true;this.textContent='Procesando…';
+    try{const r=await createAccess(p.id,m,mode);p.email=r.email;p.auth_user_id=r.user_id;body.innerHTML=credBox(r.email,r.password,p.nombre).replace('Acceso creado',r.modo==='restablecer'?'Contraseña restablecida':'Acceso creado');bindCred(body,p.telefono)}
+    catch(e){this.disabled=false;this.textContent=has?'Restablecer contraseña':'Crear acceso al portal';
+      if(e.missing){body.insertAdjacentHTML('afterbegin',`<div class="nm136-note warn">${GUIDE}</div>`);return}
+      notify(e.message,'danger')}
+  };
+};
+/* Botón en el expediente (junto a "Descargar HC") */
+function addHcButton(){
+  if(!isStaff())return;
+  document.querySelectorAll('#page-content button[onclick^="downloadHistoriaClinica("]').forEach(b=>{
+    if(b.parentElement.querySelector('[data-nm136-access]'))return;const m=b.getAttribute('onclick').match(/downloadHistoriaClinica\('([^']+)'\)/);if(!m)return;
+    if(document.getElementById('nm136-portal-card'))return; // pantalla final del registro: ya tiene su tarjeta
+    const x=document.createElement('button');x.type='button';x.className=b.className;x.dataset.nm136Access='1';x.textContent='🔑 Acceso al portal';x.onclick=()=>NM136OpenPortalAccess(m[1]);b.after(x)});
+}
+let t=0;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(addHcButton,120)}).observe(document.getElementById('page-content')||document.body,{childList:true,subtree:true});
+
+/* ================= 2. IA Nutricional ================= */
+function purgeKey(){try{if(DB?.settings&&DB.settings.apiKey){DB.settings.apiKey=''}}catch(_){}
+  try{const s=JSON.parse(sessionStorage.getItem('nutrimachata_settings')||'null');if(s&&s.apiKey){s.apiKey='';sessionStorage.setItem('nutrimachata_settings',JSON.stringify(s))}}catch(_){}}
+purgeKey();setInterval(purgeKey,5000);
+const KEY_NOTE='<div class="nm136-note ok" data-nm136-key>🔒 La clave de la IA ahora se guarda de forma segura en Supabase (secreto <b>ANTHROPIC_API_KEY</b> de la función <b>nm-ia-nutricional</b>). Ya no se escribe en el navegador.</div>';
+function replaceKeyInputs(){['ai-key-input','s-apikey'].forEach(id=>{const i=document.getElementById(id);if(!i)return;if(i.value){i.value='';i.removeAttribute('value');purgeKey()}if(i.dataset.nm136)return;i.dataset.nm136='1';i.type='hidden';const g=i.closest('.form-group');if(g){const l=g.querySelector('label');if(l)l.textContent='Clave de la IA';g.querySelectorAll('.text-xs').forEach(x=>x.style.display='none');if(!g.querySelector('[data-nm136-key]'))i.insertAdjacentHTML('afterend',KEY_NOTE)}})}
+new MutationObserver(()=>replaceKeyInputs()).observe(document.body,{childList:true,subtree:true});
+const keepModel=()=>{const m=document.getElementById('ai-model')?.value||document.getElementById('s-model')?.value;if(m)DB.settings.model=m};
+window.saveAISettings=function(){keepModel();purgeKey();notify('Configuración guardada. La clave de la IA se administra en Supabase.','success')};
+window.saveAIConfig=function(){keepModel();purgeKey();notify('Configuración de IA guardada.','success')};
+try{saveAISettings=window.saveAISettings;saveAIConfig=window.saveAIConfig}catch(_){}
+const BTN='background:rgba(255,255,255,0.15);color:white;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer';
+window.sendAI=async function(){
+  const sel=document.getElementById('ai-patient-select');const pid=String(sel?.value||'');
+  const prompt=(document.getElementById('ai-prompt')?.value||'').trim();
+  if(!prompt){notify('Ingrese una consulta','danger');return}
+  const patient=pid?(DB.patients||[]).find(p=>String(p.id)===pid):null;
+  const out=document.getElementById('ai-response');if(!out)return;
+  out.innerHTML='<div class="ai-thinking"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div><span style="margin-left:8px;font-size:13px;opacity:0.7">Consultando la IA de forma segura…</span></div>';out.classList.add('visible');
+  const show=(text,label)=>{out.innerHTML=`${label||''}<div style="line-height:1.8;font-size:13px;white-space:pre-wrap">${E(text)}</div><div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.15);display:flex;gap:8px;flex-wrap:wrap"><button style="${BTN}" onclick="saveAsDiet()">💾 Guardar como Dieta</button><button style="${BTN}" onclick="copyAIResponse()">📋 Copiar</button></div>`};
+  try{
+    const r=await callFn('nm-ia-nutricional',{prompt,paciente_id:patient&&/^[0-9a-f-]{36}$/i.test(String(patient.id))?patient.id:undefined,modelo:DB.settings?.model});
+    show(r.texto,`<div class="nm136-ai-tag">IA · ${E(patient?'Perfil de '+String(patient.nombre).split(' ')[0]:'Consulta general')} · borrador para revisión profesional</div>`);
+  }catch(e){
+    const why=e.missing?'La IA todavía no está activada en tu Supabase (falta publicar la función <b>nm-ia-nutricional</b> y su secreto ANTHROPIC_API_KEY).':E(e.message);
+    out.innerHTML=`<div style="font-size:13px;line-height:1.7">⚠️ ${why}</div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button style="${BTN}" id="nm136-ai-demo">Ver un ejemplo (no es IA)</button></div>`;
+    document.getElementById('nm136-ai-demo').onclick=()=>{const txt=typeof getDemoAIResponse==='function'?getDemoAIResponse(prompt,patient?{...patient,imc:Number(patient.imc)||0}:null):'';show(txt,'<div class="nm136-ai-tag warn">EJEMPLO DE DEMOSTRACIÓN · texto fijo, no generado por IA ni basado en este paciente</div>')};
+  }
+};
+try{sendAI=window.sendAI}catch(_){}
+/* ================= 3. Roles: los metadatos que escribe el propio usuario no dan permisos del equipo ================= */
+// user_metadata lo puede escribir cualquiera al registrarse. Antes, una cuenta con user_metadata.role="admin" y sin
+// perfil en public.usuarios entraba a la interfaz como administración. Ahora un rol del equipo solo vale si viene de
+// app_metadata (solo lo escribe el servidor) o de public.usuarios.
+if(typeof nmResolveLoginRole==='function'&&!nmResolveLoginRole.__nm136){
+  const w=async function(au,email){
+    if(email===NUTRI_ADMIN_EMAIL)return 'admin';
+    let profile=null;
+    try{profile=await Promise.race([SB.getUsuario(email),new Promise(r=>setTimeout(()=>r(null),8000))])}catch(_){}
+    if(profile&&profile.activo===false){try{await supaAuthLogout()}catch(_){}const err=new Error('Tu usuario está desactivado. Contacta a la administración.');err.code='USER_DISABLED';throw err}
+    const trusted=String(au?.app_metadata?.role||profile?.rol||'').toLowerCase();
+    if(trusted)return trusted;
+    const self=String(au?.user_metadata?.role||'').toLowerCase();
+    if(STAFF.includes(self)){console.warn('[Seguridad v136] Rol del equipo sin respaldo en usuarios/app_metadata; se entra como paciente:',email);
+      setTimeout(()=>{try{notify('Tu cuenta no tiene un perfil del equipo registrado. Pide a administración que te agregue en Equipo médico.','warning')}catch(_){}},1500)}
+    return 'patient';
+  };
+  w.__nm136=true;window.nmResolveLoginRole=w;try{nmResolveLoginRole=w}catch(_){}
+}
+window.NMV136Seguridad=true;
+})();
+}catch(nmModuleError){console.error('[NutriMachata] El módulo 71-nm-v136-seguridad.js no pudo iniciar:',nmModuleError);}
 
