@@ -2156,6 +2156,21 @@ body.nm-bento .ai-input-row .ai-input{min-width:0!important;flex:1 1 180px!impor
 #nm134-doc-locs .nm134-loc-pick label{text-transform:none!important;letter-spacing:0!important;justify-content:flex-start!important;font-size:13px!important;color:#16240f!important;background:#fff}
 #nm134-doc-locs .nm134-loc-pick label:has(input:checked){background:#edf7df}
 #nm134-doc-locs .nm134-loc-pick input[type=checkbox]{display:inline-block!important;appearance:auto!important;-webkit-appearance:checkbox!important;position:static!important;opacity:1!important;margin:0!important;flex:none}
+/* v136 · acceso al portal e IA segura */
+.nm136-portal{margin:4px 0 16px}
+.nm136-title{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#66705f;margin-bottom:12px}
+.nm136-cred{display:grid;gap:10px;margin-bottom:12px}
+.nm136-cred>div{background:#f5faee;border:1px solid #d4e8b0;border-radius:14px;padding:12px 14px}
+.nm136-cred small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#66705f;text-transform:uppercase;margin-bottom:3px}
+.nm136-cred b{font-size:15px;word-break:break-all}.nm136-cred b.mono{font-family:'DM Mono',ui-monospace,Menlo,monospace;letter-spacing:.04em;color:#174f0b}
+.nm136-note{padding:11px 13px;border-radius:12px;background:#f5faee;border:1px dashed #b8dc7a;font-size:12.5px;color:#3b4a35;margin-bottom:12px;line-height:1.5}
+.nm136-note.ok{background:#edf7df;border-style:solid;border-color:#b8dc7a;color:#2c6612}
+.nm136-note.warn{background:#fbecd6;border:1px solid #ecc996;color:#5c3a0c}
+.nm136-row{display:flex;gap:8px;flex-wrap:wrap}
+.nm136-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.nm136-form label{flex:1 1 240px;display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;margin:0}
+.nm136-ai-tag{display:inline-block;margin-bottom:10px;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,.16);font-size:11px;font-weight:700;letter-spacing:.04em}
+.nm136-ai-tag.warn{background:#fbecd6;color:#5c3a0c}
 
 
 /* ===== SOURCE: css/53-nm-v135-facturacion.css ===== */
@@ -2498,4 +2513,8 @@ body.nm135-bill .nm135-sact{display:flex;gap:6px;justify-content:flex-end;margin
 @media (max-width:1100px){body.nm135-bill .nm135-inv-head{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){body.nm135-bill .nm135-inv-head{grid-template-columns:1fr}body.nm135-bill .nm135-sgrid{grid-template-columns:1fr}body.nm135-bill .nm135-scard{flex-wrap:wrap}body.nm135-bill .nm135-sprice{text-align:left;width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px}
   body.nm135-bill .nm135-inv-tools{width:100%}body.nm135-bill .nm135-inv-tools .form-control{min-width:0;flex:1 1 100%}body.nm135-bill .nm135-seg{width:100%;overflow-x:auto}body.nm135-bill .nm135-pgrid{grid-template-columns:1fr}.nm135-mode{grid-template-columns:1fr}.nm135-tl-i{grid-template-columns:52px 1fr}.nm135-tl-i>span{grid-column:2}}
+#invoice-modal .nm135-invloc{display:flex!important;align-items:center;gap:10px;flex-wrap:wrap;margin:0!important;text-transform:none!important;letter-spacing:0!important;font-size:12.5px!important;font-weight:700!important;color:#2c6612!important}
+#invoice-modal .nm135-invloc select{flex:1 1 220px;min-width:0;border-radius:10px!important;height:38px;font-weight:700}
+#invoice-modal #nm135-inv-loc-hint{display:block;margin-top:6px;font-size:11.5px;color:#66705f}
+#invoice-modal #nm135-inv-loc-hint.on{color:#2c6612;font-weight:700}
 
