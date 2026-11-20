@@ -11312,9 +11312,11 @@ try{
     try{return await fn();}finally{billingBusy=false;setBusy(btn,false);}
   }
 
-  function productDbToUi(p){return normalizeBillingProduct({
+  function productDbToUi(p){const x=normalizeBillingProduct({
     id:p.id,name:p.nombre,description:p.descripcion||'',type:lower(p.tipo)==='servicio'?'Servicio':'Producto',category:p.categoria||'',price:num(p.precio),cost:num(p.costo),stock:num(p.stock),min:num(p.stock_minimo),active:p.activo!==false
-  });}
+  });
+    // v135: existencia real (puede ser negativa si se facturó sin stock, regla v85) para el módulo de Inventario.
+    x.stockReal=num(p.stock);x.updatedAt=p.updated_at||p.created_at||'';return x;}
   function detailDbToUi(d){const qty=num(d.cantidad,1),price=num(d.precio_unitario),gross=qty*price,discountAmount=Math.max(0,num(d.descuento));const discount=gross>0?Math.max(0,Math.min(100,discountAmount/gross*100)):0;return {id:d.id,productId:d.producto_servicio_id||'',description:d.descripcion||'Concepto',qty,price,discount,discountAmount};}
   function paymentDbToUi(p,inv){const applied=num(p.monto_aplicado??p.monto),received=num(p.monto_recibido??p.monto),creditGenerated=num(p.saldo_favor_generado),creditUsed=num(p.saldo_favor_usado);return {id:p.id,date:String(p.fecha_pago||p.created_at||'').slice(0,10),datetime:String(p.fecha_pago||p.created_at||''),amount:applied,applied,received,creditGenerated,creditUsed,method:(creditUsed>0&&received<=0)?'Saldo a favor':mapMethodFromDb(p.metodo_pago),reference:p.referencia||'',notes:p.notas||'',invoice:inv?.number||'',patient:inv?.patient||''};}
 
@@ -11647,7 +11649,7 @@ try{
 
   // Asegurar que los onclick inline apunten a las versiones Supabase.
   Object.assign(window,{saveInvoice:window.saveInvoice,saveInvoicePayment:window.saveInvoicePayment,saveBillingProduct:window.saveBillingProduct,deleteBillingProduct:window.deleteBillingProduct,deleteInvoice:window.deleteInvoice,archiveInvoice:window.archiveInvoice,renderBilling:window.renderBilling});
-  window.NMBillingClientAPI={billingFetch,loadBillingFromSupabase,getClients:()=>billingClients};
+  window.NMBillingClientAPI={billingFetch,loadBillingFromSupabase,getClients:()=>billingClients,adjustStock,productStock};
 
   // Aviso de RLS/auth. El HTML actual usa la anon key; si Supabase Auth no está activo, las policies "to authenticated" bloquearán escrituras.
   window.billingSupabasePreflight=async function(){
@@ -15608,4 +15610,153 @@ new MutationObserver(()=>{const b=document.querySelector('.bill-tabs [data-btab=
 window.NMV135IngresosLocalidad=true;
 })();
 }catch(nmModuleError){console.error('[NutriMachata] El módulo 69-nm-v135-ingresos-localidad.js no pudo iniciar:',nmModuleError);}
+
+
+/* ===== 70-nm-v135-inventario.js ===== */
+try{
+/* NutriMachata v135 · Inventario: Productos y servicios
+   Pestaña "Productos y servicios" de Facturación con:
+   - Resumen: productos y servicios activos, valor del inventario (a costo y a precio), bajo mínimo y agotados.
+   - Vista Productos: tarjetas con existencia vs. mínimo, margen, ventas de 30 días y acciones rápidas
+     (Entrada, Salida/ajuste, Historial, Editar, Eliminar).
+   - Vista Servicios: tarjetas con precio, margen, veces vendido e ingresos (30 días y total).
+   - Vista Tabla: la tabla original completa (se conserva).
+   - Movimientos de inventario por producto (tabla movimientos_inventario) y ajustes de existencia
+     que usan la función atómica nm_ajustar_stock_v131 si está instalada.
+   - Exportación CSV del catálogo. Las existencias negativas (venta sin stock, regla v85) se muestran tal cual. */
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const M=v=>typeof moneyRD==='function'?moneyRD(Number(v||0)):'RD$ '+Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const N=v=>Number(v||0).toLocaleString('en-US');
+const isAdmin=()=>String(DB?.currentRole||'').toLowerCase()==='admin';
+const S={view:'products',q:'',cat:'',sort:'name'};
+window.NM135Inv=S;
+const stockOf=p=>Number.isFinite(Number(p.stockReal))?Number(p.stockReal):Number(p.stock||0);
+const voided=x=>/anulad|archivad/i.test(String(x?.status||''));
+const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10)};
+function level(p){const s=stockOf(p),m=Number(p.min||0);if(s<=0)return 'out';if(m>0&&s<=m)return 'low';return 'ok'}
+const LEVEL={ok:['Disponible','ok'],low:['Bajo mínimo','low'],out:['Agotado','out']};
+function sales(){const since=daysAgo(30);const map=new Map();
+  for(const x of (getBillingData().invoices||[])){if(voided(x))continue;for(const i of (x.items||[])){if(!i.productId)continue;const k=String(i.productId);if(!map.has(k))map.set(k,{qty:0,rev:0,qty30:0,rev30:0,count:0,last:''});const a=map.get(k);const line=typeof billingLineTotal==='function'?billingLineTotal(i):Number(i.qty||0)*Number(i.price||0);a.qty+=Number(i.qty||0);a.rev+=line;a.count++;if(String(x.date||'')>=since){a.qty30+=Number(i.qty||0);a.rev30+=line}if(String(x.date||'')>a.last)a.last=String(x.date||'')}}
+  return map;}
+const margin=p=>p.price>0?(p.price-p.cost)/p.price*100:0;
+function filtered(list){const q=S.q.trim().toLowerCase();let r=list.filter(p=>(!S.cat||p.category===S.cat)&&(!q||[p.name,p.category,p.description].some(v=>String(v||'').toLowerCase().includes(q))));
+  const sl=sales();const by={name:(a,b)=>a.name.localeCompare(b.name,'es'),stock:(a,b)=>stockOf(a)-stockOf(b),sold:(a,b)=>(sl.get(String(b.id))?.qty30||0)-(sl.get(String(a.id))?.qty30||0),price:(a,b)=>b.price-a.price};
+  return r.sort(by[S.sort]||by.name);}
+function kpis(all){const prods=all.filter(p=>p.type==='Producto'&&p.active!==false),servs=all.filter(p=>p.type==='Servicio'&&p.active!==false);
+  const cost=prods.reduce((s,p)=>s+Math.max(0,stockOf(p))*p.cost,0),retail=prods.reduce((s,p)=>s+Math.max(0,stockOf(p))*p.price,0);
+  return {prods:prods.length,servs:servs.length,cost,retail,low:prods.filter(p=>level(p)==='low').length,out:prods.filter(p=>level(p)==='out').length,units:prods.reduce((s,p)=>s+Math.max(0,stockOf(p)),0)};}
+const ICON={
+  in:'<path d="M12 5v14M5 12h14"/>',out:'<path d="M5 12h14"/>',hist:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',del:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/>',
+  box:'<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',svc:'<path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.4 7.2 17l.9-5.4L4.2 7.7l5.4-.8z"/>'};
+const ico=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
+function productCard(p,sl,i){
+  const s=stockOf(p),m=Number(p.min||0),lv=level(p),pct=Math.max(4,Math.min(100,m>0?s/(m*3)*100:(s>0?100:0)));const st=sl.get(String(p.id))||{};
+  return `<article class="nm135-pcard lv-${lv}" style="animation-delay:${Math.min(i,12)*0.035}s" data-id="${E(p.id)}">
+    <header><span class="nm135-pico">${ico('box')}</span><div class="nm135-ptitle"><b title="${E(p.name)}">${E(p.name)}</b><small>${E(p.category||'Sin categoría')}${p.active===false?' · Inactivo':''}</small></div><span class="nm135-lv ${LEVEL[lv][1]}">${LEVEL[lv][0]}</span></header>
+    <div class="nm135-pstock"><div><b class="${s<0?'neg':''}">${N(s)}</b><small>en existencia${m?` · mínimo ${N(m)}`:''}</small></div><div class="nm135-gauge"><span style="width:${pct}%"></span>${m>0?`<i style="left:${Math.min(100,100/3)}%" title="Mínimo"></i>`:''}</div></div>
+    <div class="nm135-pnums"><div><small>Precio</small><b>${M(p.price)}</b></div><div><small>Costo</small><b>${M(p.cost)}</b></div><div><small>Margen</small><b class="${margin(p)<15?'warn':''}">${margin(p).toFixed(0)}%</b></div><div><small>Vendido en 30 días</small><b>${N(st.qty30||0)} ${(st.qty30||0)===1?'unidad':'unid.'}</b></div></div>
+    ${p.description?`<p class="nm135-pdesc">${E(p.description)}</p>`:''}
+    <footer>${isAdmin()?`<button type="button" class="nm135-pbtn in" onclick="NM135StockModal('${E(p.id)}','in')">${ico('in')}Entrada</button><button type="button" class="nm135-pbtn" onclick="NM135StockModal('${E(p.id)}','out')">${ico('out')}Salida / ajuste</button>`:''}
+      <span class="sp"></span><button type="button" class="nm135-ibtn" title="Historial" aria-label="Historial de ${E(p.name)}" onclick="NM135StockHistory('${E(p.id)}')">${ico('hist')}</button><button type="button" class="nm135-ibtn" title="Editar" aria-label="Editar ${E(p.name)}" onclick="openBillingProductModal('${E(p.id)}')">${ico('edit')}</button><button type="button" class="nm135-ibtn del" title="Eliminar" aria-label="Eliminar ${E(p.name)}" onclick="deleteBillingProduct('${E(p.id)}')">${ico('del')}</button></footer>
+  </article>`;}
+function serviceCard(p,sl,i){const st=sl.get(String(p.id))||{};
+  return `<article class="nm135-scard" style="animation-delay:${Math.min(i,12)*0.035}s" data-id="${E(p.id)}">
+    <span class="nm135-sico">${ico('svc')}</span>
+    <div class="nm135-sbody"><b>${E(p.name)}</b><small>${E(p.category||'Servicio')}${p.active===false?' · Inactivo':''}</small>${p.description?`<p>${E(p.description)}</p>`:''}
+      <div class="nm135-schips"><span>${N(st.count||0)} ${(st.count||0)===1?'factura':'facturas'} · ${N(st.qty||0)} ${(st.qty||0)===1?'unidad':'unidades'}</span><span>30 días: ${M(st.rev30||0)}</span><span>Total: ${M(st.rev||0)}</span>${st.last?`<span>Último: ${E(st.last)}</span>`:''}</div></div>
+    <div class="nm135-sprice"><b>${M(p.price)}</b><small>${p.cost>0?`Margen ${margin(p).toFixed(0)}%`:'Sin costo directo'}</small>
+      <div class="nm135-sact"><button type="button" class="nm135-ibtn" title="Editar" aria-label="Editar ${E(p.name)}" onclick="openBillingProductModal('${E(p.id)}')">${ico('edit')}</button><button type="button" class="nm135-ibtn del" title="Eliminar" aria-label="Eliminar ${E(p.name)}" onclick="deleteBillingProduct('${E(p.id)}')">${ico('del')}</button></div></div>
+  </article>`;}
+function render(){
+  const el=document.getElementById('billing-tab-content');if(!el)return;
+  const all=(getBillingData().products||[]);const k=kpis(all);const sl=sales();
+  const cats=[...new Set(all.filter(p=>S.view==='table'||p.type===(S.view==='services'?'Servicio':'Producto')).map(p=>p.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  if(S.cat&&!cats.includes(S.cat))S.cat='';
+  const list=filtered(all.filter(p=>S.view==='table'||p.type===(S.view==='services'?'Servicio':'Producto')));
+  const lowList=all.filter(p=>p.type==='Producto'&&p.active!==false&&level(p)!=='ok').sort((a,b)=>stockOf(a)-stockOf(b));
+  const tab=(v,l,n)=>`<button type="button" class="${S.view===v?'active':''}" data-v="${v}">${l}${n!=null?` <span>${n}</span>`:''}</button>`;
+  el.innerHTML=`
+  <div class="nm135-inv-head">
+    <div class="nm135-inv-kpi dark"><small>Valor del inventario</small><b>${M(k.cost)}</b><span>a costo · ${N(k.units)} unidades</span></div>
+    <div class="nm135-inv-kpi"><small>Valor a precio de venta</small><b>${M(k.retail)}</b><span>Ganancia potencial ${M(k.retail-k.cost)}</span></div>
+    <div class="nm135-inv-kpi"><small>Catálogo activo</small><b>${k.prods} <em>productos</em> · ${k.servs} <em>servicios</em></b><span>${all.filter(p=>p.active===false).length} inactivo(s)</span></div>
+    <div class="nm135-inv-kpi ${k.low+k.out?'alert':''}"><small>Alertas de existencia</small><b>${k.low+k.out?N(k.low+k.out)+' <em>producto(s)</em>':'Todo en orden ✓'}</b><span>${k.out} agotado(s) · ${k.low} bajo mínimo</span></div>
+  </div>
+  ${lowList.length?`<div class="nm135-restock"><b>Reposición sugerida</b><div>${lowList.slice(0,8).map(p=>`<button type="button" onclick="${isAdmin()?`NM135StockModal('${E(p.id)}','in')`:`openBillingProductModal('${E(p.id)}')`}"><i class="${level(p)}"></i>${E(p.name)} <small>${N(stockOf(p))}/${N(p.min)}</small></button>`).join('')}${lowList.length>8?`<span>+${lowList.length-8} más</span>`:''}</div></div>`:''}
+  <div class="card nm135-inv-card"><div class="nm135-inv-bar">
+    <div class="nm135-seg" role="tablist">${tab('products','Productos',all.filter(p=>p.type==='Producto').length)}${tab('services','Servicios',all.filter(p=>p.type==='Servicio').length)}${tab('table','Tabla completa')}</div>
+    <div class="nm135-inv-tools"><input id="nm135-inv-q" class="form-control" placeholder="Buscar por nombre, categoría o descripción…" value="${E(S.q)}">
+      <select id="nm135-inv-sort" class="form-select"><option value="name">Orden: nombre</option><option value="sold">Más vendidos (30 d)</option><option value="stock">Menor existencia</option><option value="price">Mayor precio</option></select>
+      <button type="button" class="btn btn-outline btn-sm" id="nm135-inv-csv">CSV</button><button type="button" class="btn btn-olive btn-sm" onclick="openBillingProductModal()">+ Producto / Servicio</button></div>
+  </div>
+  ${cats.length?`<div class="nm135-cats"><button type="button" class="${!S.cat?'active':''}" data-c="">Todas</button>${cats.map(c=>`<button type="button" class="${S.cat===c?'active':''}" data-c="${E(c)}">${E(c)}</button>`).join('')}</div>`:''}
+  <div class="nm135-inv-body">${S.view==='table'?(typeof inventoryTable==='function'?inventoryTable(list):''):
+    list.length?`<div class="${S.view==='services'?'nm135-sgrid':'nm135-pgrid'}">${list.map((p,i)=>S.view==='services'?serviceCard(p,sl,i):productCard(p,sl,i)).join('')}</div>`:
+    `<div class="empty-state"><div class="empty-title">${S.q||S.cat?'Nada coincide con el filtro':S.view==='services'?'Aún no hay servicios':'Aún no hay productos'}</div><div class="empty-text">${S.q||S.cat?'Prueba con otra búsqueda o categoría.':`Crea el primero con “+ Producto / Servicio” y elige el tipo ${S.view==='services'?'Servicio':'Producto'}.`}</div></div>`}</div></div>`;
+  el.querySelectorAll('.nm135-seg [data-v]').forEach(b=>b.onclick=()=>{S.view=b.dataset.v;S.cat='';render()});
+  el.querySelectorAll('.nm135-cats [data-c]').forEach(b=>b.onclick=()=>{S.cat=b.dataset.c;render()});
+  const q=el.querySelector('#nm135-inv-q');let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;const pos=q.selectionStart;render();const n=document.getElementById('nm135-inv-q');n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}},220)};
+  const so=el.querySelector('#nm135-inv-sort');so.value=S.sort;so.onchange=()=>{S.sort=so.value;render()};
+  el.querySelector('#nm135-inv-csv').onclick=csv;
+}
+function csv(){const sl=sales();const q=v=>{v=String(v??'');return /[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=[['Nombre','Tipo','Categoría','Descripción','Precio','Costo','Margen %','Existencia','Mínimo','Estado','Vendidos 30 días','Ingresos 30 días','Vendidos total','Ingresos total','Activo']];
+  (getBillingData().products||[]).forEach(p=>{const st=sl.get(String(p.id))||{};rows.push([p.name,p.type,p.category,p.description,p.price.toFixed(2),p.cost.toFixed(2),margin(p).toFixed(1),p.type==='Servicio'?'':stockOf(p),p.type==='Servicio'?'':p.min,p.type==='Servicio'?'Servicio':LEVEL[level(p)][0],st.qty30||0,(st.rev30||0).toFixed(2),st.qty||0,(st.rev||0).toFixed(2),p.active!==false?'Sí':'No'])});
+  const b=new Blob(['﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`Inventario_NutriMachata_${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},400);}
+
+/* ---------- Ajuste de existencia ---------- */
+window.NM135StockModal=function(id,mode){
+  if(!isAdmin())return notify?.('Solo administración puede ajustar existencias.','warning');
+  const p=(getBillingData().products||[]).find(x=>String(x.id)===String(id));if(!p)return;
+  document.getElementById('nm135-stock-modal')?.remove();const s=stockOf(p);
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm135-stock-modal" style="z-index:10050"><div class="modal" style="max-width:560px"><div class="modal-header"><div><div class="modal-title">${mode==='in'?'Entrada de inventario':'Salida o ajuste'}</div><div class="modal-subtitle">${E(p.name)} · existencia actual <b>${N(s)}</b></div></div><button class="modal-close" type="button" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+  <div class="modal-body"><div class="nm135-mode">${[['in','Entrada','Compra o reposición'],['out','Salida','Uso interno, merma, vencido'],['count','Conteo físico','Fijar la cantidad contada']].map(([k,l,d])=>`<label><input type="radio" name="nm135-mode" value="${k}" ${k===mode?'checked':''}><b>${l}</b><small>${d}</small></label>`).join('')}</div>
+  <div class="form-row" style="margin-top:12px"><div class="form-group"><label for="nm135-qty" id="nm135-qty-l">Cantidad</label><input id="nm135-qty" class="form-control" type="number" min="0" step="1" inputmode="numeric"></div><div class="form-group"><label>Existencia resultante</label><div class="nm135-result" id="nm135-result">${N(s)}</div></div></div>
+  <div class="form-group"><label for="nm135-reason">Motivo <span id="nm135-reason-req"></span></label><input id="nm135-reason" class="form-control" maxlength="160" placeholder="Ej.: compra a proveedor, factura #123"></div>
+  <div class="text-xs text-muted">El movimiento queda registrado en el historial del producto${' '}con el stock anterior y el nuevo.</div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button type="button" class="btn btn-olive" id="nm135-stock-save">Guardar movimiento</button></div></div></div>`);
+  const m=document.getElementById('nm135-stock-modal');const qty=m.querySelector('#nm135-qty');
+  const cur=()=>m.querySelector('[name=nm135-mode]:checked').value;
+  const calc=()=>{const v=Math.round(Number(qty.value||0));const md=cur();const res=md==='in'?s+v:md==='out'?s-v:v;m.querySelector('#nm135-result').textContent=qty.value===''?N(s):N(res);m.querySelector('#nm135-result').classList.toggle('neg',res<0&&qty.value!=='');m.querySelector('#nm135-qty-l').textContent=md==='count'?'Cantidad contada':'Cantidad';m.querySelector('#nm135-reason-req').textContent=md==='in'?'(opcional)':'*';return {v,res,md}};
+  qty.oninput=calc;m.querySelectorAll('[name=nm135-mode]').forEach(r=>r.onchange=calc);calc();setTimeout(()=>qty.focus(),80);
+  m.querySelector('#nm135-stock-save').onclick=async function(){
+    const {v,res,md}=calc();const reason=m.querySelector('#nm135-reason').value.trim();
+    if(qty.value===''||!Number.isFinite(v)||v<0)return notify?.('Escribe una cantidad válida (0 o más).','warning');
+    if(md!=='count'&&v===0)return notify?.('La cantidad debe ser mayor que 0.','warning');
+    if(md!=='in'&&!reason)return notify?.('Escribe el motivo de la salida o del ajuste.','warning');
+    const delta=res-s;if(!delta){m.remove();return notify?.('La existencia no cambia.','info')}
+    if(res<0&&!confirm(`La existencia quedaría en ${res}. ¿Continuar?`))return;
+    const api=window.NMBillingClientAPI;if(!api?.adjustStock)return notify?.('La conexión de Facturación no está lista. Intenta de nuevo.','danger');
+    this.disabled=true;this.textContent='Guardando…';
+    try{await api.adjustStock(p.id,delta,null,md==='in'?'entrada':md==='out'?'salida':'ajuste',reason||(md==='in'?'Entrada de inventario':'Ajuste por conteo físico'));
+      await api.loadBillingFromSupabase(true);m.remove();notify?.(`Existencia de ${p.name}: ${N(s)} → ${N(res)}`,'success');render();
+    }catch(e){console.error('[Inventario v135]',e);notify?.('No se pudo guardar el movimiento: '+(e.message||e),'danger');this.disabled=false;this.textContent='Guardar movimiento'}
+  };
+};
+window.NM135StockHistory=async function(id){
+  const p=(getBillingData().products||[]).find(x=>String(x.id)===String(id));if(!p)return;
+  document.getElementById('nm135-hist-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm135-hist-modal" style="z-index:10050"><div class="modal" style="max-width:760px"><div class="modal-header"><div><div class="modal-title">Historial de inventario</div><div class="modal-subtitle">${E(p.name)} · existencia actual ${N(stockOf(p))}</div></div><button class="modal-close" type="button" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body" id="nm135-hist-body"><div style="padding:24px;text-align:center">Cargando movimientos…</div></div></div></div>`);
+  const body=document.getElementById('nm135-hist-body');
+  try{const rows=await window.NMBillingClientAPI.billingFetch(`movimientos_inventario?producto_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=100`)||[];
+    const inv=getBillingData().invoices||[];const label={venta:'Venta',entrada:'Entrada',salida:'Salida',ajuste:'Ajuste'};
+    body.innerHTML=rows.length?`<div class="nm135-tl">${rows.map(r=>{const up=Number(r.stock_nuevo)>=Number(r.stock_anterior);const f=r.factura_id?inv.find(x=>String(x.id)===String(r.factura_id)):null;return `<div class="nm135-tl-i ${up?'up':'down'}"><i>${up?'+':'−'}${N(r.cantidad)}</i><div><b>${E(label[String(r.tipo||'').toLowerCase()]||r.tipo||'Movimiento')}</b> <small>${E(String(r.created_at||'').slice(0,16).replace('T',' '))}</small><p>${E(r.motivo||'')}${f?` · Factura ${E(f.number)}`:''}</p></div><span>${N(r.stock_anterior)} → <b>${N(r.stock_nuevo)}</b></span></div>`}).join('')}</div>`:'<div class="empty-state"><div class="empty-title">Sin movimientos registrados</div><div class="empty-text">Las ventas, entradas y ajustes aparecerán aquí.</div></div>';
+  }catch(e){body.innerHTML=`<div class="alert alert-danger">No se pudo cargar el historial: ${E(e.message||e)}</div>`}
+};
+const prev=window.renderBillingTab;
+window.renderBillingTab=function(tab,btn){
+  if(tab==='inventory'){const r=prev?.apply(this,arguments);try{render()}catch(e){console.error('[Inventario v135]',e)}return r}
+  return prev?.apply(this,arguments);
+};
+try{renderBillingTab=window.renderBillingTab}catch(_){}
+window.NM135RenderInventory=render;
+/* Categorías existentes como sugerencia al crear o editar (evita "Suplemento" vs "Suplementos"). */
+new MutationObserver(()=>{const c=document.getElementById('prd-category');if(!c||c.getAttribute('list'))return;const cats=[...new Set((getBillingData().products||[]).map(p=>p.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const dl=document.createElement('datalist');dl.id='nm135-prd-cats';dl.innerHTML=cats.map(x=>`<option value="${E(x)}"></option>`).join('');c.after(dl);c.setAttribute('list','nm135-prd-cats');c.setAttribute('autocomplete','off')}).observe(document.body,{childList:true});
+window.NMV135Inventario=true;
+})();
+}catch(nmModuleError){console.error('[NutriMachata] El módulo 70-nm-v135-inventario.js no pudo iniciar:',nmModuleError);}
 
