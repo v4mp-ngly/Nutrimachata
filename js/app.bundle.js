@@ -15959,3 +15959,126 @@ window.NMV136Seguridad=true;
 })();
 }catch(nmModuleError){console.error('[NutriMachata] El módulo 71-nm-v136-seguridad.js no pudo iniciar:',nmModuleError);}
 
+
+/* ===== 72-nm-v137-plantillas-pdf.js ===== */
+try{
+/* NutriMachata v137 · Plantillas PDF de dietas en Supabase Storage
+   Antes: el PDF se partía en "plantillas" ficticias que solo guardaban los primeros 500 caracteres del archivo
+   (no se podían volver a abrir) y "Usar" abría un formulario vacío.
+   Ahora:
+   - El PDF completo se guarda en el bucket privado "plantillas-dietas" (SQL 08_v137). Máx. 10 MB.
+   - Vista previa real del PDF, descarga y eliminación (solo personal clínico).
+   - "Usar con un paciente": adjunta el PDF al expediente del paciente como una dieta (igual que "Adjuntar PDF").
+   - Las referencias antiguas sin archivo se muestran aparte para que puedas borrarlas o volver a subir el PDF. */
+(function(){
+'use strict';
+const BUCKET='plantillas-dietas';
+const MAX=10*1024*1024;
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STAFF=['admin','doctor','doctora','nutricionista'];
+const isStaff=()=>STAFF.includes(String(DB?.currentRole||'').toLowerCase());
+const S={files:[],loaded:false,missing:false,error:''};
+window.NM137Plantillas=S;
+const base=()=>SUPA_URL.replace(/\/$/,'')+'/storage/v1';
+async function hdr(extra){await ensureSupaSession();return {apikey:SUPA_ANON,Authorization:'Bearer '+supaAccessToken(),...(extra||{})}}
+async function req(path,init){const r=await nmFetchTimeout(base()+path,{...init,headers:await hdr(init?.headers)},60000);const t=await r.text();let d=null;try{d=t?JSON.parse(t):null}catch(_){d=t}
+  if(!r.ok){const msg=(d&&(d.message||d.error))||('HTTP '+r.status);const e=new Error(msg);e.status=r.status;e.missing=/bucket not found|not found/i.test(String(msg))&&/bucket/i.test(String(msg));throw e}return d}
+const uid=()=>{try{if(crypto.randomUUID)return crypto.randomUUID()}catch(_){}const b=crypto.getRandomValues(new Uint8Array(16));b[6]=b[6]&15|64;b[8]=b[8]&63|128;const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`};
+const enc=p=>p.split('/').map(encodeURIComponent).join('/');
+function niceName(n){return String(n).replace(/^[0-9a-f-]{36}__/i,'').replace(/_/g,' ').replace(/\.pdf$/i,'')}
+async function list(){
+  try{const r=await req(`/object/list/${BUCKET}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefix:'',limit:1000,offset:0,sortBy:{column:'created_at',order:'desc'}})});
+    S.files=(r||[]).filter(f=>f&&f.name&&/\.pdf$/i.test(f.name)).map(f=>({path:f.name,name:niceName(f.name),size:Number(f.metadata?.size||0),created:f.created_at||f.updated_at||''}));S.missing=false;S.error=''}
+  catch(e){S.files=[];S.missing=e.missing||e.status===404||e.status===400;S.error=e.message}
+  S.loaded=true;return S.files;
+}
+async function signed(path,secs=900){const r=await req(`/object/sign/${BUCKET}/${enc(path)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresIn:secs})});const u=r?.signedURL||r?.signedUrl;if(!u)throw new Error('No se pudo abrir el archivo.');return base()+(u.startsWith('/')?u:'/'+u)}
+function legacy(){try{return (typeof dietTemplates!=='undefined'&&Array.isArray(dietTemplates))?dietTemplates.filter(t=>!t.path):[]}catch(_){return []}}
+const kb=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const fdate=s=>{try{return new Date(s).toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'})}catch(_){return ''}};
+
+function render(){
+  const c=document.getElementById('page-content');if(!c)return;
+  const old=legacy();
+  c.innerHTML=`<div class="nm137-tpl">
+   <div class="nm137-drop" id="nm137-drop" tabindex="0" role="button" aria-label="Subir PDF de plantilla">
+     <div class="nm137-drop-ico">📄</div><b>Arrastra aquí el PDF de tu plantilla</b><span>o haz clic para elegirlo · máximo 10 MB</span>
+     <input type="file" id="pdf-upload" accept="application/pdf,.pdf" hidden>
+     <div class="nm137-prog" id="nm137-prog" hidden><span></span></div>
+   </div>
+   ${S.missing?`<div class="nm136-note warn">Falta activar el almacenamiento de plantillas: ejecuta <b>sql/08_plantillas_y_permisos_v137.sql</b> en Supabase. ${E(S.error)}</div>`:S.error?`<div class="nm136-note warn">No se pudieron cargar las plantillas: ${E(S.error)} <button class="btn btn-outline btn-sm" onclick="NM137ReloadTemplates()">Reintentar</button></div>`:''}
+   <div class="card"><div class="card-header"><div><div class="card-title">Plantillas guardadas</div><div class="card-subtitle">${S.loaded?S.files.length+' archivo(s) en Supabase Storage':'Cargando…'}</div></div></div>
+    <div class="card-body">${!S.loaded?'<div class="empty-state">Cargando plantillas…</div>':S.files.length?`<div class="nm137-grid">${S.files.map((f,i)=>`
+      <article class="nm137-card" style="animation-delay:${Math.min(i,10)*0.04}s"><div class="nm137-thumb" onclick="NM137Preview(${i})" title="Ver"><span>PDF</span></div>
+       <div class="nm137-meta"><b title="${E(f.name)}">${E(f.name)}</b><small>${kb(f.size)} · ${fdate(f.created)}</small></div>
+       <div class="nm137-act"><button class="btn btn-olive btn-sm" onclick="NM137UseTemplate(${i})">Usar con un paciente</button><button class="btn btn-outline btn-sm" onclick="NM137Preview(${i})">Ver</button><button class="btn btn-ghost btn-sm" title="Eliminar" aria-label="Eliminar ${E(f.name)}" onclick="NM137Delete(${i})" style="color:var(--danger)">🗑</button></div>
+      </article>`).join('')}</div>`:`<div class="empty-state"><div class="empty-title">Aún no hay plantillas</div><div class="empty-text">Sube un PDF y podrás adjuntarlo al expediente de cualquier paciente.</div></div>`}</div></div>
+   ${old.length?`<div class="card"><div class="card-header"><div><div class="card-title">Referencias antiguas sin archivo (${old.length})</div><div class="card-subtitle">La versión anterior solo guardaba un fragmento del PDF; no se pueden abrir. Vuelve a subir el PDF original y elimina estas referencias.</div></div><button class="btn btn-outline btn-sm" onclick="NM137ClearLegacy()" style="color:var(--danger)">Eliminar referencias</button></div><div class="card-body"><div class="nm137-legacy">${old.map(t=>`<span>${E(t.name||'PDF')}${t.pageNumber?' · pág. '+t.pageNumber:''}</span>`).join('')}</div></div></div>`:''}
+  </div>`;
+  const drop=c.querySelector('#nm137-drop'),inp=c.querySelector('#pdf-upload');
+  drop.onclick=()=>inp.click();drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();inp.click()}};
+  inp.onchange=()=>{const f=inp.files[0];inp.value='';if(f)upload(f)};
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};drop.ondragleave=()=>drop.classList.remove('over');
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');const f=e.dataTransfer?.files?.[0];if(f)upload(f)};
+}
+async function upload(file){
+  if(!isStaff())return notify('Solo el personal clínico puede subir plantillas.','warning');
+  if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf')return notify('El archivo debe ser un PDF.','warning');
+  if(file.size>MAX)return notify('El PDF supera 10 MB. Comprímelo e inténtalo de nuevo.','warning');
+  const head=new Uint8Array(await file.slice(0,5).arrayBuffer());if(String.fromCharCode(...head)!=='%PDF-')return notify('El archivo no es un PDF válido.','warning');
+  const safe=file.name.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9.-]+/g,'_').slice(0,80);
+  const path=`${uid()}__${safe.endsWith('.pdf')?safe:safe+'.pdf'}`;
+  const prog=document.getElementById('nm137-prog');if(prog){prog.hidden=false;prog.firstElementChild.style.width='35%'}
+  try{await req(`/object/${BUCKET}/${enc(path)}`,{method:'POST',headers:{'Content-Type':'application/pdf','x-upsert':'false','cache-control':'3600'},body:file});
+    if(prog)prog.firstElementChild.style.width='100%';notify('Plantilla guardada en Supabase.','success');await list();render();
+  }catch(e){if(prog)prog.hidden=true;notify(e.missing?'Falta ejecutar el SQL 08_v137 (almacenamiento de plantillas).':'No se pudo subir el PDF: '+e.message,'danger')}
+}
+window.NM137Preview=async function(i){const f=S.files[i];if(!f)return;
+  try{const url=await signed(f.path);document.getElementById('nm137-prev')?.remove();
+    document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm137-prev" style="z-index:10060"><div class="modal" style="max-width:980px;width:96vw"><div class="modal-header"><div><div class="modal-title">${E(f.name)}</div><div class="modal-subtitle">${kb(f.size)}</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body" style="padding:0;height:75vh"><iframe src="${E(url)}" title="${E(f.name)}" style="width:100%;height:100%;border:0"></iframe></div><div class="modal-footer"><a class="btn btn-outline" href="${E(url)}" target="_blank" rel="noopener" download>Descargar</a><button class="btn btn-olive" onclick="this.closest('.modal-overlay').remove();NM137UseTemplate(${i})">Usar con un paciente</button></div></div></div>`)}
+  catch(e){notify('No se pudo abrir la plantilla: '+e.message,'danger')}};
+window.NM137Delete=async function(i){const f=S.files[i];if(!f)return;if(!confirm(`¿Eliminar la plantilla “${f.name}”? Las dietas ya adjuntadas a pacientes no se ven afectadas.`))return;
+  try{await req(`/object/${BUCKET}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefixes:[f.path]})});notify('Plantilla eliminada.','success');await list();render()}catch(e){notify('No se pudo eliminar: '+e.message,'danger')}};
+window.NM137ClearLegacy=function(){if(!confirm('¿Eliminar las referencias antiguas sin archivo? No afecta ningún PDF real.'))return;try{dietTemplates=dietTemplates.filter(t=>t.path);sessionStorage.setItem('dietTemplates',JSON.stringify(dietTemplates))}catch(_){}
+  try{window.NM134SaveAjuste?.('plantillas_pdf',[])}catch(_){}render()};
+function toB64(buf){const b=new Uint8Array(buf);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
+window.NM137UseTemplate=function(i){const f=S.files[i];if(!f)return;
+  const pats=(DB.patients||[]).filter(p=>p.activo!==false).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es'));
+  document.getElementById('nm137-use')?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm137-use" style="z-index:10061"><div class="modal" style="max-width:560px"><div class="modal-header"><div><div class="modal-title">Usar plantilla</div><div class="modal-subtitle">${E(f.name)}</div></div><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div><div class="modal-body">
+   <div class="form-group"><label for="nm137-q">Paciente *</label><input id="nm137-q" class="form-control" list="nm137-pl" placeholder="Escribe el nombre del paciente…" autocomplete="off"><datalist id="nm137-pl">${pats.map(p=>`<option value="${E(p.nombre)}"></option>`).join('')}</datalist></div>
+   <div class="form-group"><label for="nm137-n">Nombre de la dieta *</label><input id="nm137-n" class="form-control" maxlength="120" value="${E(f.name)}"></div>
+   <div class="nm136-note">Se adjunta el PDF completo al expediente del paciente (pestaña Dietas), igual que «Adjuntar PDF».</div></div>
+   <div class="modal-footer"><button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button><button class="btn btn-olive" id="nm137-go">Adjuntar al paciente</button></div></div></div>`);
+  const m=document.getElementById('nm137-use');
+  m.querySelector('#nm137-go').onclick=async function(){
+    const q=m.querySelector('#nm137-q').value.trim().toLowerCase(),nombre=m.querySelector('#nm137-n').value.trim();
+    const p=pats.find(x=>String(x.nombre).trim().toLowerCase()===q);
+    if(!p)return notify('Elige un paciente de la lista.','warning');if(!nombre)return notify('Escribe el nombre de la dieta.','warning');
+    this.disabled=true;this.textContent='Adjuntando…';
+    try{const url=await signed(f.path,300);const r=await fetch(url);if(!r.ok)throw new Error('No se pudo descargar la plantilla.');const b64=toB64(await r.arrayBuffer());
+      const data={paciente_id:p.id,nombre,fecha:new Date().toISOString().slice(0,10),tipoarchivo:'pdf',archivobase64:b64,archivonombreoriginal:f.name+'.pdf',activo:true};
+      const created=await SB.createDieta(data);if(!created?.id)throw new Error('Supabase no confirmó la dieta.');
+      p.dietas=p.dietas||[];p.dietas.push({id:created.id,...data});m.remove();notify(`Plantilla adjuntada a ${p.nombre}.`,'success');
+    }catch(e){notify('No se pudo adjuntar: '+(e.message||e),'danger');this.disabled=false;this.textContent='Adjuntar al paciente'}
+  };
+};
+window.NM137ReloadTemplates=async()=>{S.loaded=false;render();await list();render()};
+/* Reemplaza la pantalla y las funciones anteriores (mismos nombres que usan los botones existentes) */
+const show=async()=>{render();await list();if(currentPage==='diet-templates')render()};
+window.renderDietTemplates=function(){show()};
+window.handlePdfUpload=function(e){const f=e?.target?.files?.[0];if(f)upload(f)};
+window.handlePdfDrop=function(e){e.preventDefault?.();const f=e?.dataTransfer?.files?.[0];if(f)upload(f)};
+window.previewTemplate=function(i){return NM137Preview(i)};
+window.usePdfDietTemplate=function(i){return NM137UseTemplate(i)};
+window.deleteTemplate=function(i){return NM137Delete(i)};
+window.clearAllTemplates=function(){return NM137ClearLegacy()};
+try{renderDietTemplates=window.renderDietTemplates;handlePdfUpload=window.handlePdfUpload;handlePdfDrop=window.handlePdfDrop;previewTemplate=window.previewTemplate;usePdfDietTemplate=window.usePdfDietTemplate;deleteTemplate=window.deleteTemplate;clearAllTemplates=window.clearAllTemplates}catch(_){}
+/* El botón superior "+ Cargar PDF" no hacía nada: ahora abre el selector de archivo */
+const prevTop=window.handleTopAction;
+window.handleTopAction=function(){if(typeof currentPage!=='undefined'&&currentPage==='diet-templates'){const i=document.getElementById('pdf-upload');if(i){i.click();return}}return prevTop?.apply(this,arguments)};
+try{handleTopAction=window.handleTopAction}catch(_){}
+window.NMV137Plantillas=true;
+})();
+}catch(nmModuleError){console.error('[NutriMachata] El módulo 72-nm-v137-plantillas-pdf.js no pudo iniciar:',nmModuleError);}
+
