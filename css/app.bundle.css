@@ -2544,4 +2544,11 @@ body.nm135-bill .nm135-sact{display:flex;gap:6px;justify-content:flex-end;margin
 @media (prefers-reduced-motion:reduce){.nm137-card,.nm137-drop{animation:none;transition:none}}
 @media (max-width:640px){.nm137-grid{grid-template-columns:1fr}}
 .nm137-act .btn-ghost{margin-left:auto;flex:0 0 auto}
+/* v137 · Protección de evaluaciones */
+.nm137-editing{background:#fff7e8;border:1px solid #f0d39b;border-left:4px solid #C47A1A;border-radius:12px;padding:10px 13px;margin-bottom:14px;font-size:12.5px;color:#5a3d0c;line-height:1.5}
+.nm137-loss{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
+.nm137-loss span{background:#f5faee;border:1px solid #d4e8b0;border-radius:12px;padding:9px 6px;text-align:center;font-size:11.5px;color:#5f6f52}
+.nm137-loss b{display:block;font-size:20px;color:#174f0b}
+#nm137-dlg .is-invalid{border-color:#C44A2A;box-shadow:0 0 0 3px rgba(196,74,42,.15)}
+@media (max-width:520px){.nm137-loss{grid-template-columns:repeat(2,1fr)}}
 
