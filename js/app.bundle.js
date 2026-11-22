@@ -3396,8 +3396,9 @@ async function finishWizard() {
 
       // 3. Evaluación inicial es secundaria: si falla, paciente + historia NO se pierden.
       let nmEvalPending = false;
+      let nmEvalPayload = null;
       if (peso > 0 && !wizData._nmEvalSaved) {
-        try { await supa('evaluaciones', 'POST', {
+        try { const nmEvRes = await supa('evaluaciones', 'POST', nmEvalPayload = {
           paciente_id:         realId,
           fecha: today, peso, talla, imc,
           presion:             wizData.presion     || newPatient.presion || '—',
@@ -3412,8 +3413,17 @@ async function finishWizard() {
           muslo:               wizData.muslo       || null,
           porcentaje_grasa:    wizData.grasa       || null,
           frecuencia_cardiaca: wizData.fc          || null,
-        }); wizData._nmEvalSaved = true; } catch (evalErr) { nmEvalPending = true; console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr); }
-      }
+        }); wizData._nmEvalSaved = true;
+          /* v137: la evaluación local SOLO se muestra si Supabase la confirmó (antes se mostraba aunque fallara y
+             desaparecía al recargar: caso Nairobi 31-10-2026). */
+          const nmEvRow = Array.isArray(nmEvRes) ? nmEvRes[0] : nmEvRes;
+          newPatient.evaluaciones = [{ ...nmEvalPayload, id: nmEvRow?.id || ('pend-' + Date.now()), grasa: nmEvalPayload.porcentaje_grasa, fc: nmEvalPayload.frecuencia_cardiaca }];
+        } catch (evalErr) {
+          nmEvalPending = true; newPatient.evaluaciones = [];
+          try { sessionStorage.setItem('nm137_eval_pendiente_' + realId, JSON.stringify(nmEvalPayload)); } catch (_) {}
+          console.warn('Paciente e historia guardados; evaluación inicial pendiente:', evalErr);
+        }
+      } else if (!(peso > 0)) { newPatient.evaluaciones = []; }
 
       // v84: no crear cuentas Auth desde la sesión administrativa del navegador.
       // El autorregistro público crea/vincula el acceso sin reemplazar la sesión del staff.
@@ -3457,6 +3467,7 @@ async function finishWizard() {
           <div style="font-size:14px;opacity:0.8">${newPatient.nombre}</div>
         </div>
         <div class="card" style="padding:24px;margin-bottom:16px">
+          <div id="nm137-eval-pend" data-pid="${newPatient.id}"></div>
           <div id="nm136-portal-card" data-pid="${newPatient.id}" data-email="${autoEmail}"><!-- v136: el acceso real al portal se crea aquí (antes se mostraba una contraseña que no existía en Supabase Auth) --></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-olive" style="flex:1" onclick="navigate('historias')">Ver Historias Clínicas</button>
@@ -3466,6 +3477,7 @@ async function finishWizard() {
         </div>
       </div>
     `;  try { window.NM136PortalCard?.(document.getElementById('nm136-portal-card')); } catch (_) {}
+  try { window.NM137EvalPendiente?.(document.getElementById('nm137-eval-pend')); } catch (_) {}
 }
 
 function downloadHistoriaClinica(patientId) {
@@ -16081,4 +16093,198 @@ try{handleTopAction=window.handleTopAction}catch(_){}
 window.NMV137Plantillas=true;
 })();
 }catch(nmModuleError){console.error('[NutriMachata] El módulo 72-nm-v137-plantillas-pdf.js no pudo iniciar:',nmModuleError);}
+
+
+/* ===== 73-nm-v137-etiquetas-formulario.js ===== */
+try{
+/* NutriMachata v137 · Etiquetas de formulario siempre conectadas a su campo
+   Chrome avisaba "Incorrect use of <label for=FORM_ELEMENT>" (3 nodos): algunas pantallas vuelven a
+   dibujar solo el campo (select de paciente, localidad, etc.) y la etiqueta quedaba apuntando a un ID
+   que ya no existe. El observador anterior (js/11) solo revisaba lo recién agregado, no las etiquetas
+   que ya estaban en pantalla.
+   Ahora, en el mismo ciclo en que cambia la pantalla (antes de pintarse), cada <label for> se revisa:
+   - si su campo existe y es un campo real (input/select/textarea…): no se toca;
+   - si no: se conecta al campo de su mismo grupo, o se le quita el "for" (queda como texto).
+   No cambia estilos, textos ni funciones. Diagnóstico manual en consola: NM137Etiquetas() */
+(function(){
+'use strict';
+const OK=/^(INPUT|SELECT|TEXTAREA|BUTTON|METER|OUTPUT|PROGRESS)$/;
+let seq=0;
+function target(label){
+  const own=label.querySelector('input:not([type="hidden"]),select,textarea');if(own)return own;
+  const box=label.closest('.form-group,.radio-card,.checkbox-pill,.form-row>div')||label.parentElement;
+  return box?.querySelector?.('input:not([type="hidden"]),select,textarea')||null;
+}
+function fix(){
+  const out=[];
+  document.querySelectorAll('label[for]').forEach(label=>{
+    const id=label.getAttribute('for');const el=id?document.getElementById(id):null;
+    if(el&&OK.test(el.tagName))return;
+    const f=target(label);
+    if(f){if(!f.id)f.id='nm137-f-'+(++seq);label.setAttribute('for',f.id);out.push({antes:id,ahora:f.id})}
+    else{label.removeAttribute('for');out.push({antes:id,ahora:null})}
+  });
+  return out;
+}
+window.NM137Etiquetas=function(){const r=fix();console.table(r.length?r:[{estado:'Todas las etiquetas están conectadas'}]);return r};
+function install(){
+  fix();
+  new MutationObserver(()=>fix()).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['id','for']});
+}
+if(document.body)install();else document.addEventListener('DOMContentLoaded',install,{once:true});
+})();
+}catch(nmModuleError){console.error('[NutriMachata] El módulo 73-nm-v137-etiquetas-formulario.js no pudo iniciar:',nmModuleError);}
+
+
+/* ===== 74-nm-v137-proteccion-evaluaciones.js ===== */
+try{
+/* NutriMachata v137 · Protección de evaluaciones e historial clínico
+   Reporte: "se me borran evaluaciones" (Nairobi Carolina Guerrero Polo, evaluación del 31-10-2026).
+   Hay tres caminos en la app por los que una evaluación anterior puede dejar de verse; los tres se cierran aquí:
+   1. EDITAR usada como NUEVA: si desde "Editar" se cambia la fecha (p. ej. a hoy) y se guarda, se SOBRESCRIBE
+      la evaluación anterior. Ahora el formulario lo dice claramente y, si cambias la fecha, pregunta:
+      "Guardar como NUEVA (conserva la anterior)" — opción por defecto — o "Cambiar la fecha de esta".
+   2. ELIMINAR PACIENTE: borraba la ficha con todas sus evaluaciones, dietas e historia (p. ej. al limpiar una ficha
+      duplicada). Ahora muestra exactamente cuántos registros se perderían, ofrece DESACTIVAR (no borra nada)
+      y para borrar de verdad pide escribir ELIMINAR. Solo administración.
+   3. Ficha duplicada (registro público + alta en consulta): al crear un paciente se avisa si ya existe otro con el
+      mismo nombre, cédula o correo, para que la evaluación nueva no quede en una ficha distinta.
+   Además, sql/11b guarda en Supabase una copia de cada evaluación/dieta/historia/paciente ANTES de modificarla o
+   borrarla (papelera clínica), para poder recuperarla. */
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fdate=s=>{if(!s)return '—';const [y,m,d]=String(s).slice(0,10).split('-');return d&&m&&y?`${d}/${m}/${y}`:String(s)};
+const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const isAdmin=()=>String(DB?.currentRole||'').toLowerCase()==='admin';
+function dialog({title,html,buttons}){
+  return new Promise(res=>{
+    document.getElementById('nm137-dlg')?.remove();
+    document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay open" id="nm137-dlg" style="z-index:10080"><div class="modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="nm137-dlg-t"><div class="modal-header"><div class="modal-title" id="nm137-dlg-t">${E(title)}</div><button class="modal-close" data-v="" aria-label="Cerrar">×</button></div><div class="modal-body">${html}</div><div class="modal-footer">${buttons.map(b=>`<button class="btn ${b.cls||'btn-outline'}" data-v="${E(b.v)}">${E(b.t)}</button>`).join('')}</div></div></div>`);
+    const m=document.getElementById('nm137-dlg');
+    m.addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;const v=b.dataset.v;if(v==='__del'){const inp=m.querySelector('#nm137-confirm');if(String(inp?.value||'').trim().toUpperCase()!=='ELIMINAR'){inp?.focus();inp?.classList.add('is-invalid');return}}m.remove();res(v||null)});
+    setTimeout(()=>m.querySelector('.btn-olive,.btn-danger,[data-v]:not([data-v=""])')?.focus(),30);
+  });
+}
+
+/* ---------- 1. Editar evaluación: nunca sobrescribir por error ---------- */
+const prevEdit=window.editEvaluacion;
+if(typeof prevEdit==='function'){
+  const wrapped=function(patientId,evalId){
+    const r=prevEdit.apply(this,arguments);
+    try{
+      const p=DB.patients.find(x=>String(x.id)===String(patientId));const ev=(p?.evaluaciones||[]).find(e=>String(e.id)===String(evalId));
+      const body=document.getElementById('eval-modal-body');
+      if(body&&ev&&!body.querySelector('.nm137-editing')){
+        body.dataset.nm137Fecha=String(ev.fecha||'').slice(0,10);
+        const t=document.querySelector('#modal-evaluation .modal-title');if(t)t.textContent='Editar evaluación del '+fdate(ev.fecha);
+        body.insertAdjacentHTML('afterbegin',`<div class="nm137-editing" role="note"><b>Estás EDITANDO la evaluación del ${E(fdate(ev.fecha))}.</b> Los cambios reemplazan esos datos. Para registrar una consulta nueva usa «+ Nueva evaluación».</div>`);
+      }
+    }catch(_){}
+    return r;
+  };
+  window.editEvaluacion=wrapped;try{editEvaluacion=wrapped}catch(_){}
+}
+const prevSave=window.saveEvaluation;
+if(typeof prevSave==='function'){
+  const guarded=async function(){
+    const idEl=document.getElementById('eval-id'),body=document.getElementById('eval-modal-body');
+    const orig=body?.dataset?.nm137Fecha||'';const now=document.getElementById('eval-fecha')?.value||'';
+    if(idEl&&idEl.value&&orig&&now&&now!==orig){
+      const v=await dialog({title:'¿Nueva evaluación o cambiar la fecha?',
+        html:`<p style="margin:0 0 10px">Estás editando la evaluación del <b>${E(fdate(orig))}</b> y cambiaste la fecha a <b>${E(fdate(now))}</b>.</p><div class="nm136-note">Si la guardas como <b>nueva</b>, la evaluación del ${E(fdate(orig))} se conserva y el historial queda completo. Si cambias la fecha, esa evaluación deja de existir en su fecha original.</div>`,
+        buttons:[{t:'Cancelar',v:''},{t:'Cambiar la fecha de esta',v:'move'},{t:'Guardar como NUEVA',v:'new',cls:'btn-olive'}]});
+      if(!v)return false;
+      if(v==='new'){idEl.remove();delete body.dataset.nm137Fecha;body.querySelector('.nm137-editing')?.remove();const t=document.querySelector('#modal-evaluation .modal-title');if(t)t.textContent='Nueva Evaluación Nutricional'}
+    }
+    const r=await prevSave.apply(this,arguments);
+    return r;
+  };
+  window.saveEvaluation=guarded;try{saveEvaluation=guarded}catch(_){}
+}
+const prevOpen=window.openEvalModal;
+if(typeof prevOpen==='function'){const w=function(){const r=prevOpen.apply(this,arguments);try{const b=document.getElementById('eval-modal-body');if(b)delete b.dataset.nm137Fecha;const t=document.querySelector('#modal-evaluation .modal-title');if(t)t.textContent='Nueva Evaluación Nutricional'}catch(_){}return r};window.openEvalModal=w;try{openEvalModal=w}catch(_){}}
+
+/* ---------- 2. Eliminar paciente: mostrar lo que se pierde y ofrecer desactivar ---------- */
+async function countOf(table,pid){try{const r=await supa(`${table}?paciente_id=eq.${encodeURIComponent(pid)}&select=id`,'GET');return Array.isArray(r)?r.length:0}catch(_){return null}}
+const safeDelete=async function(id){
+  const p=(DB.patients||[]).find(x=>String(x.id)===String(id));if(!p)return;
+  if(!isAdmin())return notify('Solo administración puede eliminar pacientes.','warning');
+  const [ev,di,fa,ci]=await Promise.all(['evaluaciones','dietas','facturas','citas'].map(t=>countOf(t,id)));
+  const n=v=>v==null?'?':v;
+  const v=await dialog({title:'Eliminar paciente',
+    html:`<p style="margin:0 0 10px"><b>${E(p.nombre)}</b></p>
+      <div class="nm137-loss"><span><b>${n(ev)}</b> evaluaciones</span><span><b>${n(di)}</b> dietas</span><span><b>${n(fa)}</b> facturas</span><span><b>${n(ci)}</b> citas</span></div>
+      <div class="nm136-note warn">Eliminar borra la ficha y su historial clínico. Si es una ficha duplicada, primero revisa que sus evaluaciones estén también en la otra ficha.<br><b>Recomendado: Desactivar</b> — deja de aparecer como activo y no se pierde nada.</div>
+      <div class="form-group" style="margin-top:12px"><label for="nm137-confirm">Para eliminar definitivamente escribe ELIMINAR</label><input id="nm137-confirm" class="form-control" autocomplete="off"></div>`,
+    buttons:[{t:'Cancelar',v:''},{t:'Eliminar definitivamente',v:'__del',cls:'btn-danger'},{t:'Desactivar (recomendado)',v:'off',cls:'btn-olive'}]});
+  if(!v)return;
+  try{
+    if(v==='off'){await SB.updatePaciente(id,{activo:false,updated_at:new Date().toISOString()});p.activo=false;notify(`${p.nombre} quedó desactivado. Su historial se conserva.`,'success')}
+    else{await SB.deletePaciente(id);DB.patients=DB.patients.filter(x=>String(x.id)!==String(id));notify('Paciente eliminado','success')}
+    if(typeof currentPage!=='undefined'&&currentPage==='patients'&&typeof renderPatients==='function')renderPatients();
+  }catch(e){notify('No se pudo completar: '+(e?.message||e),'danger')}
+};
+window.deletePatient=safeDelete;try{deletePatient=safeDelete}catch(_){}
+/* El botón de la lista usaba confirm() del navegador antes de llamar a deletePatient: se evita la doble pregunta. */
+document.addEventListener('click',e=>{const b=e.target.closest?.('button[onclick*="deletePatient("]');if(!b)return;const m=String(b.getAttribute('onclick')).match(/deletePatient\('([^']+)'\)/);if(!m)return;e.preventDefault();e.stopImmediatePropagation();safeDelete(m[1])},true);
+
+/* ---------- 3. Aviso de ficha duplicada al crear paciente ---------- */
+function findDup(nombre,cedula,email){
+  const n=norm(nombre),c=String(cedula||'').replace(/\D/g,''),m=norm(email);
+  return (DB.patients||[]).find(p=>(n&&norm(p.nombre)===n)||(c.length>=6&&String(p.cedula||'').replace(/\D/g,'')===c)||(m&&!/@paciente\.com$/.test(m)&&norm(p.email)===m));
+}
+window.NM137FindDuplicate=findDup;
+const prevCreate=SB&&SB.createPaciente;
+if(typeof prevCreate==='function'&&!SB.__nm137dup){
+  SB.__nm137dup=true;
+  SB.createPaciente=async function(data){
+    // Solo personal con sesión dentro de la app (el registro público no tiene DB.patients cargado).
+    if(DB?.currentUser&&String(DB.currentRole||'')!=='patient'){
+      const d=findDup(data?.nombre,data?.cedula,data?.email);
+      if(d){
+        const v=await dialog({title:'Este paciente ya existe',
+          html:`<p style="margin:0 0 10px">Ya hay una ficha de <b>${E(d.nombre)}</b>${d.cedula?` (cédula ${E(d.cedula)})`:''} con ${(d.evaluaciones||[]).length} evaluación(es).</p><div class="nm136-note warn">Crear otra ficha separa su historial: la evaluación nueva quedaría en una ficha distinta y la anterior parecería "borrada".</div>`,
+          buttons:[{t:'Crear de todas formas',v:'create'},{t:'Abrir la ficha existente',v:'open',cls:'btn-olive'}]});
+        if(v!=='create'){
+          try{document.querySelectorAll('.modal-overlay.open').forEach(m=>{if(m.id!=='nm137-dlg')m.classList.remove('open')})}catch(_){}
+          try{navigate('paciente-'+d.id)}catch(_){}
+          const err=new Error('Se abrió la ficha existente de '+d.nombre+'; no se creó un duplicado.');err.nm137Dup=true;throw err;
+        }
+      }
+    }
+    return prevCreate.apply(this,arguments);
+  };
+}
+/* ---------- 4. Evaluación inicial del asistente que NO llegó a Supabase ---------- */
+const PK='nm137_eval_pendiente_';
+async function retryInitial(pid){
+  const raw=sessionStorage.getItem(PK+pid);if(!raw)return true;const data=JSON.parse(raw);
+  // Antes de reenviar se comprueba si ya existe (respuesta perdida): nunca se duplica.
+  const q=`evaluaciones?paciente_id=eq.${encodeURIComponent(pid)}&fecha=eq.${encodeURIComponent(data.fecha)}&peso=eq.${encodeURIComponent(data.peso)}&select=*`;
+  let row=(await supa(q,'GET')||[])[0];
+  if(!row){const r=await supa('evaluaciones','POST',data);row=Array.isArray(r)?r[0]:r}
+  if(!row?.id)throw new Error('Supabase no confirmó la evaluación');
+  sessionStorage.removeItem(PK+pid);
+  const p=(DB.patients||[]).find(x=>String(x.id)===String(pid));
+  if(p){p.evaluaciones=p.evaluaciones||[];if(!p.evaluaciones.some(e=>String(e.id)===String(row.id)))p.evaluaciones.push({...data,...row,grasa:row.porcentaje_grasa??data.porcentaje_grasa,fc:row.frecuencia_cardiaca??data.frecuencia_cardiaca})}
+  return true;
+}
+window.NM137EvalPendiente=function(el){
+  if(!el)return;const pid=el.dataset.pid;if(!pid||!sessionStorage.getItem(PK+pid)){el.innerHTML='';return}
+  el.innerHTML=`<div class="nm137-editing" role="alert" style="margin-bottom:16px"><b>La evaluación inicial NO se guardó en Supabase</b> (falló la conexión). No imprimas reportes todavía: al recargar no aparecería.<div style="margin-top:8px"><button class="btn btn-olive btn-sm" type="button">Guardar evaluación inicial ahora</button></div></div>`;
+  el.querySelector('button').onclick=async function(){this.disabled=true;this.textContent='Guardando…';
+    try{await retryInitial(pid);el.innerHTML='<div class="nm136-note ok">✓ Evaluación inicial guardada y verificada en Supabase.</div>';notify('Evaluación inicial guardada.','success')}
+    catch(e){this.disabled=false;this.textContent='Reintentar';notify('Todavía no se pudo guardar: '+(e?.message||e),'danger')}};
+};
+// Reintento automático al volver la conexión o al recargar datos
+let busy=false;
+async function retryAll(){if(busy)return;busy=true;try{const keys=[];for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith(PK))keys.push(k)}
+  for(const k of keys){try{await retryInitial(k.slice(PK.length));notify('Se guardó una evaluación inicial que estaba pendiente.','success')}catch(_){}}}finally{busy=false}}
+window.addEventListener('online',()=>setTimeout(retryAll,1500));
+setInterval(()=>{if(DB?.currentUser&&navigator.onLine!==false)retryAll()},120000);
+window.NM137RetryInitialEvals=retryAll;
+window.NMV137Proteccion=true;
+})();
+}catch(nmModuleError){console.error('[NutriMachata] El módulo 74-nm-v137-proteccion-evaluaciones.js no pudo iniciar:',nmModuleError);}
 
